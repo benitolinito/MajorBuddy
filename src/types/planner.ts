@@ -72,3 +72,14 @@ export interface PlannerState {
   plans: PlannerPlan[];
   config?: PlannerConfig;
 }
+
+export type CourseDropSource = {
+  yearId: string;
+  termId: string;
+  courseId?: string;
+};
+
+export type CourseDropOptions = {
+  targetIndex?: number;
+  source?: CourseDropSource;
+};

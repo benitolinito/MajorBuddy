@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { getTagColorClasses } from '@/lib/tagColors';
 
 interface CourseCatalogProps {
   courses: Course[];
@@ -218,6 +219,8 @@ export const CourseCatalog = ({
                 draggable
                 onDragStart={(e) => {
                   e.dataTransfer.setData('course', JSON.stringify(course));
+                  e.dataTransfer.setData('course-source', '');
+                  e.dataTransfer.effectAllowed = 'copy';
                   onDragStart(course);
                 }}
                 className="group relative bg-card border border-border rounded-lg p-3 cursor-grab hover:shadow-md hover:border-primary/30 transition-all active:cursor-grabbing"
@@ -250,13 +253,13 @@ export const CourseCatalog = ({
                     <Badge
                       key={plan.id}
                       variant="outline"
-                      className={plan.type === 'major' ? 'border-primary text-primary' : 'border-amber-500 text-amber-700 dark:text-amber-100'}
+                      className={`text-[11px] font-medium ${getTagColorClasses(plan.name)}`}
                     >
                       {plan.type === 'major' ? 'Major' : 'Minor'} • {plan.name}
                     </Badge>
                   ))}
                   {course.distributives.map((dist) => (
-                    <Badge key={dist} variant="secondary" className="text-xs">
+                    <Badge key={dist} variant="outline" className={`text-[11px] font-medium ${getTagColorClasses(dist)}`}>
                       {dist}
                     </Badge>
                   ))}
