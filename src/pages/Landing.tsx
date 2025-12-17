@@ -92,6 +92,7 @@ const seoCopy = [
   "Whether you plan to double major, accelerate graduation, take a mid-degree internship, or tack on a certificate, MajorBuddy shows the trade-offs at a glance. Historical versions are saved in the browser, no login is required to get started, and the experience is optimized for mobile so you can tweak the plan while waiting for advising appointments or class registration windows to open.",
 ] as const;
 
+const showMarketingSections = true;
 const Landing = () => {
   const navigate = useNavigate();
   const [authBusy, setAuthBusy] = useState(false);
@@ -269,6 +270,7 @@ const Landing = () => {
           </section>
         </div>
 
+        {showMarketingSections && (
         <section id="features" className="mx-auto w-full max-w-6xl px-6 py-16">
           <p className="text-sm font-semibold uppercase tracking-[0.25rem] text-primary">Why students choose MajorBuddy</p>
           <h2 className="mt-3 text-3xl font-semibold text-foreground sm:text-4xl">
@@ -292,7 +294,9 @@ const Landing = () => {
             ))}
           </div>
         </section>
+        )}
 
+        {showMarketingSections && (
         <section className="bg-muted/30 py-16" id="workflow">
           <div className="mx-auto flex max-w-5xl flex-col gap-8 px-6">
             <header className="space-y-2 text-center">
@@ -322,43 +326,9 @@ const Landing = () => {
             </ol>
           </div>
         </section>
+        )}
 
-        <section id="testimonials" className="mx-auto w-full max-w-5xl px-6 py-16">
-          <article className="rounded-3xl border border-border bg-card/90 p-6 shadow-lg">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.3rem] text-primary">What students are saying</p>
-                <h2 className="mt-1 text-2xl font-semibold text-foreground">“It finally feels like my degree plan lives in one place.”</h2>
-              </div>
-              <CheckCircle2 className="h-10 w-10 text-primary" />
-            </div>
-            <p className="mt-4 text-base text-muted-foreground">
-              “My advisor always wanted spreadsheets, but I kept tinkering in notebooks. MajorBuddy gives me a clean, colorful canvas to try different minor options and instantly export the winning version. I brought it to my last advising appointment and we finalized an entire year in ten minutes.”
-            </p>
-            <p className="mt-4 text-sm font-medium text-foreground">– Camila R., Applied Math & Economics, Class of 2026</p>
-          </article>
-        </section>
-
-        <section id="faq" className="bg-background/60 py-16">
-          <div className="mx-auto grid max-w-6xl gap-10 px-6 lg:grid-cols-[1fr,1fr]">
-            <div>
-              <p className="text-xs uppercase tracking-[0.4rem] text-muted-foreground">Questions</p>
-              <h2 className="mt-2 text-3xl font-semibold text-foreground">Frequently asked about MajorBuddy.</h2>
-              <p className="mt-2 text-base text-muted-foreground">
-                We built the platform with students and advisors, so the roadmap reflects real-world planning headaches.
-              </p>
-            </div>
-            <dl className="space-y-6">
-              {faqs.map(({ question, answer }) => (
-                <div key={question} className="rounded-2xl border border-border bg-card/70 p-5 shadow-sm backdrop-blur">
-                  <dt className="text-lg font-semibold text-foreground">{question}</dt>
-                  <dd className="mt-2 text-base text-muted-foreground">{answer}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        </section>
-
+        {showMarketingSections && (
         <section id="about" className="border-t border-border/50 bg-card/30 py-16">
           <div className="mx-auto flex max-w-5xl flex-col gap-6 px-6">
             <h2 className="text-3xl font-semibold text-foreground">Purpose-built for discoverable degree planning.</h2>
@@ -369,6 +339,7 @@ const Landing = () => {
             ))}
           </div>
         </section>
+        )}
       </main>
     </>
   );
