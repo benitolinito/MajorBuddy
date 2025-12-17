@@ -1,13 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="gradDegree" x1="0%" x2="100%" y1="0%" y2="100%">
-      <stop offset="0%" stop-color="#1d4ed8" />
-      <stop offset="100%" stop-color="#22d3ee" />
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="12" fill="url(#gradDegree)" />
-  <path d="M12 28L32 18l20 10-20 10-20-10z" fill="#f8fafc"/>
-  <path d="M22 32v9.5c0 5.246 4.477 9.5 10 9.5s10-4.254 10-9.5V32" fill="none" stroke="#f8fafc" stroke-width="4" stroke-linecap="round"/>
-  <circle cx="52" cy="33" r="4" fill="#f8fafc"/>
-  <path d="M52 37v10" stroke="#f8fafc" stroke-width="3" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24">
+  <rect width="24" height="24" rx="6" fill="#3b82f6" />
+  <g
+    transform="translate(12 12) scale(0.82) translate(-12 -12)"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path
+      d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"
+    />
+    <path d="M22 10v6" />
+    <path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5" />
+  </g>
 </svg>

@@ -25,7 +25,3 @@ dist-ssr
 *.sw?
 
 agents.md
-
-# Environment variables
-.env/*
-!.env/.env.example

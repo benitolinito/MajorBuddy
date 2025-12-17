@@ -1,7 +1,19 @@
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { AcademicYear, Course, PlannerPlan, CourseDropOptions } from '@/types/planner';
 import { TermCard } from './TermCard';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
 
 interface YearSectionProps {
   year: AcademicYear;
@@ -11,21 +23,54 @@ interface YearSectionProps {
   onDropCourse: (yearId: string, termId: string, course: Course, options?: CourseDropOptions) => void;
   onAddTerm: () => void;
   onRemoveTerm: (termId: string) => void;
+  onRemoveYear: () => void;
+  canRemoveYear: boolean;
 }
 
-export const YearSection = ({ 
-  year, 
+export const YearSection = ({
+  year,
   getTermCredits,
   plans,
-  onRemoveCourse, 
+  onRemoveCourse,
   onDropCourse,
   onAddTerm,
   onRemoveTerm,
+  onRemoveYear,
+  canRemoveYear,
 }: YearSectionProps) => {
   return (
-    <section className="mb-8">
-      <div className="flex items-baseline gap-3 mb-4">
+    <section className="group mb-8">
+      <div className="mb-4 flex items-center gap-2">
         <h3 className="text-xl font-semibold text-foreground">{year.name}</h3>
+        {canRemoveYear && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "text-muted-foreground opacity-0 transition hover:text-destructive hover:bg-destructive/10",
+                  "group-hover:opacity-100 focus-visible:opacity-100",
+                )}
+              >
+                <Trash2 className="h-4 w-4 mr-1.5" />
+                Remove
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove {year.name}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will delete every term and course scheduled within {year.name}. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep year</AlertDialogCancel>
+                <AlertDialogAction onClick={onRemoveYear}>Remove year</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
       
       <div className="flex gap-4">

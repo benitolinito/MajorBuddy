@@ -24,6 +24,7 @@ const Index = () => {
     removeTerm,
     addTerm,
     addYear,
+    removeYear,
     getTermCredits,
     stats,
     reset,
@@ -54,6 +55,7 @@ const Index = () => {
   const [showExport, setShowExport] = useState(false);
   const userLabel = user?.displayName || user?.email || undefined;
   const cloudBusy = cloudSaving || cloudLoading;
+  const canRemoveYear = state.years.length > 1;
 
   const handleDragStart = (course: Course) => {
     setDraggedCourse(course);
@@ -156,21 +158,23 @@ const Index = () => {
             
             <ResizablePanelGroup direction="horizontal" className="flex-1">
               <ResizablePanel minSize={55}>
-                <ScrollArea className="h-full p-6">
-                  <div className="max-w-4xl">
+                <ScrollArea className="h-full px-6 py-6">
+                  <div className="w-max min-w-full space-y-8 pr-6">
                     {state.years.map((year) => (
-                <YearSection
-                  key={year.id}
-                  year={year}
-                  getTermCredits={(termId) => getTermCredits(year.id, termId)}
-                  plans={state.plans}
-                  onRemoveCourse={(termId, courseId) => removeCourse(year.id, termId, courseId)}
-                  onDropCourse={handleDropCourse}
-                  onAddTerm={() => addTerm(year.id)}
+                      <YearSection
+                        key={year.id}
+                        year={year}
+                        getTermCredits={(termId) => getTermCredits(year.id, termId)}
+                        plans={state.plans}
+                        onRemoveCourse={(termId, courseId) => removeCourse(year.id, termId, courseId)}
+                        onDropCourse={handleDropCourse}
+                        onAddTerm={() => addTerm(year.id)}
                         onRemoveTerm={(termId) => removeTerm(year.id, termId)}
-                />
+                        onRemoveYear={() => removeYear(year.id)}
+                        canRemoveYear={canRemoveYear}
+                      />
                     ))}
-                    <div className="mt-4 flex">
+                    <div className="flex pt-2">
                       <Button
                         variant="outline"
                         className="border-dashed"
