@@ -126,7 +126,7 @@ export const CourseCatalog = ({
   };
 
   return (
-    <aside className="w-72 bg-card border-r border-border flex flex-col h-screen sticky top-0">
+    <aside className="bg-card border-r border-border flex flex-col h-screen sticky top-0 min-w-[260px] max-w-full">
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2">
