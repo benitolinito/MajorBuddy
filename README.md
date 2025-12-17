@@ -9,6 +9,12 @@ npm install
 npm run dev
 ```
 
+### Environment variables
+
+1. Copy `.env/.env.example` to `.env/.env.local`.
+2. Fill in the file with your Firebase project settings (the keys must keep the `VITE_` prefix).
+3. Restart `npm run dev` so Vite reloads the updated env variables.
+
 ## Scripts
 
 - `npm run dev` - start the Vite dev server
