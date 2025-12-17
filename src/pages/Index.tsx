@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CourseCatalog } from '@/components/CourseCatalog';
 import { PlannerHeader } from '@/components/PlannerHeader';
 import { YearSection } from '@/components/YearSection';
@@ -7,6 +7,8 @@ import { usePlanner } from '@/hooks/usePlanner';
 import { useCloudPlanner } from '@/hooks/useCloudPlanner';
 import { Course } from '@/types/planner';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { PlannerSetupDialog } from '@/components/PlannerSetupDialog';
+import { PlannerConfig } from '@/types/planner';
 
 const Index = () => {
   const {
@@ -18,6 +20,8 @@ const Index = () => {
     stats,
     reset,
     applySnapshot,
+    configurePlanner,
+    hasConfig,
   } = usePlanner();
 
   const { user, cloudStatus, cloudSaving, cloudLoading, signIn, signOut } = useCloudPlanner({
@@ -26,6 +30,7 @@ const Index = () => {
   });
 
   const [draggedCourse, setDraggedCourse] = useState<Course | null>(null);
+  const [showSetup, setShowSetup] = useState(!hasConfig);
   const userLabel = user?.displayName || user?.email || undefined;
   const cloudBusy = cloudSaving || cloudLoading;
 
@@ -38,11 +43,27 @@ const Index = () => {
     setDraggedCourse(null);
   };
 
+  const handleSaveSetup = (config: PlannerConfig) => {
+    configurePlanner(config);
+    setShowSetup(false);
+  };
+
+  useEffect(() => {
+    setShowSetup(!hasConfig);
+  }, [hasConfig]);
+
   return (
     <div 
       className="min-h-screen bg-background flex"
       onDragEnd={() => setDraggedCourse(null)}
     >
+      <PlannerSetupDialog
+        open={showSetup}
+        onClose={hasConfig ? () => setShowSetup(false) : undefined}
+        onSave={handleSaveSetup}
+        initialConfig={state.config ?? null}
+      />
+
       <CourseCatalog 
         courses={state.courseCatalog} 
         onDragStart={handleDragStart}
@@ -67,14 +88,15 @@ const Index = () => {
           <ScrollArea className="flex-1 p-6">
             <div className="max-w-4xl">
               {state.years.map((year) => (
-                <YearSection
-                  key={year.id}
-                  year={year}
-                  getTermCredits={(termId) => getTermCredits(year.id, termId)}
-                  onRemoveCourse={(termId, courseId) => removeCourse(year.id, termId, courseId)}
-                  onDropCourse={(termId, course) => handleDropCourse(year.id, termId, course)}
-                  onAddTerm={() => addTerm(year.id)}
-                />
+              <YearSection
+                key={year.id}
+                year={year}
+                classTarget={state.config?.classesPerTerm}
+                getTermCredits={(termId) => getTermCredits(year.id, termId)}
+                onRemoveCourse={(termId, courseId) => removeCourse(year.id, termId, courseId)}
+                onDropCourse={(termId, course) => handleDropCourse(year.id, termId, course)}
+                onAddTerm={() => addTerm(year.id)}
+              />
               ))}
             </div>
           </ScrollArea>

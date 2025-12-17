@@ -1,5 +1,3 @@
-export type YearName = 'Freshman' | 'Sophomore' | 'Junior' | 'Senior';
-
 export type TermName = 'Fall' | 'Spring' | 'Summer';
 
 export type CategoryName = 'Major' | 'Core' | 'Math' | 'GenEd' | 'Science' | 'Elective';
@@ -21,7 +19,9 @@ export interface Term {
 
 export interface AcademicYear {
   id: string;
-  name: YearName;
+  name: string;
+  startYear: number;
+  endYear: number;
   terms: Term[];
 }
 
@@ -31,6 +31,12 @@ export interface DegreeRequirements {
   genEd: number;
 }
 
+export interface PlannerConfig {
+  startYear: number;
+  classesPerTerm: number;
+  totalCredits: number;
+}
+
 export interface PlannerState {
   degreeName: string;
   university: string;
@@ -38,6 +44,7 @@ export interface PlannerState {
   years: AcademicYear[];
   requirements: DegreeRequirements;
   courseCatalog: Course[];
+  config?: PlannerConfig;
 }
 
 export const CATEGORY_COLORS: Record<CategoryName, string> = {
