@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PlannerPlan, PlanType } from '@/types/planner';
-import { Trash2 } from 'lucide-react';
+import { ChevronsRight, Trash2 } from 'lucide-react';
 
 interface RequirementsProps {
   totalCredits: number;
@@ -11,6 +11,7 @@ interface RequirementsProps {
   planProgress: Record<string, { scheduled: number; total: number }>;
   onAddPlan: (name: string, type: PlanType) => PlannerPlan | null;
   onRemovePlan: (planId: string) => void;
+  onCollapsePanel?: () => void;
 }
 
 export const RequirementsSidebar = ({
@@ -20,6 +21,7 @@ export const RequirementsSidebar = ({
   planProgress,
   onAddPlan,
   onRemovePlan,
+  onCollapsePanel,
 }: RequirementsProps) => {
   const [planName, setPlanName] = useState('');
   const [planType, setPlanType] = useState<PlanType>('major');
@@ -40,11 +42,24 @@ export const RequirementsSidebar = ({
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 mb-6 space-y-4">
-      <div>
-        <h3 className="font-semibold text-foreground mb-1">Requirements</h3>
-        <p className="text-xs text-muted-foreground">
-          Track overall credits and see progress for each major/minor.
-        </p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h3 className="font-semibold text-foreground mb-1">Requirements</h3>
+          <p className="text-xs text-muted-foreground">
+            Track overall credits and see progress for each major/minor.
+          </p>
+        </div>
+        {onCollapsePanel && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onCollapsePanel}
+            aria-label="Collapse requirements"
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       <div className="space-y-2">
