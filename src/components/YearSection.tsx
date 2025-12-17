@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react';
-import { AcademicYear, Course, PlannerPlan } from '@/types/planner';
+import { AcademicYear, Course, PlannerPlan, CourseDropOptions } from '@/types/planner';
 import { TermCard } from './TermCard';
 import { Button } from '@/components/ui/button';
 
@@ -8,7 +8,7 @@ interface YearSectionProps {
   getTermCredits: (termId: string) => number;
   plans: PlannerPlan[];
   onRemoveCourse: (termId: string, courseId: string) => void;
-  onDropCourse: (termId: string, course: Course) => void;
+  onDropCourse: (yearId: string, termId: string, course: Course, options?: CourseDropOptions) => void;
   onAddTerm: () => void;
 }
 
@@ -30,11 +30,12 @@ export const YearSection = ({
         {year.terms.map((term) => (
           <TermCard
             key={term.id}
+            yearId={year.id}
             term={term}
             credits={getTermCredits(term.id)}
             plans={plans}
             onRemoveCourse={(courseId) => onRemoveCourse(term.id, courseId)}
-            onDropCourse={(course) => onDropCourse(term.id, course)}
+            onDropCourse={(course, options) => onDropCourse(year.id, term.id, course, options)}
           />
         ))}
         

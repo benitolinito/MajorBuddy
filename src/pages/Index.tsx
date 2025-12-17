@@ -5,7 +5,7 @@ import { YearSection } from '@/components/YearSection';
 import { RequirementsSidebar } from '@/components/RequirementsSidebar';
 import { usePlanner } from '@/hooks/usePlanner';
 import { useCloudPlanner } from '@/hooks/useCloudPlanner';
-import { Course } from '@/types/planner';
+import { Course, CourseDropOptions } from '@/types/planner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlannerSetupDialog } from '@/components/PlannerSetupDialog';
 import { PlannerConfig } from '@/types/planner';
@@ -31,6 +31,7 @@ const Index = () => {
     applySnapshot,
     configurePlanner,
     hasConfig,
+    moveCourseBetweenTerms,
   } = usePlanner();
 
   const { user, cloudStatus, cloudSaving, cloudLoading, signIn, signOut } = useCloudPlanner({
@@ -52,8 +53,25 @@ const Index = () => {
     setDraggedCourse(course);
   };
 
-  const handleDropCourse = (yearId: string, termId: string, course: Course) => {
-    addCourseToTerm(yearId, termId, course);
+  const handleDropCourse = (
+    yearId: string,
+    termId: string,
+    course: Course,
+    options?: CourseDropOptions,
+  ) => {
+    const source = options?.source;
+    if (source?.courseId && source?.yearId && source?.termId) {
+      moveCourseBetweenTerms({
+        sourceYearId: source.yearId,
+        sourceTermId: source.termId,
+        courseId: source.courseId,
+        targetYearId: yearId,
+        targetTermId: termId,
+        targetIndex: options?.targetIndex,
+      });
+    } else {
+      addCourseToTerm(yearId, termId, course, options?.targetIndex);
+    }
     setDraggedCourse(null);
   };
 
@@ -126,15 +144,15 @@ const Index = () => {
                 <ScrollArea className="h-full p-6">
                   <div className="max-w-4xl">
                     {state.years.map((year) => (
-                      <YearSection
-                        key={year.id}
-                        year={year}
-                        getTermCredits={(termId) => getTermCredits(year.id, termId)}
-                        plans={state.plans}
-                        onRemoveCourse={(termId, courseId) => removeCourse(year.id, termId, courseId)}
-                        onDropCourse={(termId, course) => handleDropCourse(year.id, termId, course)}
-                        onAddTerm={() => addTerm(year.id)}
-                      />
+                <YearSection
+                  key={year.id}
+                  year={year}
+                  getTermCredits={(termId) => getTermCredits(year.id, termId)}
+                  plans={state.plans}
+                  onRemoveCourse={(termId, courseId) => removeCourse(year.id, termId, courseId)}
+                  onDropCourse={handleDropCourse}
+                  onAddTerm={() => addTerm(year.id)}
+                />
                     ))}
                   </div>
                 </ScrollArea>

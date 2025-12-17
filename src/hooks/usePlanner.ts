@@ -290,7 +290,12 @@ export const usePlanner = () => {
   );
   const [hasConfig, setHasConfig] = useState(Boolean(initialConfig));
 
-  const addCourseToTerm = useCallback((yearId: string, termId: string, course: Course) => {
+  const clampIndex = (length: number, index?: number) => {
+    if (index == null || Number.isNaN(index)) return length;
+    return Math.max(0, Math.min(index, length));
+  };
+
+  const addCourseToTerm = useCallback((yearId: string, termId: string, course: Course, targetIndex?: number) => {
     const normalizedCourse = normalizeCourse(course);
     setState((prev) => {
       const validPlanIds = normalizedCourse.planIds.filter((id) => prev.plans.some((plan) => plan.id === id));
@@ -303,7 +308,12 @@ export const usePlanner = () => {
                 ...year,
                 terms: year.terms.map((term) =>
                   term.id === termId
-                    ? { ...term, courses: [...term.courses, { ...courseWithPlans, id: generateId() }] }
+                    ? (() => {
+                        const insertionIndex = clampIndex(term.courses.length, targetIndex);
+                        const nextCourses = [...term.courses];
+                        nextCourses.splice(insertionIndex, 0, { ...courseWithPlans, id: generateId() });
+                        return { ...term, courses: nextCourses };
+                      })()
                     : term
                 ),
               }
@@ -378,6 +388,71 @@ export const usePlanner = () => {
     });
     return createdPlan;
   }, []);
+
+  const moveCourseBetweenTerms = useCallback(
+    ({
+      sourceYearId,
+      sourceTermId,
+      courseId,
+      targetYearId,
+      targetTermId,
+      targetIndex,
+    }: {
+      sourceYearId: string;
+      sourceTermId: string;
+      courseId: string;
+      targetYearId: string;
+      targetTermId: string;
+      targetIndex?: number;
+    }) => {
+      if (!courseId) return;
+      setState((prev) => {
+        let movingCourse: Course | null = null;
+
+        const yearsAfterRemoval = prev.years.map((year) => {
+          if (year.id !== sourceYearId) return year;
+          return {
+            ...year,
+            terms: year.terms.map((term) => {
+              if (term.id !== sourceTermId) return term;
+              const remaining = term.courses.filter((course) => {
+                if (course.id === courseId) {
+                  movingCourse = course;
+                  return false;
+                }
+                return true;
+              });
+              return { ...term, courses: remaining };
+            }),
+          };
+        });
+
+        if (!movingCourse) {
+          return prev;
+        }
+
+        const updatedYears = yearsAfterRemoval.map((year) => {
+          if (year.id !== targetYearId) return year;
+          return {
+            ...year,
+            terms: year.terms.map((term) => {
+              if (term.id !== targetTermId) return term;
+              const insertionIndex = clampIndex(term.courses.length, targetIndex);
+              const nextCourses = [...term.courses];
+              nextCourses.splice(insertionIndex, 0, movingCourse as Course);
+              return { ...term, courses: nextCourses };
+            }),
+          };
+        });
+
+        return {
+          ...prev,
+          years: updatedYears,
+        };
+      });
+    },
+    [],
+  );
 
   const updatePlanRequirement = useCallback((planId: string, requiredCredits: number) => {
     const normalizedCredits = Math.max(0, Number(requiredCredits) || 0);
@@ -608,6 +683,7 @@ export const usePlanner = () => {
   return {
     state,
     addCourseToTerm,
+    moveCourseBetweenTerms,
     addCourseToCatalog,
     addDistributive,
     addPlan,
