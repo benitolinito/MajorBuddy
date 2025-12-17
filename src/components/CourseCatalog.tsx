@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getTagColorClasses } from '@/lib/tagColors';
+import { getTagAccentClass, getTagColorClasses } from '@/lib/tagColors';
 import { PlanSwitcher } from '@/components/PlanSwitcher';
 
 interface CourseCatalogProps {
@@ -33,16 +33,22 @@ const TogglePill = ({
   label,
   active,
   tone = 'neutral',
+  colorClassName,
+  colorAccentClass,
   onClick,
 }: {
   label: string;
   active: boolean;
   tone?: 'neutral' | 'major' | 'minor';
+  colorClassName?: string;
+  colorAccentClass?: string;
   onClick: () => void;
 }) => {
   const base = 'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors';
   const activeStyles =
-    tone === 'major'
+    colorClassName
+      ? colorClassName
+      : tone === 'major'
       ? 'bg-primary text-primary-foreground border-primary'
       : tone === 'minor'
         ? 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/40 dark:text-amber-100 dark:border-amber-500/40'
@@ -50,6 +56,9 @@ const TogglePill = ({
   const idleStyles = 'bg-card text-foreground border-border hover:border-primary/50 hover:text-primary';
   return (
     <button type="button" onClick={onClick} className={`${base} ${active ? activeStyles : idleStyles}`}>
+      {colorAccentClass && (
+        <span className={`mr-1.5 inline-flex h-2.5 w-2.5 rounded-full ${colorAccentClass}`} aria-hidden />
+      )}
       {label}
     </button>
   );
@@ -274,7 +283,7 @@ export const CourseCatalog = ({
                     <Badge
                       key={plan.id}
                       variant="outline"
-                      className={`text-[11px] font-medium ${getTagColorClasses(plan.name)}`}
+                      className={`text-[11px] font-medium ${getTagColorClasses(plan.name, plan.color)}`}
                     >
                       {plan.type === 'major' ? 'Major' : 'Minor'} • {plan.name}
                     </Badge>
@@ -405,6 +414,8 @@ export const CourseCatalog = ({
                     label={`${plan.type === 'major' ? 'Major' : 'Minor'} • ${plan.name}`}
                     active={selectedPlans.includes(plan.id)}
                     tone={plan.type === 'major' ? 'major' : 'minor'}
+                    colorClassName={getTagColorClasses(plan.name, plan.color)}
+                    colorAccentClass={getTagAccentClass(plan.name, plan.color)}
                     onClick={() => togglePlan(plan.id)}
                   />
                 ))}

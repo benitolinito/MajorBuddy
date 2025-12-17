@@ -8,7 +8,9 @@ export interface PlannerPlan {
   id: string;
   name: string;
   type: PlanType;
-  requiredCredits: number;
+  requiredCredits: number | null;
+  classesNeeded?: number | null;
+  color?: string | null;
 }
 
 export interface Course {
@@ -87,4 +89,12 @@ export type CourseDropSource = {
 export type CourseDropOptions = {
   targetIndex?: number;
   source?: CourseDropSource;
+};
+
+export type PlanInput = {
+  name: string;
+  type: PlanType;
+  requiredCredits?: number | null;
+  classesNeeded?: number | null;
+  color?: string | null;
 };

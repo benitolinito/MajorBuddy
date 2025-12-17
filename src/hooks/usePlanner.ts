@@ -11,7 +11,9 @@ import {
   PlanType,
   NewCourseInput,
   PlanProfile,
+  PlanInput,
 } from '@/types/planner';
+import { getDefaultColorId } from '@/lib/tagColors';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const CONFIG_STORAGE_KEY = 'plannerSetup';
@@ -55,17 +57,27 @@ const normalizeDistributives = (value: unknown): string[] => {
   return Array.from(seen);
 };
 
+const normalizeOptionalNumber = (value: unknown, fallback: number | null = null) => {
+  if (value === null || value === undefined || value === '') return fallback;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, numeric);
+};
+
 const normalizePlan = (value: unknown): PlannerPlan => {
   const plan = (value ?? {}) as Record<string, unknown>;
   const type: PlanType = plan.type === 'minor' ? 'minor' : 'major';
   const defaultCredits = type === 'major' ? DEFAULT_MAJOR_CREDITS : DEFAULT_MINOR_CREDITS;
+  const name = isNonEmptyString(plan.name) ? plan.name.trim() : 'Untitled plan';
+  const requiredCredits =
+    plan.requiredCredits === undefined ? defaultCredits : normalizeOptionalNumber(plan.requiredCredits, null);
   return {
     id: isNonEmptyString(plan.id) ? plan.id : generateId(),
-    name: isNonEmptyString(plan.name) ? plan.name.trim() : 'Untitled plan',
+    name,
     type,
-    requiredCredits: Number.isFinite(Number(plan.requiredCredits))
-      ? Math.max(0, Number(plan.requiredCredits))
-      : defaultCredits,
+    requiredCredits,
+    classesNeeded: normalizeOptionalNumber(plan.classesNeeded, null),
+    color: isNonEmptyString(plan.color) ? plan.color.trim() : getDefaultColorId(name),
   };
 };
 
@@ -652,15 +664,20 @@ export const usePlanner = () => {
     return normalized;
   }, []);
 
-  const addPlan = useCallback((name: string, type: PlanType = 'major', requiredCredits?: number) => {
-    const normalizedName = name.trim();
+  const addPlan = useCallback((input: PlanInput) => {
+    const normalizedName = input.name.trim();
     if (!normalizedName) return null;
+    const type: PlanType = input.type === 'minor' ? 'minor' : 'major';
     const creditsTarget =
-      Number.isFinite(Number(requiredCredits)) && Number(requiredCredits) !== 0
-        ? Math.max(0, Number(requiredCredits))
-        : type === 'major'
-          ? DEFAULT_MAJOR_CREDITS
-          : DEFAULT_MINOR_CREDITS;
+      Number.isFinite(Number(input.requiredCredits)) && Number(input.requiredCredits) > 0
+        ? Math.max(0, Number(input.requiredCredits))
+        : null;
+    const classTarget =
+      Number.isFinite(Number(input.classesNeeded)) && Number(input.classesNeeded) > 0
+        ? Math.max(0, Number(input.classesNeeded))
+        : null;
+    const resolvedColor =
+      typeof input.color === 'string' && input.color.trim() ? input.color.trim() : getDefaultColorId(normalizedName);
     let createdPlan: PlannerPlan | null = null;
     setState((prev) => {
       const existing = prev.plans.find(
@@ -670,7 +687,14 @@ export const usePlanner = () => {
         createdPlan = existing;
         return prev;
       }
-      const nextPlan: PlannerPlan = { id: generateId(), name: normalizedName, type, requiredCredits: creditsTarget };
+      const nextPlan: PlannerPlan = {
+        id: generateId(),
+        name: normalizedName,
+        type,
+        requiredCredits: creditsTarget,
+        classesNeeded: classTarget,
+        color: resolvedColor,
+      };
       const updatedPlans = [...prev.plans, nextPlan];
       createdPlan = nextPlan;
       persistJson(PLANS_STORAGE_KEY, updatedPlans);
