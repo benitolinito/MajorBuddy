@@ -10,6 +10,7 @@ interface YearSectionProps {
   onRemoveCourse: (termId: string, courseId: string) => void;
   onDropCourse: (termId: string, course: Course) => void;
   onAddTerm: () => void;
+  onRemoveTerm: (termId: string) => void;
 }
 
 export const YearSection = ({ 
@@ -19,6 +20,7 @@ export const YearSection = ({
   onRemoveCourse, 
   onDropCourse,
   onAddTerm,
+  onRemoveTerm,
 }: YearSectionProps) => {
   return (
     <section className="mb-8">
@@ -35,6 +37,7 @@ export const YearSection = ({
             plans={plans}
             onRemoveCourse={(courseId) => onRemoveCourse(term.id, courseId)}
             onDropCourse={(course) => onDropCourse(term.id, course)}
+            onRemoveTerm={() => onRemoveTerm(term.id)}
           />
         ))}
         

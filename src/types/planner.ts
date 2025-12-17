@@ -13,6 +13,7 @@ export interface PlannerPlan {
 
 export interface Course {
   id: string;
+  sourceId?: string;
   code: string;
   name: string;
   description?: string;

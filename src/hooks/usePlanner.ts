@@ -4,6 +4,7 @@ import {
   AcademicYear,
   Course,
   PlannerConfig,
+  Term,
   TermName,
   TermSystem,
   PlannerPlan,
@@ -76,8 +77,10 @@ const normalizeCourse = (value: unknown): Course => {
         : [];
   const distributives = normalizeDistributives(distributivesSource);
   const planIds = Array.isArray(course.planIds) ? course.planIds.filter(isNonEmptyString) : [];
+  const sourceId = isNonEmptyString(course.sourceId) ? course.sourceId.trim() : undefined;
   return {
     id: isNonEmptyString(course.id) ? course.id : generateId(),
+    sourceId,
     code: isNonEmptyString(course.code) ? course.code.trim() : 'NEW-000',
     name: isNonEmptyString(course.name) ? course.name.trim() : 'Untitled course',
     description: typeof course.description === 'string' ? course.description : undefined,
@@ -114,6 +117,17 @@ const TERM_SEQUENCE: Record<TermSystem, TermName[]> = {
 const INITIAL_TERMS: Record<TermSystem, TermName[]> = {
   semester: ['Fall', 'Spring'],
   quarter: ['Fall', 'Winter', 'Spring'],
+};
+
+const sortTermsForSystem = (terms: Term[], termSystem: TermSystem) => {
+  const termSequence = TERM_SEQUENCE[termSystem] ?? TERM_SEQUENCE.semester;
+  const orderLookup = new Map(termSequence.map((name, index) => [name, index]));
+  return [...terms].sort((a, b) => {
+    const orderA = orderLookup.get(a.name) ?? termSequence.length;
+    const orderB = orderLookup.get(b.name) ?? termSequence.length;
+    if (orderA !== orderB) return orderA - orderB;
+    return a.year - b.year;
+  });
 };
 
 const getCalendarYearForTerm = (startYear: number, termName: TermName) => (termName === 'Fall' ? startYear : startYear + 1);
@@ -172,7 +186,7 @@ const sanitizeYears = (provided: AcademicYear[] | null | undefined, config: Plan
       name: isNonEmptyString(year?.name) ? year.name : formatYearLabel(fallbackStart),
       startYear: fallbackStart,
       endYear: Number.isFinite(Number(year?.endYear)) ? Number(year.endYear) : fallbackStart + 1,
-      terms: normalizedTerms,
+      terms: sortTermsForSystem(normalizedTerms, config.termSystem),
     };
   });
 };
@@ -181,11 +195,11 @@ const createDefaultConfig = (): PlannerConfig => {
   const currentYear = new Date().getFullYear();
   return {
     startYear: currentYear,
-    classesPerTerm: 4,
-    totalCredits: 120,
+    classesPerTerm: 0,
+    totalCredits: 0,
     termSystem: 'semester',
-    planName: 'BS Computer Science',
-    university: 'University of Technology',
+    planName: '',
+    university: '',
   };
 };
 
@@ -294,7 +308,15 @@ export const usePlanner = () => {
     const normalizedCourse = normalizeCourse(course);
     setState((prev) => {
       const validPlanIds = normalizedCourse.planIds.filter((id) => prev.plans.some((plan) => plan.id === id));
-      const courseWithPlans = { ...normalizedCourse, planIds: validPlanIds };
+      const courseWithPlans = {
+        ...normalizedCourse,
+        planIds: validPlanIds,
+        sourceId: normalizedCourse.sourceId ?? normalizedCourse.id,
+      };
+      const scheduledCourse: Course = {
+        ...courseWithPlans,
+        id: generateId(),
+      };
       return {
         ...prev,
         years: prev.years.map((year) =>
@@ -303,7 +325,7 @@ export const usePlanner = () => {
                 ...year,
                 terms: year.terms.map((term) =>
                   term.id === termId
-                    ? { ...term, courses: [...term.courses, { ...courseWithPlans, id: generateId() }] }
+                    ? { ...term, courses: [...term.courses, scheduledCourse] }
                     : term
                 ),
               }
@@ -340,7 +362,22 @@ export const usePlanner = () => {
     setState((prev) => {
       const normalizedCourse = normalizeCourse({ ...courseInput, id: courseId });
       const validPlanIds = normalizedCourse.planIds.filter((id) => prev.plans.some((plan) => plan.id === id));
-      const courseWithPlans = { ...normalizedCourse, planIds: validPlanIds, id: courseId };
+      const courseWithPlans: Course = {
+        ...normalizedCourse,
+        planIds: validPlanIds,
+        id: courseId,
+        sourceId: normalizedCourse.sourceId ?? courseId,
+      };
+      const mergeCourseMetadata = (existing: Course): Course => ({
+        ...existing,
+        code: courseWithPlans.code,
+        name: courseWithPlans.name,
+        description: courseWithPlans.description,
+        credits: courseWithPlans.credits,
+        distributives: courseWithPlans.distributives,
+        planIds: courseWithPlans.planIds,
+        sourceId: existing.sourceId ?? courseWithPlans.sourceId,
+      });
 
       const updatedCatalog = prev.courseCatalog.map((course) =>
         course.id === courseId ? courseWithPlans : course
@@ -351,7 +388,11 @@ export const usePlanner = () => {
         ...year,
         terms: year.terms.map((term) => ({
           ...term,
-          courses: term.courses.map((course) => (course.id === courseId ? courseWithPlans : course)),
+          courses: term.courses.map((course) => {
+            const matchesSource = course.id === courseId || course.sourceId === courseId;
+            const matchesLegacy = !course.sourceId && course.code === courseWithPlans.code;
+            return matchesSource || matchesLegacy ? mergeCourseMetadata(course) : course;
+          }),
         })),
       }));
 
@@ -362,6 +403,32 @@ export const usePlanner = () => {
         ...prev,
         courseCatalog: updatedCatalog,
         distributives: updatedDistributives,
+        years: updatedYears,
+      };
+    });
+  }, []);
+
+  const removeCourseFromCatalog = useCallback((courseId: string) => {
+    setState((prev) => {
+      const updatedCatalog = prev.courseCatalog.filter((course) => course.id !== courseId);
+      const removedCourse = prev.courseCatalog.find((course) => course.id === courseId);
+      const updatedYears = prev.years.map((year) => ({
+        ...year,
+        terms: year.terms.map((term) => ({
+          ...term,
+          courses: term.courses.filter((course) => {
+            if (course.id === courseId || course.sourceId === courseId) return false;
+            if (!course.sourceId && removedCourse && course.code === removedCourse.code) return false;
+            return true;
+          }),
+        })),
+      }));
+
+      persistJson(COURSE_STORAGE_KEY, updatedCatalog);
+
+      return {
+        ...prev,
+        courseCatalog: updatedCatalog,
         years: updatedYears,
       };
     });
@@ -467,6 +534,23 @@ export const usePlanner = () => {
     }));
   }, []);
 
+  const removeTerm = useCallback((yearId: string, termId: string) => {
+    setState((prev) => {
+      const termSystem = prev.config?.termSystem ?? createDefaultConfig().termSystem;
+      return {
+        ...prev,
+        years: prev.years.map((year) => {
+          if (year.id !== yearId) return year;
+          const remainingTerms = year.terms.filter((term) => term.id !== termId);
+          return {
+            ...year,
+            terms: sortTermsForSystem(remainingTerms, termSystem),
+          };
+        }),
+      };
+    });
+  }, []);
+
   const addTerm = useCallback((yearId: string) => {
     setState((prev) => {
       const termSystem = prev.config?.termSystem ?? createDefaultConfig().termSystem;
@@ -484,9 +568,38 @@ export const usePlanner = () => {
 
           return {
             ...year,
-            terms: [...year.terms, newTerm],
+            terms: sortTermsForSystem([...year.terms, newTerm], termSystem),
           };
         }),
+      };
+    });
+  }, []);
+
+  const addYear = useCallback(() => {
+    setState((prev) => {
+      const termSystem = prev.config?.termSystem ?? createDefaultConfig().termSystem;
+      const baseYear = Number.isFinite(prev.config?.startYear)
+        ? Number(prev.config?.startYear)
+        : createDefaultConfig().startYear;
+      const lastStartYear = prev.years.length
+        ? prev.years.reduce(
+            (max, year) => (Number.isFinite(year.startYear) ? Math.max(max, year.startYear) : max),
+            baseYear
+          )
+        : baseYear - 1;
+      const nextStartYear = lastStartYear + 1;
+      const newYear: AcademicYear = {
+        id: generateId(),
+        name: formatYearLabel(nextStartYear),
+        startYear: nextStartYear,
+        endYear: nextStartYear + 1,
+        terms: INITIAL_TERMS[termSystem].map((name) => createTerm(name, nextStartYear)),
+      };
+
+      return {
+        ...prev,
+        years: [...prev.years, newYear],
+        classYear: Math.max(prev.classYear, newYear.endYear),
       };
     });
   }, []);
@@ -534,21 +647,27 @@ export const usePlanner = () => {
   }, [state.years]);
 
   const reset = useCallback(() => {
-    setState((prev) =>
-      createPlannerState(
-        prev.config ?? loadStoredConfig(),
-        {
-          courseCatalog: prev.courseCatalog,
-          distributives: prev.distributives,
-          plans: prev.plans,
-          years: prev.years,
-          meta: {
-            degreeName: prev.config?.planName ?? prev.degreeName,
-            university: prev.config?.university ?? prev.university,
-          },
+    setState((prev) => {
+      const config = prev.config ?? loadStoredConfig() ?? createDefaultConfig();
+      const clearedYears = prev.years.map((year) => ({
+        ...year,
+        terms: year.terms.map((term) => ({
+          ...term,
+          courses: [],
+        })),
+      }));
+
+      return createPlannerState(config, {
+        courseCatalog: prev.courseCatalog,
+        distributives: prev.distributives,
+        plans: prev.plans,
+        years: clearedYears,
+        meta: {
+          degreeName: prev.degreeName,
+          university: prev.university,
         },
-      )
-    );
+      });
+    });
   }, []);
 
   const applySnapshot = useCallback((snapshot: PlannerState) => {
@@ -599,12 +718,8 @@ export const usePlanner = () => {
       plans: normalizedPlans,
       years: snapshot.years.map((year, index) => {
         const startYear = year.startYear ?? year.terms?.[0]?.year ?? (normalizedConfig.startYear + index);
-        return {
-          ...year,
-          name: year.name || formatYearLabel(startYear),
-          startYear,
-          endYear: year.endYear ?? startYear + 1,
-          terms: year.terms.map((term) => ({
+        const orderedTerms = sortTermsForSystem(
+          (year.terms ?? []).map((term) => ({
             ...term,
             courses: term.courses?.map((course) => {
               const normalizedCourse = normalizeCourse(course);
@@ -614,6 +729,14 @@ export const usePlanner = () => {
               };
             }) ?? [],
           })),
+          normalizedConfig.termSystem
+        );
+        return {
+          ...year,
+          name: year.name || formatYearLabel(startYear),
+          startYear,
+          endYear: year.endYear ?? startYear + 1,
+          terms: orderedTerms,
         };
       }),
     });
@@ -641,11 +764,14 @@ export const usePlanner = () => {
     addCourseToTerm,
     addCourseToCatalog,
     updateCourseInCatalog,
+    removeCourseFromCatalog,
     addDistributive,
     addPlan,
     removePlan,
     removeCourse,
+    removeTerm,
     addTerm,
+    addYear,
     getTermCredits,
     stats,
     reset,

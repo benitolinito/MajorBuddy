@@ -1,5 +1,16 @@
 import { GraduationCap, RotateCcw, Download, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface PlannerHeaderProps {
   degreeName: string;
@@ -49,10 +60,26 @@ export const PlannerHeader = ({
 
         <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={onReset}>
-              <RotateCcw className="h-4 w-4 mr-1.5" />
-              Reset
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <RotateCcw className="h-4 w-4 mr-1.5" />
+                  Reset
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reset your schedule?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to reset? This will clear planned classes from your schedule. Your class library will be unaffected.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep schedule</AlertDialogCancel>
+                  <AlertDialogAction onClick={onReset}>Reset schedule</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <Button size="sm" onClick={onOpenExport} disabled={!onOpenExport}>
               <Download className="h-4 w-4 mr-1.5" />
               Export Schedule

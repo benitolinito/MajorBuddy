@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BookOpen, ChevronsLeft, Pencil, Plus, Search, Tag } from 'lucide-react';
+import { BookOpen, ChevronsLeft, Pencil, Plus, Search, Tag, Trash } from 'lucide-react';
 import { Course, NewCourseInput, PlannerPlan } from '@/types/planner';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -16,6 +16,7 @@ interface CourseCatalogProps {
   onDragStart: (course: Course) => void;
   onCreateCourse: (course: NewCourseInput) => void;
   onUpdateCourse: (courseId: string, course: NewCourseInput) => void;
+  onRemoveCourse: (courseId: string) => void;
   onCreateDistributive: (label: string) => string;
   onCollapsePanel?: () => void;
 }
@@ -53,6 +54,7 @@ export const CourseCatalog = ({
   onDragStart,
   onCreateCourse,
   onUpdateCourse,
+  onRemoveCourse,
   onCreateDistributive,
   onCollapsePanel,
 }: CourseCatalogProps) => {
@@ -121,6 +123,12 @@ export const CourseCatalog = ({
     setSelectedPlans(course.planIds);
     setNewDistributive('');
     setDialogOpen(true);
+  };
+
+  const handleRemoveCourse = () => {
+    if (!editingCourse) return;
+    onRemoveCourse(editingCourse.id);
+    handleDialogChange(false);
   };
 
   const handleSave = () => {
@@ -389,11 +397,24 @@ export const CourseCatalog = ({
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="ghost" onClick={() => handleDialogChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">{isEditing ? 'Save changes' : 'Save class'}</Button>
+            <div className="flex items-center gap-2 pt-2">
+              {isEditing && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleRemoveCourse}
+                  className="mr-auto"
+                >
+                  <Trash className="h-4 w-4" />
+                  Remove class
+                </Button>
+              )}
+              <div className="ml-auto flex gap-2">
+                <Button type="button" variant="ghost" onClick={() => handleDialogChange(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">{isEditing ? 'Save changes' : 'Save class'}</Button>
+              </div>
             </div>
           </form>
         </DialogContent>

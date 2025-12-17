@@ -12,7 +12,7 @@ import { ExportScheduleDialog } from '@/components/ExportScheduleDialog';
 import { PlannerConfig } from '@/types/planner';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
-import { ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Plus } from 'lucide-react';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { cn } from '@/lib/utils';
 
@@ -21,12 +21,15 @@ const Index = () => {
     state,
     addCourseToTerm,
     removeCourse,
+    removeTerm,
     addTerm,
+    addYear,
     getTermCredits,
     stats,
     reset,
     addCourseToCatalog,
     updateCourseInCatalog,
+    removeCourseFromCatalog,
     addDistributive,
     addPlan,
     removePlan,
@@ -110,6 +113,7 @@ const Index = () => {
               onDragStart={handleDragStart}
               onCreateCourse={addCourseToCatalog}
               onUpdateCourse={updateCourseInCatalog}
+              onRemoveCourse={removeCourseFromCatalog}
               onCreateDistributive={addDistributive}
               onCollapsePanel={() => catalogPanelRef.current?.collapse()}
             />
@@ -145,8 +149,19 @@ const Index = () => {
                         onRemoveCourse={(termId, courseId) => removeCourse(year.id, termId, courseId)}
                         onDropCourse={(termId, course) => handleDropCourse(year.id, termId, course)}
                         onAddTerm={() => addTerm(year.id)}
+                        onRemoveTerm={(termId) => removeTerm(year.id, termId)}
                       />
                     ))}
+                    <div className="mt-4 flex">
+                      <Button
+                        variant="outline"
+                        className="border-dashed"
+                        onClick={addYear}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add another academic year
+                      </Button>
+                    </div>
                   </div>
                 </ScrollArea>
               </ResizablePanel>

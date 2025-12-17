@@ -6,6 +6,9 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { PlannerConfig, TermSystem } from "@/types/planner";
 
+const formatInitialValue = (value?: number | string | null) =>
+  (value !== null && value !== undefined ? String(value) : "");
+
 type PlannerSetupDialogProps = {
   open: boolean;
   onClose?: () => void;
@@ -14,7 +17,7 @@ type PlannerSetupDialogProps = {
 };
 
 export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: PlannerSetupDialogProps) => {
-  const defaultConfig = useMemo(() => {
+  const fallbackDefaults = useMemo(() => {
     const currentYear = new Date().getFullYear();
     return {
       startYear: initialConfig?.startYear ?? currentYear,
@@ -26,30 +29,41 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: Pla
     };
   }, [initialConfig]);
 
-  const [startYear, setStartYear] = useState(defaultConfig.startYear);
-  const [classesPerTerm, setClassesPerTerm] = useState(defaultConfig.classesPerTerm);
-  const [totalCredits, setTotalCredits] = useState(defaultConfig.totalCredits);
-  const [termSystem, setTermSystem] = useState<TermSystem>(defaultConfig.termSystem);
-  const [planName, setPlanName] = useState(defaultConfig.planName);
-  const [university, setUniversity] = useState(defaultConfig.university);
+  const [startYear, setStartYear] = useState(() => formatInitialValue(initialConfig?.startYear));
+  const [classesPerTerm, setClassesPerTerm] = useState(() => formatInitialValue(initialConfig?.classesPerTerm));
+  const [totalCredits, setTotalCredits] = useState(() => formatInitialValue(initialConfig?.totalCredits));
+  const [termSystem, setTermSystem] = useState<TermSystem | "">(() => initialConfig?.termSystem ?? "");
+  const [planName, setPlanName] = useState(() => initialConfig?.planName ?? "");
+  const [university, setUniversity] = useState(() => initialConfig?.university ?? "");
 
   useEffect(() => {
-    setStartYear(defaultConfig.startYear);
-    setClassesPerTerm(defaultConfig.classesPerTerm);
-    setTotalCredits(defaultConfig.totalCredits);
-    setTermSystem(defaultConfig.termSystem);
-    setPlanName(defaultConfig.planName);
-    setUniversity(defaultConfig.university);
-  }, [defaultConfig]);
+    setStartYear(formatInitialValue(initialConfig?.startYear));
+    setClassesPerTerm(formatInitialValue(initialConfig?.classesPerTerm));
+    setTotalCredits(formatInitialValue(initialConfig?.totalCredits));
+    setTermSystem(initialConfig?.termSystem ?? "");
+    setPlanName(initialConfig?.planName ?? "");
+    setUniversity(initialConfig?.university ?? "");
+  }, [initialConfig]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const sanitizedStartYear = Number.isFinite(Number(startYear)) ? Number(startYear) : defaultConfig.startYear;
-    const sanitizedClasses = Number.isFinite(Number(classesPerTerm)) ? Number(classesPerTerm) : defaultConfig.classesPerTerm;
-    const sanitizedCredits = Number.isFinite(Number(totalCredits)) ? Number(totalCredits) : defaultConfig.totalCredits;
-    const normalizedPlanName = planName.trim() || defaultConfig.planName;
-    const normalizedUniversity = university.trim() || defaultConfig.university;
-    const normalizedTermSystem: TermSystem = termSystem === "quarter" ? "quarter" : "semester";
+    const parsedStartYear = Number(startYear);
+    const parsedClasses = Number(classesPerTerm);
+    const parsedCredits = Number(totalCredits);
+    const sanitizedStartYear =
+      Number.isFinite(parsedStartYear) && startYear.trim() !== "" ? parsedStartYear : fallbackDefaults.startYear;
+    const sanitizedClasses =
+      Number.isFinite(parsedClasses) && classesPerTerm.trim() !== "" ? parsedClasses : fallbackDefaults.classesPerTerm;
+    const sanitizedCredits =
+      Number.isFinite(parsedCredits) && totalCredits.trim() !== "" ? parsedCredits : fallbackDefaults.totalCredits;
+    const normalizedPlanName = planName.trim() || fallbackDefaults.planName;
+    const normalizedUniversity = university.trim() || fallbackDefaults.university;
+    const normalizedTermSystem: TermSystem =
+      termSystem === "quarter"
+        ? "quarter"
+        : termSystem === "semester"
+          ? "semester"
+          : fallbackDefaults.termSystem;
 
     onSave({
       startYear: sanitizedStartYear,
@@ -81,17 +95,17 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: Pla
                 type="text"
                 value={planName}
                 onChange={(e) => setPlanName(e.target.value)}
-                placeholder="e.g., CS with AI focus"
+                placeholder="e.g., Math & CS"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="university">University</Label>
+              <Label htmlFor="university">School</Label>
               <Input
                 id="university"
                 type="text"
                 value={university}
                 onChange={(e) => setUniversity(e.target.value)}
-                placeholder="School name"
+                placeholder=""
               />
             </div>
           </div>
@@ -105,41 +119,30 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: Pla
                 min={2000}
                 max={3000}
                 value={startYear}
-                onChange={(e) => setStartYear(Number(e.target.value))}
+                onChange={(e) => setStartYear(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">
-                We&apos;ll label each year as <span className="font-medium">25-26, 26-27</span> based on this start year.
-              </p>
             </div>
 
             <div className="space-y-3">
               <Label className="block">Academic calendar</Label>
               <RadioGroup
                 value={termSystem}
-                onValueChange={(value) => setTermSystem(value === "quarter" ? "quarter" : "semester")}
+                onValueChange={(value) =>
+                  setTermSystem(value === "quarter" ? "quarter" : value === "semester" ? "semester" : "")
+                }
                 className="grid grid-cols-1 gap-3 sm:grid-cols-2"
               >
-                <div className="flex items-start gap-2 rounded-lg border border-border p-3">
-                  <RadioGroupItem id="term-semester" value="semester" className="mt-0.5" />
-                  <div className="space-y-1">
-                    <Label htmlFor="term-semester" className="text-sm font-medium leading-none">
-                      Semester
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      {/* Two main terms (Fall &amp; Spring) with room for summer classes. */}
-                    </p>
-                  </div>
+                <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-border p-3 text-center">
+                  <RadioGroupItem id="term-semester" value="semester" />
+                  <Label htmlFor="term-semester" className="text-sm font-medium leading-none">
+                    Semester
+                  </Label>
                 </div>
-                <div className="flex items-start gap-2 rounded-lg border border-border p-3">
-                  <RadioGroupItem id="term-quarter" value="quarter" className="mt-0.5" />
-                  <div className="space-y-1">
-                    <Label htmlFor="term-quarter" className="text-sm font-medium leading-none">
-                      Quarter
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      {/* Three quarters (Fall, Winter, Spring); add Summer if you need it. */}
-                    </p>
-                  </div>
+                <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-border p-3 text-center">
+                  <RadioGroupItem id="term-quarter" value="quarter" />
+                  <Label htmlFor="term-quarter" className="text-sm font-medium leading-none">
+                    Quarter
+                  </Label>
                 </div>
               </RadioGroup>
             </div>
@@ -154,7 +157,7 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: Pla
                 min={1}
                 max={10}
                 value={classesPerTerm}
-                onChange={(e) => setClassesPerTerm(Number(e.target.value))}
+                onChange={(e) => setClassesPerTerm(e.target.value)}
               />
             </div>
 
@@ -166,7 +169,7 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: Pla
                 min={1}
                 max={400}
                 value={totalCredits}
-                onChange={(e) => setTotalCredits(Number(e.target.value))}
+                onChange={(e) => setTotalCredits(e.target.value)}
               />
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import { Term, Course, PlannerPlan } from '@/types/planner';
 import { CourseCard } from './CourseCard';
 import { Badge } from '@/components/ui/badge';
@@ -9,9 +10,10 @@ interface TermCardProps {
   plans: PlannerPlan[];
   onRemoveCourse: (courseId: string) => void;
   onDropCourse: (course: Course) => void;
+  onRemoveTerm?: () => void;
 }
 
-export const TermCard = ({ term, credits, plans, onRemoveCourse, onDropCourse }: TermCardProps) => {
+export const TermCard = ({ term, credits, plans, onRemoveCourse, onDropCourse, onRemoveTerm }: TermCardProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -37,10 +39,23 @@ export const TermCard = ({ term, credits, plans, onRemoveCourse, onDropCourse }:
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`bg-muted/50 rounded-xl p-4 min-w-[280px] flex-1 transition-all ${
+      className={`group relative bg-muted/50 rounded-xl p-4 min-w-[280px] max-w-[320px] flex-1 transition-all ${
         isDragOver ? 'ring-2 ring-primary ring-offset-2 bg-primary/5' : ''
       }`}
     >
+      {onRemoveTerm && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemoveTerm();
+          }}
+          className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card text-muted-foreground opacity-0 p-0 leading-none transition hover:border-destructive hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+          aria-label={`Remove ${term.name} ${term.year}`}
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
       <div className="flex items-start justify-between mb-4">
         <div>
           <p className="text-sm font-semibold text-primary uppercase tracking-wide">{term.name}</p>
