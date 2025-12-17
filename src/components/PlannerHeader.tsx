@@ -13,6 +13,7 @@ interface PlannerHeaderProps {
   cloudBusy?: boolean;
   onSignIn?: () => void;
   onSignOut?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const PlannerHeader = ({
@@ -27,6 +28,7 @@ export const PlannerHeader = ({
   cloudBusy,
   onSignIn,
   onSignOut,
+  onOpenSettings,
 }: PlannerHeaderProps) => {
   const showAuth = Boolean(onSignIn || onSignOut);
   const signedIn = Boolean(userLabel);
@@ -68,7 +70,13 @@ export const PlannerHeader = ({
             <Download className="h-4 w-4 mr-1.5" />
             Export Schedule
           </Button>
-          <Button variant="ghost" size="icon" className="ml-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-1"
+            onClick={onOpenSettings}
+            aria-label="Open planner settings"
+          >
             <Settings className="h-4 w-4" />
           </Button>
           {showAuth && (

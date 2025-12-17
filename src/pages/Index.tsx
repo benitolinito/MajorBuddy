@@ -82,6 +82,7 @@ const Index = () => {
           cloudBusy={cloudBusy}
           onSignIn={signIn}
           onSignOut={signOut}
+          onOpenSettings={() => setShowSetup(true)}
         />
         
         <div className="flex-1 flex">
@@ -91,7 +92,6 @@ const Index = () => {
               <YearSection
                 key={year.id}
                 year={year}
-                classTarget={state.config?.classesPerTerm}
                 getTermCredits={(termId) => getTermCredits(year.id, termId)}
                 onRemoveCourse={(termId, courseId) => removeCourse(year.id, termId, courseId)}
                 onDropCourse={(termId, course) => handleDropCourse(year.id, termId, course)}

@@ -9,7 +9,6 @@ interface YearSectionProps {
   onRemoveCourse: (termId: string, courseId: string) => void;
   onDropCourse: (termId: string, course: Course) => void;
   onAddTerm: () => void;
-  classTarget?: number;
 }
 
 export const YearSection = ({ 
@@ -18,15 +17,11 @@ export const YearSection = ({
   onRemoveCourse, 
   onDropCourse,
   onAddTerm,
-  classTarget,
 }: YearSectionProps) => {
   return (
     <section className="mb-8">
       <div className="flex items-baseline gap-3 mb-4">
         <h3 className="text-xl font-semibold text-foreground">{year.name}</h3>
-        {classTarget && (
-          <p className="text-sm text-muted-foreground">Target {classTarget} classes / term</p>
-        )}
       </div>
       
       <div className="flex gap-4">

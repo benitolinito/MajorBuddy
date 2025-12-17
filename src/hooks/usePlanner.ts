@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { PlannerState, AcademicYear, Course, PlannerConfig } from '@/types/planner';
+import { PlannerState, AcademicYear, Course, PlannerConfig, TermName, TermSystem } from '@/types/planner';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const CONFIG_STORAGE_KEY = 'plannerSetup';
@@ -24,16 +24,39 @@ const formatYearLabel = (startYear: number) => {
   return `${pad(startYear)}-${pad(startYear + 1)}`;
 };
 
+const TERM_SEQUENCE: Record<TermSystem, TermName[]> = {
+  semester: ['Fall', 'Spring', 'Summer'],
+  quarter: ['Fall', 'Winter', 'Spring', 'Summer'],
+};
+
+const INITIAL_TERMS: Record<TermSystem, TermName[]> = {
+  semester: ['Fall', 'Spring'],
+  quarter: ['Fall', 'Winter', 'Spring'],
+};
+
+const getCalendarYearForTerm = (startYear: number, termName: TermName) => (termName === 'Fall' ? startYear : startYear + 1);
+
+const createTerm = (termName: TermName, academicStartYear: number) => ({
+  id: generateId(),
+  name: termName,
+  year: getCalendarYearForTerm(academicStartYear, termName),
+  courses: [],
+});
+
 const createDefaultConfig = (): PlannerConfig => {
   const currentYear = new Date().getFullYear();
   return {
     startYear: currentYear,
     classesPerTerm: 4,
     totalCredits: 120,
+    termSystem: 'semester',
+    planName: 'BS Computer Science',
+    university: 'University of Technology',
   };
 };
 
-const createInitialYears = (startYear: number, yearsCount = 4): AcademicYear[] => {
+const createInitialYears = (startYear: number, termSystem: TermSystem, yearsCount = 4): AcademicYear[] => {
+  const termOrder = INITIAL_TERMS[termSystem] ?? INITIAL_TERMS.semester;
   return Array.from({ length: yearsCount }, (_, index) => {
     const academicStartYear = startYear + index;
     return {
@@ -41,10 +64,7 @@ const createInitialYears = (startYear: number, yearsCount = 4): AcademicYear[] =
       name: formatYearLabel(academicStartYear),
       startYear: academicStartYear,
       endYear: academicStartYear + 1,
-      terms: [
-        { id: generateId(), name: 'Fall', year: academicStartYear, courses: [] },
-        { id: generateId(), name: 'Spring', year: academicStartYear + 1, courses: [] },
-      ],
+      terms: termOrder.map((name) => createTerm(name, academicStartYear)),
     };
   });
 };
@@ -54,14 +74,15 @@ const createPlannerState = (
   courseCatalog: Course[] = COURSE_CATALOG,
   meta?: { degreeName?: string; university?: string },
 ): PlannerState => {
-  const effectiveConfig = config ?? createDefaultConfig();
-  const { startYear, totalCredits } = effectiveConfig;
+  const defaults = createDefaultConfig();
+  const effectiveConfig = config ? { ...defaults, ...config } : defaults;
+  const { startYear, totalCredits, termSystem, planName, university } = effectiveConfig;
 
   return {
-    degreeName: meta?.degreeName ?? 'BS Computer Science',
-    university: meta?.university ?? 'University of Technology',
+    degreeName: meta?.degreeName ?? planName,
+    university: meta?.university ?? university,
     classYear: startYear + 4,
-    years: createInitialYears(startYear),
+    years: createInitialYears(startYear, termSystem),
     requirements: {
       totalCredits,
       majorCore: 48,
@@ -79,11 +100,21 @@ const loadStoredConfig = (): PlannerConfig | null => {
 
   try {
     const parsed = JSON.parse(raw) as Partial<PlannerConfig>;
-    if (!parsed.startYear || !parsed.classesPerTerm || !parsed.totalCredits) return null;
+    if (parsed.startYear == null || parsed.classesPerTerm == null || parsed.totalCredits == null) return null;
+    const defaults = createDefaultConfig();
     return {
       startYear: Number(parsed.startYear),
       classesPerTerm: Number(parsed.classesPerTerm),
       totalCredits: Number(parsed.totalCredits),
+      termSystem: parsed.termSystem === 'quarter' ? 'quarter' : defaults.termSystem,
+      planName:
+        typeof parsed.planName === 'string' && parsed.planName.trim()
+          ? parsed.planName.trim()
+          : defaults.planName,
+      university:
+        typeof parsed.university === 'string' && parsed.university.trim()
+          ? parsed.university.trim()
+          : defaults.university,
     };
   } catch {
     return null;
@@ -137,20 +168,27 @@ export const usePlanner = () => {
   }, []);
 
   const addTerm = useCallback((yearId: string) => {
-    setState((prev) => ({
-      ...prev,
-      years: prev.years.map((year) => {
-        if (year.id !== yearId) return year;
-        const lastTerm = year.terms[year.terms.length - 1];
-        const newTermName = lastTerm?.name === 'Fall' ? 'Spring' : lastTerm?.name === 'Spring' ? 'Summer' : 'Fall';
-        const baseYear = lastTerm?.year ?? year.startYear ?? new Date().getFullYear();
-        const newYear = newTermName === 'Fall' ? baseYear + 1 : baseYear;
-        return {
-          ...year,
-          terms: [...year.terms, { id: generateId(), name: newTermName, year: newYear, courses: [] }],
-        };
-      }),
-    }));
+    setState((prev) => {
+      const termSystem = prev.config?.termSystem ?? createDefaultConfig().termSystem;
+      const termSequence = TERM_SEQUENCE[termSystem] ?? TERM_SEQUENCE.semester;
+      return {
+        ...prev,
+        years: prev.years.map((year) => {
+          if (year.id !== yearId) return year;
+
+          const existingNames = year.terms.map((t) => t.name);
+          const nextTermName =
+            termSequence.find((name) => !existingNames.includes(name)) ?? termSequence[termSequence.length - 1];
+          const academicStart = Number.isFinite(year.startYear) ? year.startYear : createDefaultConfig().startYear;
+          const newTerm = createTerm(nextTermName, academicStart);
+
+          return {
+            ...year,
+            terms: [...year.terms, newTerm],
+          };
+        }),
+      };
+    });
   }, []);
 
   const stats = useMemo(() => {
@@ -188,28 +226,39 @@ export const usePlanner = () => {
       createPlannerState(
         prev.config ?? loadStoredConfig(),
         prev.courseCatalog?.length ? prev.courseCatalog : COURSE_CATALOG,
-        { degreeName: prev.degreeName, university: prev.university },
+        {
+          degreeName: prev.config?.planName ?? prev.degreeName,
+          university: prev.config?.university ?? prev.university,
+        },
       )
     );
   }, []);
 
   const applySnapshot = useCallback((snapshot: PlannerState) => {
+    const defaults = createDefaultConfig();
     const storedConfig = loadStoredConfig();
-    const fallbackStartYear = snapshot.years?.[0]?.startYear ?? snapshot.years?.[0]?.terms?.[0]?.year ?? createDefaultConfig().startYear;
-    const normalizedConfig =
-      snapshot.config ??
-      storedConfig ??
-      {
-        startYear: fallbackStartYear,
-        classesPerTerm: createDefaultConfig().classesPerTerm,
-        totalCredits: snapshot.requirements?.totalCredits ?? createDefaultConfig().totalCredits,
-      };
+    const fallbackStartYear = snapshot.years?.[0]?.startYear ?? snapshot.years?.[0]?.terms?.[0]?.year ?? defaults.startYear;
+    const normalizedConfig: PlannerConfig = {
+      startYear: snapshot.config?.startYear ?? storedConfig?.startYear ?? fallbackStartYear,
+      classesPerTerm: snapshot.config?.classesPerTerm ?? storedConfig?.classesPerTerm ?? defaults.classesPerTerm,
+      totalCredits:
+        snapshot.config?.totalCredits ??
+        storedConfig?.totalCredits ??
+        snapshot.requirements?.totalCredits ??
+        defaults.totalCredits,
+      termSystem: snapshot.config?.termSystem ?? storedConfig?.termSystem ?? defaults.termSystem,
+      planName: snapshot.config?.planName ?? snapshot.degreeName ?? storedConfig?.planName ?? defaults.planName,
+      university: snapshot.config?.university ?? snapshot.university ?? storedConfig?.university ?? defaults.university,
+    };
 
     persistConfig(normalizedConfig);
     setHasConfig(true);
 
     setState({
       ...snapshot,
+      degreeName: snapshot.degreeName ?? normalizedConfig.planName,
+      university: snapshot.university ?? normalizedConfig.university,
+      classYear: snapshot.classYear ?? normalizedConfig.startYear + 4,
       config: normalizedConfig,
       courseCatalog: snapshot.courseCatalog?.length ? snapshot.courseCatalog : COURSE_CATALOG,
       years: snapshot.years.map((year, index) => {
@@ -231,7 +280,7 @@ export const usePlanner = () => {
       createPlannerState(
         config,
         prev.courseCatalog?.length ? prev.courseCatalog : COURSE_CATALOG,
-        { degreeName: prev.degreeName, university: prev.university },
+        { degreeName: config.planName, university: config.university },
       )
     );
   }, []);

@@ -1,4 +1,6 @@
-export type TermName = 'Fall' | 'Spring' | 'Summer';
+export type TermName = 'Fall' | 'Winter' | 'Spring' | 'Summer';
+
+export type TermSystem = 'semester' | 'quarter';
 
 export type CategoryName = 'Major' | 'Core' | 'Math' | 'GenEd' | 'Science' | 'Elective';
 
@@ -35,6 +37,9 @@ export interface PlannerConfig {
   startYear: number;
   classesPerTerm: number;
   totalCredits: number;
+  termSystem: TermSystem;
+  planName: string;
+  university: string;
 }
 
 export interface PlannerState {
