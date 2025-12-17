@@ -346,6 +346,37 @@ export const usePlanner = () => {
     return normalizedCourse;
   }, []);
 
+  const updateCourseInCatalog = useCallback((courseId: string, courseInput: NewCourseInput) => {
+    setState((prev) => {
+      const normalizedCourse = normalizeCourse({ ...courseInput, id: courseId });
+      const validPlanIds = normalizedCourse.planIds.filter((id) => prev.plans.some((plan) => plan.id === id));
+      const courseWithPlans = { ...normalizedCourse, planIds: validPlanIds, id: courseId };
+
+      const updatedCatalog = prev.courseCatalog.map((course) =>
+        course.id === courseId ? courseWithPlans : course
+      );
+      const updatedDistributives = normalizeDistributives([...prev.distributives, ...courseWithPlans.distributives]);
+
+      const updatedYears = prev.years.map((year) => ({
+        ...year,
+        terms: year.terms.map((term) => ({
+          ...term,
+          courses: term.courses.map((course) => (course.id === courseId ? courseWithPlans : course)),
+        })),
+      }));
+
+      persistJson(COURSE_STORAGE_KEY, updatedCatalog);
+      persistJson(DISTRIBUTIVES_STORAGE_KEY, updatedDistributives);
+
+      return {
+        ...prev,
+        courseCatalog: updatedCatalog,
+        distributives: updatedDistributives,
+        years: updatedYears,
+      };
+    });
+  }, []);
+
   const addDistributive = useCallback((label: string) => {
     const normalized = label.trim();
     if (!normalized) return '';
@@ -685,6 +716,7 @@ export const usePlanner = () => {
     addCourseToTerm,
     moveCourseBetweenTerms,
     addCourseToCatalog,
+    updateCourseInCatalog,
     addDistributive,
     addPlan,
     removePlan,

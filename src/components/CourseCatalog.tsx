@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BookOpen, ChevronsLeft, Plus, Search, Tag } from 'lucide-react';
+import { BookOpen, ChevronsLeft, Pencil, Plus, Search, Tag } from 'lucide-react';
 import { Course, NewCourseInput, PlannerPlan } from '@/types/planner';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -16,6 +16,7 @@ interface CourseCatalogProps {
   plans: PlannerPlan[];
   onDragStart: (course: Course) => void;
   onCreateCourse: (course: NewCourseInput) => void;
+  onUpdateCourse: (courseId: string, course: NewCourseInput) => void;
   onCreateDistributive: (label: string) => string;
   onCollapsePanel?: () => void;
 }
@@ -52,6 +53,7 @@ export const CourseCatalog = ({
   plans,
   onDragStart,
   onCreateCourse,
+  onUpdateCourse,
   onCreateDistributive,
   onCollapsePanel,
 }: CourseCatalogProps) => {
@@ -64,6 +66,7 @@ export const CourseCatalog = ({
   const [selectedDistributives, setSelectedDistributives] = useState<string[]>([]);
   const [newDistributive, setNewDistributive] = useState('');
   const [selectedPlans, setSelectedPlans] = useState<string[]>([]);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
 
   const planLookup = useMemo(() => new Map(plans.map((plan) => [plan.id, plan])), [plans]);
 
@@ -101,6 +104,24 @@ export const CourseCatalog = ({
     setSelectedDistributives([]);
     setSelectedPlans([]);
     setNewDistributive('');
+    setEditingCourse(null);
+  };
+
+  const startAddCourse = () => {
+    resetForm();
+    setDialogOpen(true);
+  };
+
+  const startEditCourse = (course: Course) => {
+    setEditingCourse(course);
+    setCode(course.code);
+    setTitle(course.name);
+    setDescription(course.description ?? '');
+    setCredits(course.credits);
+    setSelectedDistributives(course.distributives);
+    setSelectedPlans(course.planIds);
+    setNewDistributive('');
+    setDialogOpen(true);
   };
 
   const handleSave = () => {
@@ -118,15 +139,20 @@ export const CourseCatalog = ({
       planIds: activePlanIds,
     };
 
-    onCreateCourse(payload);
-    resetForm();
-    setDialogOpen(false);
+    if (editingCourse) {
+      onUpdateCourse(editingCourse.id, payload);
+    } else {
+      onCreateCourse(payload);
+    }
+    handleDialogChange(false);
   };
 
   const handleDialogChange = (open: boolean) => {
     setDialogOpen(open);
     if (!open) resetForm();
   };
+
+  const isEditing = Boolean(editingCourse);
 
   return (
     <aside className="bg-card border-r border-border flex flex-col h-screen sticky top-0 min-w-[260px] max-w-full">
@@ -140,7 +166,7 @@ export const CourseCatalog = ({
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <Button size="sm" onClick={() => setDialogOpen(true)}>
+            <Button size="sm" onClick={startAddCourse}>
               <Plus className="h-4 w-4 mr-1" />
               Add class
             </Button>
@@ -150,7 +176,6 @@ export const CourseCatalog = ({
                 variant="ghost"
                 className="h-8 w-8"
                 onClick={onCollapsePanel}
-            
               >
                 <ChevronsLeft className="h-4 w-4" />
               </Button>
@@ -190,8 +215,23 @@ export const CourseCatalog = ({
                   e.dataTransfer.effectAllowed = 'copy';
                   onDragStart(course);
                 }}
-                className="bg-card border border-border rounded-lg p-3 cursor-grab hover:shadow-md hover:border-primary/30 transition-all active:cursor-grabbing"
+                className="group relative bg-card border border-border rounded-lg p-3 cursor-grab hover:shadow-md hover:border-primary/30 transition-all active:cursor-grabbing"
               >
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Edit ${course.code}`}
+                  draggable={false}
+                  className="absolute right-2 bottom-2 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startEditCourse(course);
+                  }}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
                 <div className="flex items-start justify-between gap-2">
                   <span className="font-semibold text-sm text-foreground">{course.code}</span>
                   <span className="text-xs text-muted-foreground">{course.credits}cr</span>
@@ -225,9 +265,11 @@ export const CourseCatalog = ({
       <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Add a class</DialogTitle>
+            <DialogTitle>{isEditing ? 'Edit class' : 'Add a class'}</DialogTitle>
             <DialogDescription>
-              Give us the basics for this class and tag where it fits in your plan.
+              {isEditing
+                ? 'Update the details for this class and keep your library tidy.'
+                : 'Give us the basics for this class and tag where it fits in your plan.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -354,7 +396,7 @@ export const CourseCatalog = ({
               <Button type="button" variant="ghost" onClick={() => handleDialogChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Save class</Button>
+              <Button type="submit">{isEditing ? 'Save changes' : 'Save class'}</Button>
             </div>
           </form>
         </DialogContent>
