@@ -8,6 +8,7 @@ import { useCloudPlanner } from '@/hooks/useCloudPlanner';
 import { Course } from '@/types/planner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlannerSetupDialog } from '@/components/PlannerSetupDialog';
+import { ExportScheduleDialog } from '@/components/ExportScheduleDialog';
 import { PlannerConfig } from '@/types/planner';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ const Index = () => {
     stats,
     reset,
     addCourseToCatalog,
+    updateCourseInCatalog,
     addDistributive,
     addPlan,
     removePlan,
@@ -45,6 +47,7 @@ const Index = () => {
   const [requirementsCollapsed, setRequirementsCollapsed] = useState(false);
   const [, setDraggedCourse] = useState<Course | null>(null);
   const [showSetup, setShowSetup] = useState(!hasConfig);
+  const [showExport, setShowExport] = useState(false);
   const userLabel = user?.displayName || user?.email || undefined;
   const cloudBusy = cloudSaving || cloudLoading;
 
@@ -77,6 +80,14 @@ const Index = () => {
         onSave={handleSaveSetup}
         initialConfig={state.config ?? null}
       />
+      <ExportScheduleDialog
+        open={showExport}
+        onOpenChange={setShowExport}
+        years={state.years}
+        plans={state.plans}
+        degreeName={state.degreeName}
+        university={state.university}
+      />
 
       <ResizablePanelGroup direction="horizontal" className="h-screen w-full">
         <ResizablePanel
@@ -98,6 +109,7 @@ const Index = () => {
               plans={state.plans}
               onDragStart={handleDragStart}
               onCreateCourse={addCourseToCatalog}
+              onUpdateCourse={updateCourseInCatalog}
               onCreateDistributive={addDistributive}
               onCollapsePanel={() => catalogPanelRef.current?.collapse()}
             />
@@ -110,8 +122,6 @@ const Index = () => {
               degreeName={state.degreeName}
               university={state.university}
               classYear={state.classYear}
-              totalCredits={stats.totalCredits}
-              maxCredits={state.requirements.totalCredits}
               onReset={reset}
               userLabel={userLabel}
               cloudStatus={cloudStatus}
@@ -119,6 +129,7 @@ const Index = () => {
               onSignIn={signIn}
               onSignOut={signOut}
               onOpenSettings={() => setShowSetup(true)}
+              onOpenExport={() => setShowExport(true)}
             />
             
             <ResizablePanelGroup direction="horizontal" className="flex-1">

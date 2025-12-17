@@ -5,8 +5,6 @@ interface PlannerHeaderProps {
   degreeName: string;
   university: string;
   classYear: number;
-  totalCredits: number;
-  maxCredits: number;
   onReset: () => void;
   userLabel?: string;
   cloudStatus?: string;
@@ -14,14 +12,13 @@ interface PlannerHeaderProps {
   onSignIn?: () => void;
   onSignOut?: () => void;
   onOpenSettings?: () => void;
+  onOpenExport?: () => void;
 }
 
 export const PlannerHeader = ({
   degreeName,
   university,
   classYear,
-  totalCredits,
-  maxCredits,
   onReset,
   userLabel,
   cloudStatus,
@@ -29,6 +26,7 @@ export const PlannerHeader = ({
   onSignIn,
   onSignOut,
   onOpenSettings,
+  onOpenExport,
 }: PlannerHeaderProps) => {
   const showAuth = Boolean(onSignIn || onSignOut);
   const signedIn = Boolean(userLabel);
@@ -50,20 +48,12 @@ export const PlannerHeader = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
-          <div className="text-right sm:mr-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Credits</p>
-            <p className="text-xl font-bold text-foreground">
-              <span className="text-primary">{totalCredits}</span>
-              <span className="text-muted-foreground font-normal"> / {maxCredits}</span>
-            </p>
-          </div>
-
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={onReset}>
               <RotateCcw className="h-4 w-4 mr-1.5" />
               Reset
             </Button>
-            <Button size="sm">
+            <Button size="sm" onClick={onOpenExport} disabled={!onOpenExport}>
               <Download className="h-4 w-4 mr-1.5" />
               Export Schedule
             </Button>
