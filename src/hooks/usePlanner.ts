@@ -871,6 +871,30 @@ export const usePlanner = () => {
     });
   }, []);
 
+  const removeYear = useCallback((yearId: string) => {
+    setState((prev) => {
+      if (prev.years.length <= 1) return prev;
+      const remainingYears = prev.years.filter((year) => year.id !== yearId);
+      if (remainingYears.length === prev.years.length || remainingYears.length === 0) return prev;
+      const maxEndYear = remainingYears.reduce((max, year) => {
+        const candidate = Number.isFinite(year.endYear)
+          ? Number(year.endYear)
+          : Number.isFinite(year.startYear)
+            ? Number(year.startYear) + 1
+            : max;
+        return Math.max(max, candidate);
+      }, 0);
+
+      const nextClassYear = maxEndYear > 0 ? maxEndYear : prev.classYear;
+
+      return {
+        ...prev,
+        years: remainingYears,
+        classYear: nextClassYear,
+      };
+    });
+  }, []);
+
   const stats = useMemo(() => {
     const planProgressMap = new Map<string, { scheduled: number; total: number }>();
     state.plans.forEach((plan) => {
@@ -1046,6 +1070,7 @@ export const usePlanner = () => {
     removeTerm,
     addTerm,
     addYear,
+    removeYear,
     getTermCredits,
     stats,
     reset,

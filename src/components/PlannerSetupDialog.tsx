@@ -24,8 +24,8 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: Pla
       classesPerTerm: initialConfig?.classesPerTerm ?? 4,
       totalCredits: initialConfig?.totalCredits ?? 120,
       termSystem: initialConfig?.termSystem ?? "semester",
-      planName: initialConfig?.planName ?? "BS Computer Science",
-      university: initialConfig?.university ?? "University of Technology",
+      planName: initialConfig?.planName ?? "My Plan",
+      university: initialConfig?.university ?? "University Name",
     };
   }, [initialConfig]);
 
@@ -77,7 +77,7 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: Pla
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose?.()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Set up your planner</DialogTitle>
           <DialogDescription>
@@ -86,7 +86,7 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: Pla
           </DialogDescription>
         </DialogHeader>
 
-        <form className="space-y-5" onSubmit={handleSubmit}>
+        <form className="space-y-5 pb-2" onSubmit={handleSubmit}>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="plan-name">Plan name</Label>
