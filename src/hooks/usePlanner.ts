@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   PlannerState,
   AcademicYear,
@@ -10,6 +10,7 @@ import {
   PlannerPlan,
   PlanType,
   NewCourseInput,
+  PlanProfile,
 } from '@/types/planner';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -18,6 +19,7 @@ const COURSE_STORAGE_KEY = 'plannerCourseCatalog';
 const DISTRIBUTIVES_STORAGE_KEY = 'plannerDistributives';
 const PLANS_STORAGE_KEY = 'plannerPlans';
 const YEARS_STORAGE_KEY = 'plannerAcademicYears';
+const PLAN_PROFILES_STORAGE_KEY = 'plannerPlanProfiles';
 const DEFAULT_MAJOR_CREDITS = 48;
 const DEFAULT_MINOR_CREDITS = 24;
 
@@ -102,6 +104,66 @@ const loadStoredPlans = (): PlannerPlan[] => {
   const raw = loadJson<unknown>(PLANS_STORAGE_KEY, []);
   if (!Array.isArray(raw)) return [];
   return raw.map(normalizePlan);
+};
+
+type PlanProfileSnapshot = PlanProfile & { snapshot: PlannerState };
+
+const clonePlannerState = (state: PlannerState): PlannerState =>
+  JSON.parse(JSON.stringify(state)) as PlannerState;
+
+const stripScheduledCourses = (state: PlannerState): PlannerState => ({
+  ...state,
+  years: state.years.map((year) => ({
+    ...year,
+    terms: year.terms.map((term) => ({
+      ...term,
+      courses: [],
+    })),
+  })),
+});
+
+const normalizeProfileName = (name: string, existing: PlanProfile[]): string => {
+  const fallback = name.trim() || 'My plan';
+  const existingNames = new Set(existing.map((profile) => profile.name.toLowerCase()));
+  if (!existingNames.has(fallback.toLowerCase())) return fallback;
+  let suffix = 2;
+  let candidate = `${fallback} ${suffix}`;
+  while (existingNames.has(candidate.toLowerCase())) {
+    suffix += 1;
+    candidate = `${fallback} ${suffix}`;
+  }
+  return candidate;
+};
+
+const loadStoredPlanProfiles = (): { activeId: string; profiles: PlanProfileSnapshot[] } => {
+  const fallback = { activeId: '', profiles: [] as PlanProfileSnapshot[] };
+  const raw = loadJson<unknown>(PLAN_PROFILES_STORAGE_KEY, fallback);
+  if (!raw || typeof raw !== 'object') return fallback;
+  if (Array.isArray(raw)) {
+    return { activeId: '', profiles: [] };
+  }
+  const store = raw as { activeId?: unknown; profiles?: unknown };
+  const activeId = isNonEmptyString(store.activeId) ? store.activeId : '';
+  const profiles = Array.isArray(store.profiles)
+    ? store.profiles
+        .map((entry) => {
+          const snapshotEntry = entry as Partial<PlanProfileSnapshot>;
+          if (!snapshotEntry?.snapshot) return null;
+          const id = isNonEmptyString(snapshotEntry.id) ? snapshotEntry.id : generateId();
+          const name = isNonEmptyString(snapshotEntry.name) ? snapshotEntry.name : 'My plan';
+          return {
+            id,
+            name,
+            snapshot: snapshotEntry.snapshot as PlannerState,
+          };
+        })
+        .filter(Boolean) as PlanProfileSnapshot[]
+    : [];
+  return { activeId, profiles };
+};
+
+const persistPlanProfiles = (activeId: string, profiles: PlanProfileSnapshot[]) => {
+  persistJson(PLAN_PROFILES_STORAGE_KEY, { activeId, profiles });
 };
 
 const formatYearLabel = (startYear: number) => {
@@ -254,6 +316,58 @@ const createPlannerState = (
   };
 };
 
+const buildInitialPlanner = () => {
+  const storedProfiles = loadStoredPlanProfiles();
+  if (storedProfiles.profiles.length > 0) {
+    const profileSnapshots = new Map<string, PlannerState>();
+    storedProfiles.profiles.forEach((profile) => {
+      profileSnapshots.set(profile.id, profile.snapshot);
+    });
+    const activeId = profileSnapshots.has(storedProfiles.activeId)
+      ? storedProfiles.activeId
+      : storedProfiles.profiles[0]?.id ?? '';
+    const fallbackState =
+      profileSnapshots.get(activeId) ??
+      createPlannerState(loadStoredConfig(), {
+        courseCatalog: loadStoredCourses(),
+        distributives: loadStoredDistributives(),
+        plans: loadStoredPlans(),
+        years: sanitizeYears(loadStoredYears(), createDefaultConfig()),
+      });
+
+    return {
+      state: clonePlannerState(fallbackState),
+      hasConfig: Boolean(fallbackState.config),
+      planProfiles: storedProfiles.profiles.map(({ id, name }) => ({ id, name })),
+      activePlanProfileId: activeId || storedProfiles.profiles[0]?.id || '',
+      profileSnapshots,
+    };
+  }
+
+  const initialConfig = loadStoredConfig();
+  const initialYears = sanitizeYears(loadStoredYears(), initialConfig ?? createDefaultConfig());
+  const initialCourses = loadStoredCourses();
+  const initialDistributives = loadStoredDistributives();
+  const initialPlans = loadStoredPlans();
+
+  const initialState = createPlannerState(initialConfig, {
+    courseCatalog: initialCourses,
+    distributives: initialDistributives,
+    plans: initialPlans,
+    years: initialYears,
+  });
+  const profileId = generateId();
+  const profileName = initialState.degreeName || initialState.config?.planName || 'My plan';
+
+  return {
+    state: initialState,
+    hasConfig: Boolean(initialConfig),
+    planProfiles: [{ id: profileId, name: profileName }],
+    activePlanProfileId: profileId,
+    profileSnapshots: new Map<string, PlannerState>([[profileId, initialState]]),
+  };
+};
+
 const loadStoredConfig = (): PlannerConfig | null => {
   if (typeof window === 'undefined') return null;
   const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
@@ -288,26 +402,91 @@ const persistConfig = (config: PlannerConfig) => {
 };
 
 export const usePlanner = () => {
-  const initialConfig = loadStoredConfig();
-  const initialYears = sanitizeYears(loadStoredYears(), initialConfig ?? createDefaultConfig());
-  const initialCourses = loadStoredCourses();
-  const initialDistributives = loadStoredDistributives();
-  const initialPlans = loadStoredPlans();
+  const initialLoad = useMemo(() => buildInitialPlanner(), []);
 
-  const [state, setState] = useState<PlannerState>(() =>
-    createPlannerState(initialConfig, {
-      courseCatalog: initialCourses,
-      distributives: initialDistributives,
-      plans: initialPlans,
-      years: initialYears,
-    })
-  );
-  const [hasConfig, setHasConfig] = useState(Boolean(initialConfig));
+  const [state, setState] = useState<PlannerState>(() => initialLoad.state);
+  const [hasConfig, setHasConfig] = useState(Boolean(initialLoad.hasConfig));
+  const [planProfiles, setPlanProfiles] = useState<PlanProfile[]>(initialLoad.planProfiles);
+  const [activePlanProfileId, setActivePlanProfileId] = useState<string>(initialLoad.activePlanProfileId);
+  const profileSnapshotsRef = useRef<Map<string, PlannerState>>(initialLoad.profileSnapshots);
 
   const clampIndex = (length: number, index?: number) => {
     if (index == null || Number.isNaN(index)) return length;
     return Math.max(0, Math.min(index, length));
   };
+
+  const selectPlanProfile = useCallback(
+    (profileId: string) => {
+      if (!profileId || profileId === activePlanProfileId) return;
+      const snapshot = profileSnapshotsRef.current.get(profileId);
+      if (!snapshot) return;
+      setActivePlanProfileId(profileId);
+      setState(clonePlannerState(snapshot));
+      setHasConfig(Boolean(snapshot.config));
+    },
+    [activePlanProfileId],
+  );
+
+  const createPlanProfile = useCallback(
+    (name: string, options?: { fromProfileId?: string; startBlank?: boolean }) => {
+      const baseProfileId = options?.fromProfileId ?? activePlanProfileId;
+      const sourceSnapshot =
+        profileSnapshotsRef.current.get(baseProfileId) ??
+        profileSnapshotsRef.current.get(activePlanProfileId) ??
+        state;
+
+      const snapshotBase = clonePlannerState(sourceSnapshot);
+      const snapshot = options?.startBlank ? stripScheduledCourses(snapshotBase) : snapshotBase;
+      const profileName = normalizeProfileName(
+        name || snapshot.degreeName || snapshot.config?.planName || 'My plan',
+        planProfiles,
+      );
+      const newProfile: PlanProfile = { id: generateId(), name: profileName };
+
+      profileSnapshotsRef.current.set(newProfile.id, snapshot);
+      setPlanProfiles((prev) => [...prev, newProfile]);
+      setActivePlanProfileId(newProfile.id);
+      setState(snapshot);
+      setHasConfig(Boolean(snapshot.config));
+      return newProfile;
+    },
+    [activePlanProfileId, planProfiles, state],
+  );
+
+  const renamePlanProfile = useCallback((profileId: string, nextName: string) => {
+    const normalizedName = nextName.trim();
+    if (!normalizedName) return;
+    setPlanProfiles((prev) => {
+      const existing = prev.filter((profile) => profile.id !== profileId);
+      const updatedName = normalizeProfileName(normalizedName, existing);
+      return prev.map((profile) => (profile.id === profileId ? { ...profile, name: updatedName } : profile));
+    });
+  }, []);
+
+  const deletePlanProfile = useCallback(
+    (profileId: string) => {
+      setPlanProfiles((prev) => {
+        if (prev.length <= 1) return prev;
+        const remaining = prev.filter((profile) => profile.id !== profileId);
+        if (remaining.length === prev.length) return prev;
+        profileSnapshotsRef.current.delete(profileId);
+
+        if (profileId === activePlanProfileId) {
+          const nextProfile = remaining[0];
+          const nextSnapshot =
+            profileSnapshotsRef.current.get(nextProfile.id) ??
+            profileSnapshotsRef.current.get(activePlanProfileId) ??
+            state;
+          setState(clonePlannerState(nextSnapshot));
+          setHasConfig(Boolean(nextSnapshot.config));
+          setActivePlanProfileId(nextProfile.id);
+        }
+
+        return remaining;
+      });
+    },
+    [activePlanProfileId, state],
+  );
 
   const addCourseToTerm = useCallback((yearId: string, termId: string, course: Course, targetIndex?: number) => {
     const normalizedCourse = normalizeCourse(course);
@@ -348,6 +527,19 @@ export const usePlanner = () => {
   useEffect(() => {
     persistJson(YEARS_STORAGE_KEY, state.years);
   }, [state.years]);
+
+  useEffect(() => {
+    if (!activePlanProfileId) return;
+    profileSnapshotsRef.current.set(activePlanProfileId, clonePlannerState(state));
+    const profilesWithSnapshots = planProfiles
+      .map((profile) => {
+        const snapshot = profileSnapshotsRef.current.get(profile.id);
+        if (!snapshot) return null;
+        return { ...profile, snapshot };
+      })
+      .filter(Boolean) as PlanProfileSnapshot[];
+    persistPlanProfiles(activePlanProfileId, profilesWithSnapshots);
+  }, [activePlanProfileId, planProfiles, state]);
 
   const addCourseToCatalog = useCallback((courseInput: NewCourseInput) => {
     const normalizedCourse = normalizeCourse({ ...courseInput, id: generateId() });
@@ -836,11 +1028,17 @@ export const usePlanner = () => {
 
   return {
     state,
+    planProfiles,
+    activePlanProfileId,
     addCourseToTerm,
     moveCourseBetweenTerms,
     addCourseToCatalog,
     updateCourseInCatalog,
     removeCourseFromCatalog,
+    createPlanProfile,
+    selectPlanProfile,
+    renamePlanProfile,
+    deletePlanProfile,
     addDistributive,
     addPlan,
     removePlan,

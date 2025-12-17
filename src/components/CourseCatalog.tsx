@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { BookOpen, ChevronsLeft, Pencil, Plus, Search, Tag, Trash } from 'lucide-react';
-import { Course, NewCourseInput, PlannerPlan } from '@/types/planner';
+import { Course, NewCourseInput, PlanProfile, PlannerPlan } from '@/types/planner';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -9,16 +9,23 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { getTagColorClasses } from '@/lib/tagColors';
+import { PlanSwitcher } from '@/components/PlanSwitcher';
 
 interface CourseCatalogProps {
   courses: Course[];
   distributives: string[];
   plans: PlannerPlan[];
+  planProfiles: PlanProfile[];
+  activePlanProfileId: string;
   onDragStart: (course: Course) => void;
   onCreateCourse: (course: NewCourseInput) => void;
   onUpdateCourse: (courseId: string, course: NewCourseInput) => void;
   onRemoveCourse: (courseId: string) => void;
   onCreateDistributive: (label: string) => string;
+  onCreatePlanProfile: (name: string, options?: { startBlank?: boolean }) => PlanProfile | void;
+  onSelectPlanProfile: (planId: string) => void;
+  onRenamePlanProfile: (planId: string, name: string) => void;
+  onDeletePlanProfile: (planId: string) => void;
   onCollapsePanel?: () => void;
 }
 
@@ -52,11 +59,17 @@ export const CourseCatalog = ({
   courses,
   distributives,
   plans,
+  planProfiles,
+  activePlanProfileId,
   onDragStart,
   onCreateCourse,
   onUpdateCourse,
   onRemoveCourse,
   onCreateDistributive,
+  onCreatePlanProfile,
+  onSelectPlanProfile,
+  onRenamePlanProfile,
+  onDeletePlanProfile,
   onCollapsePanel,
 }: CourseCatalogProps) => {
   const [search, setSearch] = useState('');
@@ -164,8 +177,16 @@ export const CourseCatalog = ({
 
   return (
     <aside className="bg-card border-r border-border flex flex-col h-screen sticky top-0 min-w-[260px] max-w-full">
-      <div className="p-4 border-b border-border">
-        <div className="flex items-center justify-between gap-2 mb-4">
+      <div className="p-4 border-b border-border space-y-4">
+        <PlanSwitcher
+          plans={planProfiles}
+          activePlanId={activePlanProfileId}
+          onSelectPlan={onSelectPlanProfile}
+          onCreatePlan={onCreatePlanProfile}
+          onRenamePlan={onRenamePlanProfile}
+          onDeletePlan={onDeletePlanProfile}
+        />
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-muted-foreground" />
             <div>

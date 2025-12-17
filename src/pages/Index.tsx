@@ -15,10 +15,17 @@ import { Button } from '@/components/ui/button';
 import { ChevronsLeft, ChevronsRight, Plus } from 'lucide-react';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { cn } from '@/lib/utils';
+import { AuthDialog } from '@/components/AuthDialog';
 
 const Index = () => {
   const {
     state,
+    planProfiles,
+    activePlanProfileId,
+    createPlanProfile,
+    selectPlanProfile,
+    renamePlanProfile,
+    deletePlanProfile,
     addCourseToTerm,
     removeCourse,
     removeTerm,
@@ -39,7 +46,17 @@ const Index = () => {
     moveCourseBetweenTerms,
   } = usePlanner();
 
-  const { user, cloudStatus, cloudSaving, cloudLoading, signIn, signOut } = useCloudPlanner({
+  const {
+    user,
+    cloudStatus,
+    cloudSaving,
+    cloudLoading,
+    authBusy,
+    signInWithGoogle,
+    signInWithEmail,
+    registerWithEmail,
+    signOut,
+  } = useCloudPlanner({
     state,
     applySnapshot,
   });
@@ -52,8 +69,9 @@ const Index = () => {
   const [, setDraggedCourse] = useState<Course | null>(null);
   const [showSetup, setShowSetup] = useState(!hasConfig);
   const [showExport, setShowExport] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
   const userLabel = user?.displayName || user?.email || undefined;
-  const cloudBusy = cloudSaving || cloudLoading;
+  const cloudBusy = cloudSaving || cloudLoading || authBusy;
 
   const handleDragStart = (course: Course) => {
     setDraggedCourse(course);
@@ -91,7 +109,7 @@ const Index = () => {
   }, [hasConfig]);
 
   return (
-    <div 
+    <div
       className="min-h-screen bg-background"
       onDragEnd={() => setDraggedCourse(null)}
     >
@@ -108,6 +126,15 @@ const Index = () => {
         plans={state.plans}
         degreeName={state.degreeName}
         university={state.university}
+      />
+      <AuthDialog
+        open={showAuth}
+        onOpenChange={setShowAuth}
+        busy={authBusy}
+        status={authBusy ? cloudStatus : null}
+        onSignInWithGoogle={signInWithGoogle}
+        onEmailSignIn={signInWithEmail}
+        onEmailRegister={registerWithEmail}
       />
 
       <ResizablePanelGroup direction="horizontal" className="h-screen w-full">
@@ -128,11 +155,17 @@ const Index = () => {
               courses={state.courseCatalog} 
               distributives={state.distributives}
               plans={state.plans}
+              planProfiles={planProfiles}
+              activePlanProfileId={activePlanProfileId}
               onDragStart={handleDragStart}
               onCreateCourse={addCourseToCatalog}
               onUpdateCourse={updateCourseInCatalog}
               onRemoveCourse={removeCourseFromCatalog}
               onCreateDistributive={addDistributive}
+              onCreatePlanProfile={createPlanProfile}
+              onSelectPlanProfile={selectPlanProfile}
+              onRenamePlanProfile={renamePlanProfile}
+              onDeletePlanProfile={deletePlanProfile}
               onCollapsePanel={() => catalogPanelRef.current?.collapse()}
             />
           )}
@@ -148,7 +181,7 @@ const Index = () => {
               userLabel={userLabel}
               cloudStatus={cloudStatus}
               cloudBusy={cloudBusy}
-              onSignIn={signIn}
+              onSignIn={() => setShowAuth(true)}
               onSignOut={signOut}
               onOpenSettings={() => setShowSetup(true)}
               onOpenExport={() => setShowExport(true)}
