@@ -41,7 +41,7 @@ export const CourseCard = ({ course, plans = [], onRemove, draggable = false, on
           <Badge
             key={plan.id}
             variant="outline"
-            className={`text-[11px] font-medium ${getTagColorClasses(plan.name)}`}
+            className={`text-[11px] font-medium ${getTagColorClasses(plan.name, plan.color)}`}
           >
             {plan.type === 'major' ? 'Major' : 'Minor'} • {plan.name}
           </Badge>

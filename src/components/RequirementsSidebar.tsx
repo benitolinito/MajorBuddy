@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PlannerPlan, PlanType } from '@/types/planner';
 import { ChevronsRight, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { PlanInput, PlannerPlan, PlanType } from '@/types/planner';
+import { TAG_COLOR_OPTIONS, getDefaultColorId, getTagAccentClass, getTagColorClasses } from '@/lib/tagColors';
 
 interface RequirementsProps {
   totalCredits: number;
   maxCredits: number;
   plans: PlannerPlan[];
   planProgress: Record<string, { scheduled: number; total: number }>;
-  onAddPlan: (name: string, type: PlanType) => PlannerPlan | null;
+  onAddPlan: (plan: PlanInput) => PlannerPlan | null;
   onRemovePlan: (planId: string) => void;
   onCollapsePanel?: () => void;
 }
@@ -25,20 +28,57 @@ export const RequirementsSidebar = ({
 }: RequirementsProps) => {
   const [planName, setPlanName] = useState('');
   const [planType, setPlanType] = useState<PlanType>('major');
-  const [showAdd, setShowAdd] = useState(false);
+  const [classesNeeded, setClassesNeeded] = useState('');
+  const [planCredits, setPlanCredits] = useState('');
+  const [colorChoice, setColorChoice] = useState<string>(() => getDefaultColorId(''));
+  const [showDialog, setShowDialog] = useState(false);
 
   const sortedPlans = useMemo(
     () => [...plans].sort((a, b) => a.name.localeCompare(b.name)),
     [plans],
   );
 
+  const resetPlanForm = () => {
+    setPlanName('');
+    setPlanType('major');
+    setClassesNeeded('');
+    setPlanCredits('');
+    setColorChoice(getDefaultColorId(''));
+  };
+
+  const normalizePositive = (value: string) => {
+    if (!value.trim()) return null;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) return null;
+    return Math.max(0, numeric);
+  };
+
   const handleAddPlan = () => {
-    const created = onAddPlan(planName, planType);
+    const classTarget = normalizePositive(classesNeeded);
+    if (!classTarget) return;
+    if (!planName.trim()) return;
+    const creditTarget = normalizePositive(planCredits);
+    const created = onAddPlan({
+      name: planName,
+      type: planType,
+      classesNeeded: classTarget,
+      requiredCredits: creditTarget,
+      color: colorChoice,
+    });
     if (created) {
-      setPlanName('');
-      setShowAdd(false);
+      resetPlanForm();
+      setShowDialog(false);
     }
   };
+
+  const handleDialogChange = (open: boolean) => {
+    setShowDialog(open);
+    if (!open) {
+      resetPlanForm();
+    }
+  };
+
+  const canSavePlan = Boolean(planName.trim()) && Boolean(normalizePositive(classesNeeded));
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 mb-6 space-y-4">
@@ -82,49 +122,13 @@ export const RequirementsSidebar = ({
           variant="secondary"
           size="sm"
           className="w-full"
-          onClick={() => setShowAdd((prev) => !prev)}
+          onClick={() => setShowDialog(true)}
         >
           Add major/minor
         </Button>
-        {showAdd && (
-          <div className="border border-border rounded-lg p-3 space-y-2">
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={planType === 'major' ? 'default' : 'outline'}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setPlanType('major')}
-                >
-                  Major
-                </Button>
-                <Button
-                  type="button"
-                  variant={planType === 'minor' ? 'default' : 'outline'}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setPlanType('minor')}
-                >
-                  Minor
-                </Button>
-              </div>
-              <Input
-                placeholder="Plan name"
-                value={planName}
-                onChange={(e) => setPlanName(e.target.value)}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setShowAdd(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleAddPlan} disabled={!planName.trim()}>
-                Save
-              </Button>
-            </div>
-          </div>
-        )}
+        <p className="text-[11px] text-muted-foreground text-center">
+          Capture class counts, credits, and colors for each plan.
+        </p>
       </div>
 
       <div className="space-y-3">
@@ -137,7 +141,12 @@ export const RequirementsSidebar = ({
           sortedPlans.map((plan) => {
             const progress = planProgress[plan.id] ?? { scheduled: 0, total: 0 };
             const { scheduled, total } = progress;
-            const pct = total > 0 ? Math.min((scheduled / total) * 100, 100) : 0;
+            const targetClasses =
+              plan.classesNeeded && plan.classesNeeded > 0 ? plan.classesNeeded : total;
+            const pct = targetClasses > 0 ? Math.min((scheduled / targetClasses) * 100, 100) : 0;
+            const targetLabel = targetClasses || '—';
+            const colorClass = getTagColorClasses(plan.name, plan.color);
+            const accentClass = getTagAccentClass(plan.name, plan.color);
             return (
               <div
                 key={plan.id}
@@ -146,14 +155,16 @@ export const RequirementsSidebar = ({
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs uppercase tracking-wide font-semibold text-muted-foreground">
+                      <span className={`text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${colorClass}`}>
                         {plan.type === 'major' ? 'Major' : 'Minor'}
                       </span>
-                      <span className="text-sm font-semibold text-foreground">{plan.name}</span>
+                      <span className="text-sm font-semibold text-foreground leading-none">{plan.name}</span>
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      Tagged classes: {total || 0}
-                    </p>
+                    <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground mt-2">
+                      <span>Goal: {plan.classesNeeded ? `${plan.classesNeeded} classes` : 'Set a class goal'}</span>
+                      <span>Tagged in library: {total || 0}</span>
+                      {plan.requiredCredits ? <span>Credits target: {plan.requiredCredits}</span> : null}
+                    </div>
                   </div>
                   <Button
                     variant="ghost"
@@ -169,28 +180,142 @@ export const RequirementsSidebar = ({
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-muted-foreground">Progress</span>
                     <span className="font-medium text-foreground">
-                      {scheduled}/{total || '—'} classes
+                      {scheduled}/{targetLabel} classes scheduled
                     </span>
                   </div>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${
-                        plan.type === 'major' ? 'bg-primary' : 'bg-amber-500'
-                      }`}
+                      className={`h-full rounded-full transition-all ${accentClass || 'bg-primary'}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  {total === 0 && (
+                  {targetClasses === 0 ? (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Add a class goal to see progress here.
+                    </p>
+                  ) : total === 0 ? (
                     <p className="text-[11px] text-muted-foreground mt-1">
                       Tag classes to this plan in the Add class dialog to start tracking.
                     </p>
-                  )}
+                  ) : null}
                 </div>
               </div>
             );
           })
         )}
       </div>
+
+      <Dialog open={showDialog} onOpenChange={handleDialogChange}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add a major or minor</DialogTitle>
+            <DialogDescription>
+              Set how many classes you need, add optional credits, and pick a color for quick tagging.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleAddPlan();
+            }}
+          >
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={planType === 'major' ? 'default' : 'outline'}
+                size="sm"
+                className="flex-1"
+                onClick={() => setPlanType('major')}
+              >
+                Major
+              </Button>
+              <Button
+                type="button"
+                variant={planType === 'minor' ? 'default' : 'outline'}
+                size="sm"
+                className="flex-1"
+                onClick={() => setPlanType('minor')}
+              >
+                Minor
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="plan-name">Plan name</Label>
+              <Input
+                id="plan-name"
+                placeholder="e.g., Computer Science"
+                value={planName}
+                onChange={(e) => setPlanName(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="plan-classes">Classes needed</Label>
+                <Input
+                  id="plan-classes"
+                  type="number"
+                  min={1}
+                  value={classesNeeded}
+                  onChange={(e) => setClassesNeeded(e.target.value)}
+                  required
+                />
+                <p className="text-[11px] text-muted-foreground">Required so we can chart progress.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="plan-credits">Credits (optional)</Label>
+                <Input
+                  id="plan-credits"
+                  type="number"
+                  min={0}
+                  value={planCredits}
+                  onChange={(e) => setPlanCredits(e.target.value)}
+                  placeholder="e.g., 48"
+                />
+                <p className="text-[11px] text-muted-foreground">Skip if you only track classes.</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <p className="text-[11px] text-muted-foreground">
+                This color appears on plan badges in the Class Library and schedule.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {TAG_COLOR_OPTIONS.map((option) => {
+                  const isActive = colorChoice === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setColorChoice(option.id)}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition ${
+                        isActive ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <span className={`h-4 w-4 rounded-full ${option.accentClass}`} />
+                      <span className="text-xs font-medium text-foreground">{option.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" onClick={() => handleDialogChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={!canSavePlan}>
+                Save plan
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
