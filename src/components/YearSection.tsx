@@ -1,11 +1,12 @@
 import { Plus } from 'lucide-react';
-import { AcademicYear, Course } from '@/types/planner';
+import { AcademicYear, Course, PlannerPlan } from '@/types/planner';
 import { TermCard } from './TermCard';
 import { Button } from '@/components/ui/button';
 
 interface YearSectionProps {
   year: AcademicYear;
   getTermCredits: (termId: string) => number;
+  plans: PlannerPlan[];
   onRemoveCourse: (termId: string, courseId: string) => void;
   onDropCourse: (termId: string, course: Course) => void;
   onAddTerm: () => void;
@@ -14,6 +15,7 @@ interface YearSectionProps {
 export const YearSection = ({ 
   year, 
   getTermCredits,
+  plans,
   onRemoveCourse, 
   onDropCourse,
   onAddTerm,
@@ -30,6 +32,7 @@ export const YearSection = ({
             key={term.id}
             term={term}
             credits={getTermCredits(term.id)}
+            plans={plans}
             onRemoveCourse={(courseId) => onRemoveCourse(term.id, courseId)}
             onDropCourse={(course) => onDropCourse(term.id, course)}
           />

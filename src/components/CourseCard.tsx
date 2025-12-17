@@ -1,20 +1,18 @@
 import { X } from 'lucide-react';
-import { Course, CategoryName, CATEGORY_COLORS } from '@/types/planner';
+import { Badge } from '@/components/ui/badge';
+import { Course, PlannerPlan } from '@/types/planner';
 
 interface CourseCardProps {
   course: Course;
+  plans?: PlannerPlan[];
   onRemove: () => void;
 }
 
-const CategoryBadge = ({ category }: { category: CategoryName }) => (
-  <span 
-    className={`${CATEGORY_COLORS[category]} text-primary-foreground text-[10px] font-medium px-1.5 py-0.5 rounded`}
-  >
-    {category}
-  </span>
-);
+export const CourseCard = ({ course, plans = [], onRemove }: CourseCardProps) => {
+  const coursePlans = course.planIds
+    .map((id) => plans.find((plan) => plan.id === id))
+    .filter((plan): plan is PlannerPlan => Boolean(plan));
 
-export const CourseCard = ({ course, onRemove }: CourseCardProps) => {
   return (
     <div className="group relative bg-card border border-border rounded-lg p-3 hover:shadow-sm transition-all">
       <button
@@ -29,9 +27,21 @@ export const CourseCard = ({ course, onRemove }: CourseCardProps) => {
         <span className="text-xs text-muted-foreground">{course.credits}cr</span>
       </div>
       <p className="text-xs text-muted-foreground mt-1">{course.name}</p>
-      <div className="flex flex-wrap gap-1 mt-2">
-        {course.categories.map((cat) => (
-          <CategoryBadge key={cat} category={cat} />
+      {course.description && <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{course.description}</p>}
+      <div className="flex flex-wrap gap-1.5 mt-2">
+        {coursePlans.map((plan) => (
+          <Badge
+            key={plan.id}
+            variant="outline"
+            className={plan.type === 'major' ? 'border-primary text-primary' : 'border-amber-500 text-amber-700 dark:text-amber-100'}
+          >
+            {plan.type === 'major' ? 'Major' : 'Minor'} • {plan.name}
+          </Badge>
+        ))}
+        {course.distributives.map((dist) => (
+          <Badge key={dist} variant="secondary" className="text-[11px]">
+            {dist}
+          </Badge>
         ))}
       </div>
     </div>

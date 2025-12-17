@@ -1,4 +1,4 @@
-import { GraduationCap, RotateCcw, FileText, Download, Settings } from 'lucide-react';
+import { GraduationCap, RotateCcw, Download, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface PlannerHeaderProps {
@@ -61,10 +61,6 @@ export const PlannerHeader = ({
           <Button variant="outline" size="sm" onClick={onReset}>
             <RotateCcw className="h-4 w-4 mr-1.5" />
             Reset
-          </Button>
-          <Button variant="outline" size="sm">
-            <FileText className="h-4 w-4 mr-1.5" />
-            Audit Report
           </Button>
           <Button size="sm">
             <Download className="h-4 w-4 mr-1.5" />

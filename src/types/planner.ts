@@ -2,14 +2,32 @@ export type TermName = 'Fall' | 'Winter' | 'Spring' | 'Summer';
 
 export type TermSystem = 'semester' | 'quarter';
 
-export type CategoryName = 'Major' | 'Core' | 'Math' | 'GenEd' | 'Science' | 'Elective';
+export type PlanType = 'major' | 'minor';
+
+export interface PlannerPlan {
+  id: string;
+  name: string;
+  type: PlanType;
+  requiredCredits: number;
+}
 
 export interface Course {
   id: string;
   code: string;
   name: string;
+  description?: string;
   credits: number;
-  categories: CategoryName[];
+  distributives: string[];
+  planIds: string[];
+}
+
+export interface NewCourseInput {
+  code: string;
+  name: string;
+  description?: string;
+  credits: number;
+  distributives: string[];
+  planIds: string[];
 }
 
 export interface Term {
@@ -49,23 +67,7 @@ export interface PlannerState {
   years: AcademicYear[];
   requirements: DegreeRequirements;
   courseCatalog: Course[];
+  distributives: string[];
+  plans: PlannerPlan[];
   config?: PlannerConfig;
 }
-
-export const CATEGORY_COLORS: Record<CategoryName, string> = {
-  Major: 'bg-category-major',
-  Core: 'bg-category-core',
-  Math: 'bg-category-math',
-  GenEd: 'bg-category-gened',
-  Science: 'bg-category-science',
-  Elective: 'bg-category-elective',
-};
-
-export const CATEGORY_TEXT_COLORS: Record<CategoryName, string> = {
-  Major: 'text-category-major',
-  Core: 'text-category-core',
-  Math: 'text-category-math',
-  GenEd: 'text-category-gened',
-  Science: 'text-category-science',
-  Elective: 'text-category-elective',
-};

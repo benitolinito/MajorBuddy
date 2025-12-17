@@ -1,16 +1,17 @@
 import { useState } from 'react';
-import { Term, Course } from '@/types/planner';
+import { Term, Course, PlannerPlan } from '@/types/planner';
 import { CourseCard } from './CourseCard';
 import { Badge } from '@/components/ui/badge';
 
 interface TermCardProps {
   term: Term;
   credits: number;
+  plans: PlannerPlan[];
   onRemoveCourse: (courseId: string) => void;
   onDropCourse: (course: Course) => void;
 }
 
-export const TermCard = ({ term, credits, onRemoveCourse, onDropCourse }: TermCardProps) => {
+export const TermCard = ({ term, credits, plans, onRemoveCourse, onDropCourse }: TermCardProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -60,6 +61,7 @@ export const TermCard = ({ term, credits, onRemoveCourse, onDropCourse }: TermCa
             <CourseCard
               key={course.id}
               course={course}
+              plans={plans}
               onRemove={() => onRemoveCourse(course.id)}
             />
           ))

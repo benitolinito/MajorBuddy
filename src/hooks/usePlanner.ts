@@ -1,23 +1,104 @@
 import { useState, useCallback, useMemo } from 'react';
-import { PlannerState, AcademicYear, Course, PlannerConfig, TermName, TermSystem } from '@/types/planner';
+import {
+  PlannerState,
+  AcademicYear,
+  Course,
+  PlannerConfig,
+  TermName,
+  TermSystem,
+  PlannerPlan,
+  PlanType,
+  NewCourseInput,
+} from '@/types/planner';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const CONFIG_STORAGE_KEY = 'plannerSetup';
+const COURSE_STORAGE_KEY = 'plannerCourseCatalog';
+const DISTRIBUTIVES_STORAGE_KEY = 'plannerDistributives';
+const PLANS_STORAGE_KEY = 'plannerPlans';
+const DEFAULT_MAJOR_CREDITS = 48;
+const DEFAULT_MINOR_CREDITS = 24;
 
-const COURSE_CATALOG: Course[] = [
-  { id: 'cs101', code: 'CS101', name: 'Intro to Computer Science', credits: 4, categories: ['Major', 'Core'] },
-  { id: 'math101', code: 'MATH101', name: 'Calculus I', credits: 4, categories: ['Major', 'Math'] },
-  { id: 'eng101', code: 'ENG101', name: 'English Composition', credits: 3, categories: ['GenEd'] },
-  { id: 'hist101', code: 'HIST101', name: 'World History', credits: 3, categories: ['GenEd'] },
-  { id: 'cs102', code: 'CS102', name: 'Data Structures', credits: 4, categories: ['Major', 'Core'] },
-  { id: 'math102', code: 'MATH102', name: 'Calculus II', credits: 4, categories: ['Major', 'Math'] },
-  { id: 'phys101', code: 'PHYS101', name: 'General Physics I', credits: 4, categories: ['Science'] },
-  { id: 'cs201', code: 'CS201', name: 'Algorithms', credits: 4, categories: ['Major', 'Core'] },
-  { id: 'cs202', code: 'CS202', name: 'Computer Architecture', credits: 4, categories: ['Major'] },
-  { id: 'art101', code: 'ART101', name: 'Art History', credits: 3, categories: ['Elective'] },
-  { id: 'cs301', code: 'CS301', name: 'Operating Systems', credits: 4, categories: ['Major', 'Core'] },
-  { id: 'cs302', code: 'CS302', name: 'Database Systems', credits: 3, categories: ['Major', 'Elective'] },
-];
+const persistJson = (key: string, value: unknown) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(key, JSON.stringify(value));
+};
+
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+
+const loadJson = <T>(key: string, fallback: T): T => {
+  if (typeof window === 'undefined') return fallback;
+  const raw = localStorage.getItem(key);
+  if (!raw) return fallback;
+
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed as T;
+  } catch {
+    return fallback;
+  }
+};
+
+const normalizeDistributives = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  value.forEach((item) => {
+    if (isNonEmptyString(item)) {
+      seen.add(item.trim());
+    }
+  });
+  return Array.from(seen);
+};
+
+const normalizePlan = (value: unknown): PlannerPlan => {
+  const plan = (value ?? {}) as Record<string, unknown>;
+  const type: PlanType = plan.type === 'minor' ? 'minor' : 'major';
+  const defaultCredits = type === 'major' ? DEFAULT_MAJOR_CREDITS : DEFAULT_MINOR_CREDITS;
+  return {
+    id: isNonEmptyString(plan.id) ? plan.id : generateId(),
+    name: isNonEmptyString(plan.name) ? plan.name.trim() : 'Untitled plan',
+    type,
+    requiredCredits: Number.isFinite(Number(plan.requiredCredits))
+      ? Math.max(0, Number(plan.requiredCredits))
+      : defaultCredits,
+  };
+};
+
+const normalizeCourse = (value: unknown): Course => {
+  const course = (value ?? {}) as Record<string, unknown>;
+  const distributivesSource =
+    'distributives' in course
+      ? course.distributives
+      : 'categories' in course
+        ? course.categories
+        : [];
+  const distributives = normalizeDistributives(distributivesSource);
+  const planIds = Array.isArray(course.planIds) ? course.planIds.filter(isNonEmptyString) : [];
+  return {
+    id: isNonEmptyString(course.id) ? course.id : generateId(),
+    code: isNonEmptyString(course.code) ? course.code.trim() : 'NEW-000',
+    name: isNonEmptyString(course.name) ? course.name.trim() : 'Untitled course',
+    description: typeof course.description === 'string' ? course.description : undefined,
+    credits: Number.isFinite(Number(course.credits)) ? Number(course.credits) : 0,
+    distributives,
+    planIds,
+  };
+};
+
+const loadStoredCourses = (): Course[] => {
+  const raw = loadJson<unknown>(COURSE_STORAGE_KEY, []);
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeCourse);
+};
+
+const loadStoredDistributives = (): string[] => normalizeDistributives(loadJson(DISTRIBUTIVES_STORAGE_KEY, []));
+
+const loadStoredPlans = (): PlannerPlan[] => {
+  const raw = loadJson<unknown>(PLANS_STORAGE_KEY, []);
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizePlan);
+};
 
 const formatYearLabel = (startYear: number) => {
   const pad = (value: number) => value.toString().slice(-2).padStart(2, '0');
@@ -69,18 +150,27 @@ const createInitialYears = (startYear: number, termSystem: TermSystem, yearsCoun
   });
 };
 
+type PlannerMeta = { degreeName?: string; university?: string };
+
 const createPlannerState = (
   config: PlannerConfig | null,
-  courseCatalog: Course[] = COURSE_CATALOG,
-  meta?: { degreeName?: string; university?: string },
+  options?: {
+    courseCatalog?: Course[];
+    distributives?: string[];
+    plans?: PlannerPlan[];
+    meta?: PlannerMeta;
+  },
 ): PlannerState => {
   const defaults = createDefaultConfig();
   const effectiveConfig = config ? { ...defaults, ...config } : defaults;
   const { startYear, totalCredits, termSystem, planName, university } = effectiveConfig;
+  const courseCatalog = options?.courseCatalog?.map(normalizeCourse) ?? [];
+  const distributives = normalizeDistributives(options?.distributives ?? []);
+  const plans = options?.plans?.map(normalizePlan) ?? [];
 
   return {
-    degreeName: meta?.degreeName ?? planName,
-    university: meta?.university ?? university,
+    degreeName: options?.meta?.degreeName ?? planName,
+    university: options?.meta?.university ?? university,
     classYear: startYear + 4,
     years: createInitialYears(startYear, termSystem),
     requirements: {
@@ -89,6 +179,8 @@ const createPlannerState = (
       genEd: 30,
     },
     courseCatalog,
+    distributives,
+    plans,
     config: effectiveConfig,
   };
 };
@@ -128,25 +220,141 @@ const persistConfig = (config: PlannerConfig) => {
 
 export const usePlanner = () => {
   const initialConfig = loadStoredConfig();
-  const [state, setState] = useState<PlannerState>(() => createPlannerState(initialConfig));
+  const initialCourses = loadStoredCourses();
+  const initialDistributives = loadStoredDistributives();
+  const initialPlans = loadStoredPlans();
+
+  const [state, setState] = useState<PlannerState>(() =>
+    createPlannerState(initialConfig, {
+      courseCatalog: initialCourses,
+      distributives: initialDistributives,
+      plans: initialPlans,
+    })
+  );
   const [hasConfig, setHasConfig] = useState(Boolean(initialConfig));
 
   const addCourseToTerm = useCallback((yearId: string, termId: string, course: Course) => {
-    setState((prev) => ({
-      ...prev,
-      years: prev.years.map((year) =>
-        year.id === yearId
-          ? {
-              ...year,
-              terms: year.terms.map((term) =>
-                term.id === termId
-                  ? { ...term, courses: [...term.courses, { ...course, id: generateId() }] }
-                  : term
-              ),
-            }
-          : year
-      ),
-    }));
+    const normalizedCourse = normalizeCourse(course);
+    setState((prev) => {
+      const validPlanIds = normalizedCourse.planIds.filter((id) => prev.plans.some((plan) => plan.id === id));
+      const courseWithPlans = { ...normalizedCourse, planIds: validPlanIds };
+      return {
+        ...prev,
+        years: prev.years.map((year) =>
+          year.id === yearId
+            ? {
+                ...year,
+                terms: year.terms.map((term) =>
+                  term.id === termId
+                    ? { ...term, courses: [...term.courses, { ...courseWithPlans, id: generateId() }] }
+                    : term
+                ),
+              }
+            : year
+        ),
+      };
+    });
+  }, []);
+
+  const addCourseToCatalog = useCallback((courseInput: NewCourseInput) => {
+    const normalizedCourse = normalizeCourse({ ...courseInput, id: generateId() });
+    setState((prev) => {
+      const validPlanIds = normalizedCourse.planIds.filter((id) => prev.plans.some((plan) => plan.id === id));
+      const courseWithPlans = { ...normalizedCourse, planIds: validPlanIds };
+      const updatedCatalog = [...prev.courseCatalog, courseWithPlans];
+      const updatedDistributives = normalizeDistributives([...prev.distributives, ...courseWithPlans.distributives]);
+      persistJson(COURSE_STORAGE_KEY, updatedCatalog);
+      persistJson(DISTRIBUTIVES_STORAGE_KEY, updatedDistributives);
+
+      return {
+        ...prev,
+        courseCatalog: updatedCatalog,
+        distributives: updatedDistributives,
+      };
+    });
+    return normalizedCourse;
+  }, []);
+
+  const addDistributive = useCallback((label: string) => {
+    const normalized = label.trim();
+    if (!normalized) return '';
+    let nextDistributives: string[] = [];
+    setState((prev) => {
+      if (prev.distributives.includes(normalized)) {
+        nextDistributives = prev.distributives;
+        return prev;
+      }
+      nextDistributives = [...prev.distributives, normalized];
+      persistJson(DISTRIBUTIVES_STORAGE_KEY, nextDistributives);
+      return { ...prev, distributives: nextDistributives };
+    });
+    return normalized;
+  }, []);
+
+  const addPlan = useCallback((name: string, type: PlanType = 'major', requiredCredits?: number) => {
+    const normalizedName = name.trim();
+    if (!normalizedName) return null;
+    const creditsTarget =
+      Number.isFinite(Number(requiredCredits)) && Number(requiredCredits) !== 0
+        ? Math.max(0, Number(requiredCredits))
+        : type === 'major'
+          ? DEFAULT_MAJOR_CREDITS
+          : DEFAULT_MINOR_CREDITS;
+    let createdPlan: PlannerPlan | null = null;
+    setState((prev) => {
+      const existing = prev.plans.find(
+        (plan) => plan.name.toLowerCase() === normalizedName.toLowerCase() && plan.type === type
+      );
+      if (existing) {
+        createdPlan = existing;
+        return prev;
+      }
+      const nextPlan: PlannerPlan = { id: generateId(), name: normalizedName, type, requiredCredits: creditsTarget };
+      const updatedPlans = [...prev.plans, nextPlan];
+      createdPlan = nextPlan;
+      persistJson(PLANS_STORAGE_KEY, updatedPlans);
+      return { ...prev, plans: updatedPlans };
+    });
+    return createdPlan;
+  }, []);
+
+  const updatePlanRequirement = useCallback((planId: string, requiredCredits: number) => {
+    const normalizedCredits = Math.max(0, Number(requiredCredits) || 0);
+    setState((prev) => {
+      const updatedPlans = prev.plans.map((plan) =>
+        plan.id === planId ? { ...plan, requiredCredits: normalizedCredits } : plan
+      );
+      persistJson(PLANS_STORAGE_KEY, updatedPlans);
+      return { ...prev, plans: updatedPlans };
+    });
+  }, []);
+
+  const removePlan = useCallback((planId: string) => {
+    setState((prev) => {
+      const updatedPlans = prev.plans.filter((plan) => plan.id !== planId);
+      const updatedCatalog = prev.courseCatalog.map((course) => ({
+        ...course,
+        planIds: course.planIds.filter((id) => id !== planId),
+      }));
+      const updatedYears = prev.years.map((year) => ({
+        ...year,
+        terms: year.terms.map((term) => ({
+          ...term,
+          courses: term.courses.map((course) => ({
+            ...course,
+            planIds: course.planIds.filter((id) => id !== planId),
+          })),
+        })),
+      }));
+      persistJson(PLANS_STORAGE_KEY, updatedPlans);
+      persistJson(COURSE_STORAGE_KEY, updatedCatalog);
+      return {
+        ...prev,
+        plans: updatedPlans,
+        courseCatalog: updatedCatalog,
+        years: updatedYears,
+      };
+    });
   }, []);
 
   const removeCourse = useCallback((yearId: string, termId: string, courseId: string) => {
@@ -192,26 +400,38 @@ export const usePlanner = () => {
   }, []);
 
   const stats = useMemo(() => {
+    const planProgressMap = new Map<string, { scheduled: number; total: number }>();
+    state.plans.forEach((plan) => {
+      planProgressMap.set(plan.id, { scheduled: 0, total: 0 });
+    });
+
+    state.courseCatalog.forEach((course) => {
+      course.planIds.forEach((planId) => {
+        if (!planProgressMap.has(planId)) return;
+        const entry = planProgressMap.get(planId);
+        if (entry) {
+          planProgressMap.set(planId, { ...entry, total: entry.total + 1 });
+        }
+      });
+    });
+
     let totalCredits = 0;
-    let majorCore = 0;
-    let genEd = 0;
 
     state.years.forEach((year) => {
       year.terms.forEach((term) => {
         term.courses.forEach((course) => {
           totalCredits += course.credits;
-          if (course.categories.includes('Core') || course.categories.includes('Major')) {
-            majorCore += course.credits;
-          }
-          if (course.categories.includes('GenEd')) {
-            genEd += course.credits;
-          }
+          course.planIds.forEach((id) => {
+            const entry = planProgressMap.get(id);
+            if (!entry) return;
+            planProgressMap.set(id, { ...entry, scheduled: entry.scheduled + 1 });
+          });
         });
       });
     });
 
-    return { totalCredits, majorCore, genEd };
-  }, [state.years]);
+    return { totalCredits, planProgress: Object.fromEntries(planProgressMap) };
+  }, [state.years, state.plans, state.courseCatalog]);
 
   const getTermCredits = useCallback((yearId: string, termId: string) => {
     const year = state.years.find((y) => y.id === yearId);
@@ -225,10 +445,14 @@ export const usePlanner = () => {
     setState((prev) =>
       createPlannerState(
         prev.config ?? loadStoredConfig(),
-        prev.courseCatalog?.length ? prev.courseCatalog : COURSE_CATALOG,
         {
-          degreeName: prev.config?.planName ?? prev.degreeName,
-          university: prev.config?.university ?? prev.university,
+          courseCatalog: prev.courseCatalog,
+          distributives: prev.distributives,
+          plans: prev.plans,
+          meta: {
+            degreeName: prev.config?.planName ?? prev.degreeName,
+            university: prev.config?.university ?? prev.university,
+          },
         },
       )
     );
@@ -254,13 +478,32 @@ export const usePlanner = () => {
     persistConfig(normalizedConfig);
     setHasConfig(true);
 
+    const normalizedCatalog = snapshot.courseCatalog?.length
+      ? snapshot.courseCatalog.map(normalizeCourse)
+      : loadStoredCourses();
+    const normalizedDistributives = snapshot.distributives?.length
+      ? normalizeDistributives(snapshot.distributives)
+      : loadStoredDistributives();
+    const normalizedPlans = snapshot.plans?.length ? snapshot.plans.map(normalizePlan) : loadStoredPlans();
+    const planIdSet = new Set(normalizedPlans.map((plan) => plan.id));
+    const sanitizedCatalog = normalizedCatalog.map((course) => ({
+      ...course,
+      planIds: course.planIds.filter((id) => planIdSet.has(id)),
+    }));
+
+    persistJson(COURSE_STORAGE_KEY, sanitizedCatalog);
+    persistJson(DISTRIBUTIVES_STORAGE_KEY, normalizedDistributives);
+    persistJson(PLANS_STORAGE_KEY, normalizedPlans);
+
     setState({
       ...snapshot,
       degreeName: snapshot.degreeName ?? normalizedConfig.planName,
       university: snapshot.university ?? normalizedConfig.university,
       classYear: snapshot.classYear ?? normalizedConfig.startYear + 4,
       config: normalizedConfig,
-      courseCatalog: snapshot.courseCatalog?.length ? snapshot.courseCatalog : COURSE_CATALOG,
+      courseCatalog: sanitizedCatalog,
+      distributives: normalizedDistributives,
+      plans: normalizedPlans,
       years: snapshot.years.map((year, index) => {
         const startYear = year.startYear ?? year.terms?.[0]?.year ?? (normalizedConfig.startYear + index);
         return {
@@ -268,6 +511,16 @@ export const usePlanner = () => {
           name: year.name || formatYearLabel(startYear),
           startYear,
           endYear: year.endYear ?? startYear + 1,
+          terms: year.terms.map((term) => ({
+            ...term,
+            courses: term.courses?.map((course) => {
+              const normalizedCourse = normalizeCourse(course);
+              return {
+                ...normalizedCourse,
+                planIds: normalizedCourse.planIds.filter((id) => planIdSet.has(id)),
+              };
+            }) ?? [],
+          })),
         };
       }),
     });
@@ -279,8 +532,12 @@ export const usePlanner = () => {
     setState((prev) =>
       createPlannerState(
         config,
-        prev.courseCatalog?.length ? prev.courseCatalog : COURSE_CATALOG,
-        { degreeName: config.planName, university: config.university },
+        {
+          courseCatalog: prev.courseCatalog,
+          distributives: prev.distributives,
+          plans: prev.plans,
+          meta: { degreeName: config.planName, university: config.university },
+        },
       )
     );
   }, []);
@@ -288,6 +545,10 @@ export const usePlanner = () => {
   return {
     state,
     addCourseToTerm,
+    addCourseToCatalog,
+    addDistributive,
+    addPlan,
+    removePlan,
     removeCourse,
     addTerm,
     getTermCredits,

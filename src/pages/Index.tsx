@@ -19,6 +19,10 @@ const Index = () => {
     getTermCredits,
     stats,
     reset,
+    addCourseToCatalog,
+    addDistributive,
+    addPlan,
+    removePlan,
     applySnapshot,
     configurePlanner,
     hasConfig,
@@ -66,7 +70,11 @@ const Index = () => {
 
       <CourseCatalog 
         courses={state.courseCatalog} 
+        distributives={state.distributives}
+        plans={state.plans}
         onDragStart={handleDragStart}
+        onCreateCourse={addCourseToCatalog}
+        onCreateDistributive={addDistributive}
       />
       
       <div className="flex-1 flex flex-col">
@@ -93,6 +101,7 @@ const Index = () => {
                 key={year.id}
                 year={year}
                 getTermCredits={(termId) => getTermCredits(year.id, termId)}
+                plans={state.plans}
                 onRemoveCourse={(termId, courseId) => removeCourse(year.id, termId, courseId)}
                 onDropCourse={(termId, course) => handleDropCourse(year.id, termId, course)}
                 onAddTerm={() => addTerm(year.id)}
@@ -101,14 +110,14 @@ const Index = () => {
             </div>
           </ScrollArea>
           
-          <aside className="w-64 p-6 border-l border-border">
+          <aside className="w-80 p-6 border-l border-border">
             <RequirementsSidebar
               totalCredits={stats.totalCredits}
               maxCredits={state.requirements.totalCredits}
-              majorCore={stats.majorCore}
-              maxMajorCore={state.requirements.majorCore}
-              genEd={stats.genEd}
-              maxGenEd={state.requirements.genEd}
+              plans={state.plans}
+              planProgress={stats.planProgress}
+              onAddPlan={addPlan}
+              onRemovePlan={removePlan}
             />
           </aside>
         </div>
