@@ -73,6 +73,11 @@ export interface PlannerState {
   config?: PlannerConfig;
 }
 
+export type PlanProfile = {
+  id: string;
+  name: string;
+};
+
 export type CourseDropSource = {
   yearId: string;
   termId: string;

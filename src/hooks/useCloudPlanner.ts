@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { User, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import { auth, googleProvider } from "@/firebaseClient";
+import {
+  User,
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+} from "firebase/auth";
+
 import { PlannerSnapshot, loadPlannerSnapshot, savePlannerSnapshot } from "@/cloudPlanStore";
+import { auth, googleProvider } from "@/firebaseClient";
 
 type UseCloudPlannerArgs = {
   state: PlannerSnapshot;
@@ -10,11 +18,15 @@ type UseCloudPlannerArgs = {
 
 const SAVE_DEBOUNCE_MS = 1200;
 
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
+
 export const useCloudPlanner = ({ state, applySnapshot }: UseCloudPlannerArgs) => {
   const [user, setUser] = useState<User | null>(null);
   const [cloudStatus, setCloudStatus] = useState("");
   const [cloudSaving, setCloudSaving] = useState(false);
   const [cloudLoading, setCloudLoading] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
   const hasLoadedRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
   const userRef = useRef<User | null>(null);
@@ -34,25 +46,65 @@ export const useCloudPlanner = ({ state, applySnapshot }: UseCloudPlannerArgs) =
     return unsubscribe;
   }, []);
 
-  const signIn = useCallback(async () => {
+  const signInWithGoogle = useCallback(async () => {
+    setAuthBusy(true);
     setCloudStatus("Signing in with Google...");
     try {
       const credential = await signInWithPopup(auth, googleProvider);
       setUser(credential.user);
       setCloudStatus("Signed in. Syncing your plan...");
     } catch (error) {
-      setCloudStatus(error instanceof Error ? error.message : "Could not sign in");
+      const message = getErrorMessage(error, "Could not sign in");
+      setCloudStatus(message);
+      throw new Error(message);
+    } finally {
+      setAuthBusy(false);
+    }
+  }, []);
+
+  const signInWithEmail = useCallback(async (email: string, password: string) => {
+    setAuthBusy(true);
+    setCloudStatus("Signing in...");
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      setUser(credential.user);
+      setCloudStatus("Signed in. Syncing your plan...");
+    } catch (error) {
+      const message = getErrorMessage(error, "Could not sign in with email");
+      setCloudStatus(message);
+      throw new Error(message);
+    } finally {
+      setAuthBusy(false);
+    }
+  }, []);
+
+  const registerWithEmail = useCallback(async (email: string, password: string) => {
+    setAuthBusy(true);
+    setCloudStatus("Creating your account...");
+    try {
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      setUser(credential.user);
+      setCloudStatus("Account created. Syncing your plan...");
+    } catch (error) {
+      const message = getErrorMessage(error, "Could not create your account");
+      setCloudStatus(message);
+      throw new Error(message);
+    } finally {
+      setAuthBusy(false);
     }
   }, []);
 
   const signOutUser = useCallback(async () => {
+    setAuthBusy(true);
     setCloudStatus("Signing out...");
     try {
       await signOut(auth);
       setCloudStatus("Signed out.");
       hasLoadedRef.current = false;
     } catch (error) {
-      setCloudStatus(error instanceof Error ? error.message : "Could not sign out");
+      setCloudStatus(getErrorMessage(error, "Could not sign out"));
+    } finally {
+      setAuthBusy(false);
     }
   }, []);
 
@@ -69,7 +121,7 @@ export const useCloudPlanner = ({ state, applySnapshot }: UseCloudPlannerArgs) =
           setCloudStatus("No saved plan yet.");
         }
       } catch (error) {
-        setCloudStatus(error instanceof Error ? error.message : "Could not load saved plan");
+        setCloudStatus(getErrorMessage(error, "Could not load saved plan"));
       } finally {
         hasLoadedRef.current = true;
         setCloudLoading(false);
@@ -97,7 +149,7 @@ export const useCloudPlanner = ({ state, applySnapshot }: UseCloudPlannerArgs) =
         await savePlannerSnapshot(uid, state);
         setCloudStatus("All changes saved.");
       } catch (error) {
-        setCloudStatus(error instanceof Error ? error.message : "Could not save plan");
+        setCloudStatus(getErrorMessage(error, "Could not save plan"));
       } finally {
         setCloudSaving(false);
       }
@@ -115,7 +167,10 @@ export const useCloudPlanner = ({ state, applySnapshot }: UseCloudPlannerArgs) =
     cloudStatus,
     cloudSaving,
     cloudLoading,
-    signIn,
+    authBusy,
+    signInWithGoogle,
+    signInWithEmail,
+    registerWithEmail,
     signOut: signOutUser,
   };
 };
