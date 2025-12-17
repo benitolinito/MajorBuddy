@@ -49,7 +49,7 @@ export const PlannerHeader = ({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 sm:flex-nowrap">
+        <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
           <div className="text-right sm:mr-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Credits</p>
             <p className="text-xl font-bold text-foreground">
@@ -58,23 +58,24 @@ export const PlannerHeader = ({
             </p>
           </div>
 
-          <Button variant="outline" size="sm" onClick={onReset}>
-            <RotateCcw className="h-4 w-4 mr-1.5" />
-            Reset
-          </Button>
-          <Button size="sm">
-            <Download className="h-4 w-4 mr-1.5" />
-            Export Schedule
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="ml-1"
-            onClick={onOpenSettings}
-            aria-label="Open planner settings"
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onReset}>
+              <RotateCcw className="h-4 w-4 mr-1.5" />
+              Reset
+            </Button>
+            <Button size="sm">
+              <Download className="h-4 w-4 mr-1.5" />
+              Export Schedule
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onOpenSettings}
+              aria-label="Open planner settings"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          </div>
           {showAuth && (
             <div className="flex items-center gap-2">
               <div className="hidden lg:flex flex-col items-end">

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   PlannerState,
   AcademicYear,
@@ -16,6 +16,7 @@ const CONFIG_STORAGE_KEY = 'plannerSetup';
 const COURSE_STORAGE_KEY = 'plannerCourseCatalog';
 const DISTRIBUTIVES_STORAGE_KEY = 'plannerDistributives';
 const PLANS_STORAGE_KEY = 'plannerPlans';
+const YEARS_STORAGE_KEY = 'plannerAcademicYears';
 const DEFAULT_MAJOR_CREDITS = 48;
 const DEFAULT_MINOR_CREDITS = 24;
 
@@ -124,6 +125,58 @@ const createTerm = (termName: TermName, academicStartYear: number) => ({
   courses: [],
 });
 
+const isTermName = (value: unknown): value is TermName =>
+  value === 'Fall' || value === 'Winter' || value === 'Spring' || value === 'Summer';
+
+const loadStoredYears = (): AcademicYear[] | null => {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem(YEARS_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as AcademicYear[]) : null;
+  } catch {
+    return null;
+  }
+};
+
+const sanitizeYears = (provided: AcademicYear[] | null | undefined, config: PlannerConfig): AcademicYear[] => {
+  if (!provided?.length) {
+    return createInitialYears(config.startYear, config.termSystem);
+  }
+
+  const defaultTermName = TERM_SEQUENCE[config.termSystem][0] ?? 'Fall';
+
+  return provided.map((year, index) => {
+    const fallbackStart = Number.isFinite(Number(year?.startYear)) ? Number(year?.startYear) : config.startYear + index;
+    const normalizedTerms = Array.isArray(year?.terms) && year.terms.length
+      ? year.terms.map((term) => {
+          const termName = isTermName(term?.name) ? term.name : defaultTermName;
+          const termYear = Number.isFinite(Number(term?.year))
+            ? Number(term.year)
+            : getCalendarYearForTerm(fallbackStart, termName);
+          const courses = Array.isArray(term?.courses)
+            ? term.courses.map((course) => normalizeCourse(course))
+            : [];
+          return {
+            id: isNonEmptyString(term?.id) ? term.id : generateId(),
+            name: termName,
+            year: termYear,
+            courses,
+          };
+        })
+      : createInitialYears(fallbackStart, config.termSystem, 1)[0].terms;
+
+    return {
+      id: isNonEmptyString(year?.id) ? year.id : generateId(),
+      name: isNonEmptyString(year?.name) ? year.name : formatYearLabel(fallbackStart),
+      startYear: fallbackStart,
+      endYear: Number.isFinite(Number(year?.endYear)) ? Number(year.endYear) : fallbackStart + 1,
+      terms: normalizedTerms,
+    };
+  });
+};
+
 const createDefaultConfig = (): PlannerConfig => {
   const currentYear = new Date().getFullYear();
   return {
@@ -159,6 +212,7 @@ const createPlannerState = (
     distributives?: string[];
     plans?: PlannerPlan[];
     meta?: PlannerMeta;
+    years?: AcademicYear[];
   },
 ): PlannerState => {
   const defaults = createDefaultConfig();
@@ -167,12 +221,13 @@ const createPlannerState = (
   const courseCatalog = options?.courseCatalog?.map(normalizeCourse) ?? [];
   const distributives = normalizeDistributives(options?.distributives ?? []);
   const plans = options?.plans?.map(normalizePlan) ?? [];
+  const years = sanitizeYears(options?.years ?? loadStoredYears(), effectiveConfig);
 
   return {
     degreeName: options?.meta?.degreeName ?? planName,
     university: options?.meta?.university ?? university,
     classYear: startYear + 4,
-    years: createInitialYears(startYear, termSystem),
+    years,
     requirements: {
       totalCredits,
       majorCore: 48,
@@ -220,6 +275,7 @@ const persistConfig = (config: PlannerConfig) => {
 
 export const usePlanner = () => {
   const initialConfig = loadStoredConfig();
+  const initialYears = sanitizeYears(loadStoredYears(), initialConfig ?? createDefaultConfig());
   const initialCourses = loadStoredCourses();
   const initialDistributives = loadStoredDistributives();
   const initialPlans = loadStoredPlans();
@@ -229,6 +285,7 @@ export const usePlanner = () => {
       courseCatalog: initialCourses,
       distributives: initialDistributives,
       plans: initialPlans,
+      years: initialYears,
     })
   );
   const [hasConfig, setHasConfig] = useState(Boolean(initialConfig));
@@ -255,6 +312,10 @@ export const usePlanner = () => {
       };
     });
   }, []);
+
+  useEffect(() => {
+    persistJson(YEARS_STORAGE_KEY, state.years);
+  }, [state.years]);
 
   const addCourseToCatalog = useCallback((courseInput: NewCourseInput) => {
     const normalizedCourse = normalizeCourse({ ...courseInput, id: generateId() });
@@ -449,6 +510,7 @@ export const usePlanner = () => {
           courseCatalog: prev.courseCatalog,
           distributives: prev.distributives,
           plans: prev.plans,
+          years: prev.years,
           meta: {
             degreeName: prev.config?.planName ?? prev.degreeName,
             university: prev.config?.university ?? prev.university,
@@ -536,6 +598,7 @@ export const usePlanner = () => {
           courseCatalog: prev.courseCatalog,
           distributives: prev.distributives,
           plans: prev.plans,
+          years: prev.years,
           meta: { degreeName: config.planName, university: config.university },
         },
       )
