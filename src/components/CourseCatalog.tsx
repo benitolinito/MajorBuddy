@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BookOpen, Plus, Search, Tag } from 'lucide-react';
+import { BookOpen, ChevronsLeft, Plus, Search, Tag } from 'lucide-react';
 import { Course, NewCourseInput, PlannerPlan } from '@/types/planner';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -16,6 +16,7 @@ interface CourseCatalogProps {
   onDragStart: (course: Course) => void;
   onCreateCourse: (course: NewCourseInput) => void;
   onCreateDistributive: (label: string) => string;
+  onCollapsePanel?: () => void;
 }
 
 const TogglePill = ({
@@ -51,6 +52,7 @@ export const CourseCatalog = ({
   onDragStart,
   onCreateCourse,
   onCreateDistributive,
+  onCollapsePanel,
 }: CourseCatalogProps) => {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -136,10 +138,23 @@ export const CourseCatalog = ({
               <p className="text-xs text-muted-foreground">Add your classes, then drag to a term.</p>
             </div>
           </div>
-          <Button size="sm" onClick={() => setDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add class
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button size="sm" onClick={() => setDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add class
+            </Button>
+            {onCollapsePanel && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
+                onClick={onCollapsePanel}
+            
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
