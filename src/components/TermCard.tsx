@@ -1,9 +1,10 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { X } from 'lucide-react';
 import { Term, Course, PlannerPlan, CourseDropOptions } from '@/types/planner';
 import { CourseCard } from './CourseCard';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface TermCardProps {
   yearId: string;
@@ -20,6 +21,8 @@ export const TermCard = ({ yearId, term, credits, plans, onRemoveCourse, onDropC
   const [indicatorIndex, setIndicatorIndex] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const positionsRef = useRef<Map<string, DOMRect>>(new Map());
+  const [recentCourseId, setRecentCourseId] = useState<string | null>(null);
+  const dropHighlightTimeout = useRef<number | null>(null);
 
   const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
@@ -71,6 +74,11 @@ export const TermCard = ({ yearId, term, credits, plans, onRemoveCourse, onDropC
       const course = JSON.parse(courseData) as Course;
       const source = extractSource(e);
       onDropCourse(course, { targetIndex: insertionIndex, source });
+      setRecentCourseId(course.id);
+      if (dropHighlightTimeout.current) {
+        window.clearTimeout(dropHighlightTimeout.current);
+      }
+      dropHighlightTimeout.current = window.setTimeout(() => setRecentCourseId(null), 700);
     } catch {
       // ignore malformed payloads
     }
@@ -129,6 +137,12 @@ export const TermCard = ({ yearId, term, credits, plans, onRemoveCourse, onDropC
     positionsRef.current = nextPositions;
   }, [term.courses]);
 
+  useEffect(() => () => {
+    if (dropHighlightTimeout.current) {
+      window.clearTimeout(dropHighlightTimeout.current);
+    }
+  }, []);
+
   return (
     <div
       onDragOver={handleTermDragOver}
@@ -172,7 +186,15 @@ export const TermCard = ({ yearId, term, credits, plans, onRemoveCourse, onDropC
           </div>
         ) : (
           term.courses.map((course, index) => (
-            <div key={course.id} data-course-index={index} data-course-id={course.id} className="transition-transform duration-200 ease-out">
+            <div
+              key={course.id}
+              data-course-index={index}
+              data-course-id={course.id}
+              className={cn(
+                "transition-transform duration-200 ease-out",
+                recentCourseId === course.id && "animate-course-drop",
+              )}
+            >
               {indicatorIndex !== null && indicatorIndex === index && renderDropIndicator(index)}
               <CourseCard
                 course={course}

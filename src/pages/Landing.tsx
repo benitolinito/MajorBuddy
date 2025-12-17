@@ -4,7 +4,6 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithP
 import {
   ArrowRight,
   CalendarDays,
-  CheckCircle2,
   GraduationCap,
   Layers3,
   ListChecks,
@@ -61,35 +60,6 @@ const workflowSteps = [
     description: "Export a clean schedule, invite collaborators, or revisit the plan on mobile between advising sessions.",
     icon: ShieldCheck,
   },
-] as const;
-
-const faqs = [
-  {
-    question: "Is MajorBuddy free to use?",
-    answer:
-      "Yes. The core planner, drag-and-drop schedule builder, and export tools are free. We are adding optional pro features for teams, but students can plan unlimited terms without paying.",
-  },
-  {
-    question: "Will it work for quarter and semester schools?",
-    answer:
-      "Absolutely. The setup flow lets you pick quarter or semester calendars, and you can add or remove terms for co-ops, summer sessions, or study abroad blocks.",
-  },
-  {
-    question: "Can I collaborate with advisors or friends?",
-    answer:
-      "You can export snapshots to share over email today, and our roadmap includes shared links and commenting so advisors can propose edits without spreadsheets.",
-  },
-  {
-    question: "Does MajorBuddy replace my university degree audit?",
-    answer:
-      "No—think of MajorBuddy as the planning canvas on top of your audit. Use it to explore what-if scenarios, run course drafts, and then confirm the plan with your official audit.",
-  },
-] as const;
-
-const seoCopy = [
-  "MajorBuddy is a modern academic planning tool for students who would rather build their degree plan the same way they organize a kanban board. The browser-based interface mirrors real semester or quarter calendars, supports custom requirements, and showcases every class with meaningful colors, tags, and notes. Unlike static PDF checklists, MajorBuddy stays interactive—drag a course into a new term, watch credit totals rebalance, and keep going until every graduation requirement is satisfied.",
-  "Advisors and student success teams also lean on MajorBuddy to standardize planning conversations. Because every requirement, general education bucket, and elective track can be modeled in one hub, departments can share starter templates with incoming students while still giving them room to personalize. The built-in export tools generate clean progress reports that plug into email threads, LMS resources, or portfolio updates.",
-  "Whether you plan to double major, accelerate graduation, take a mid-degree internship, or tack on a certificate, MajorBuddy shows the trade-offs at a glance. Historical versions are saved in the browser, no login is required to get started, and the experience is optimized for mobile so you can tweak the plan while waiting for advising appointments or class registration windows to open.",
 ] as const;
 
 const showMarketingSections = true;
@@ -328,18 +298,6 @@ const Landing = () => {
         </section>
         )}
 
-        {showMarketingSections && (
-        <section id="about" className="border-t border-border/50 bg-card/30 py-16">
-          <div className="mx-auto flex max-w-5xl flex-col gap-6 px-6">
-            <h2 className="text-3xl font-semibold text-foreground">Purpose-built for discoverable degree planning.</h2>
-            {seoCopy.map((paragraph) => (
-              <p key={paragraph.slice(0, 32)} className="text-base leading-7 text-muted-foreground">
-                {paragraph}
-              </p>
-            ))}
-          </div>
-        </section>
-        )}
       </main>
     </>
   );

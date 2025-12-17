@@ -54,6 +54,16 @@
     --sidebar-ring: 217 91% 60%;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
   .dark {
     --background: 220 20% 10%;
     --foreground: 210 20% 95%;
@@ -120,5 +130,46 @@
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: hsl(var(--muted-foreground) / 0.3);
     border-radius: 3px;
+  }
+
+  @keyframes section-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(32px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes course-drop-pop {
+    0% {
+      transform: scale(0.9);
+      opacity: 0.2;
+    }
+    60% {
+      transform: scale(1.02);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  .section-reveal {
+    animation: section-fade-in 0.6s ease forwards;
+  }
+
+  .animate-course-drop {
+    animation: course-drop-pop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .section-reveal,
+    .animate-course-drop {
+      animation: none;
+    }
   }
 }
