@@ -101,6 +101,13 @@
     --sidebar-accent-foreground: 210 20% 95%;
     --sidebar-border: 220 15% 20%;
     --sidebar-ring: 217 91% 60%;
+
+    --cat-major: 217 91% 60%;
+    --cat-core: 142 71% 45%;
+    --cat-math: 280 70% 55%;
+    --cat-gened: 45 93% 47%;
+    --cat-science: 340 75% 55%;
+    --cat-elective: 200 15% 50%;
   }
 }
 

@@ -1,6 +1,7 @@
 import { GraduationCap, RotateCcw, Download, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface PlannerHeaderProps {
   degreeName: string;
@@ -68,6 +69,7 @@ export const PlannerHeader = ({
               <Download className="h-4 w-4 mr-1.5" />
               Export Schedule
             </Button>
+            <ThemeToggle />
             <Button
               variant="ghost"
               size="icon"
