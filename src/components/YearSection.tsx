@@ -14,6 +14,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 interface YearSectionProps {
   year: AcademicYear;
@@ -38,7 +39,7 @@ export const YearSection = ({
   onRemoveYear,
   canRemoveYear,
 }: YearSectionProps) => {
-  const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   return (
     <section className="group mb-8">

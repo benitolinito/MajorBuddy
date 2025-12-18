@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PlanProfile } from '@/types/planner';
+import { buildDuplicatePlanName, DEFAULT_PLAN_NAME, getSuggestedPlanName } from '@/lib/plannerProfiles';
 
 type PlanDialogMode = 'create' | 'rename';
 
@@ -43,9 +44,10 @@ export const PlanSwitcher = ({
   const [startBlank, setStartBlank] = useState(false);
 
   const defaultNewPlanName = useMemo(() => {
-    if (activePlan?.name) return `${activePlan.name} copy`;
-    return plans.length ? `Plan ${plans.length + 1}` : 'My plan';
-  }, [activePlan?.name, plans.length]);
+    if (activePlan?.name) return buildDuplicatePlanName(activePlan.name, plans);
+    if (plans.length) return getSuggestedPlanName(plans);
+    return DEFAULT_PLAN_NAME;
+  }, [activePlan?.name, plans]);
 
   const openCreateDialog = (blank = false) => {
     setDialogMode('create');

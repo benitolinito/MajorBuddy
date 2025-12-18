@@ -65,6 +65,30 @@ const TogglePill = ({
   );
 };
 
+type CourseFormState = {
+  code: string;
+  title: string;
+  description: string;
+  credits: number;
+  distributives: string[];
+  distributiveColors: Record<string, string>;
+  activeDistributive: string | null;
+  newDistributive: string;
+  planIds: string[];
+};
+
+const createEmptyCourseForm = (): CourseFormState => ({
+  code: '',
+  title: '',
+  description: '',
+  credits: 3,
+  distributives: [],
+  distributiveColors: {},
+  activeDistributive: null,
+  newDistributive: '',
+  planIds: [],
+});
+
 export const CourseCatalog = ({
   courses,
   distributives,
@@ -84,16 +108,23 @@ export const CourseCatalog = ({
 }: CourseCatalogProps) => {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [code, setCode] = useState('');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [credits, setCredits] = useState(3);
-  const [selectedDistributives, setSelectedDistributives] = useState<string[]>([]);
-  const [selectedDistributiveColors, setSelectedDistributiveColors] = useState<Record<string, string>>({});
-  const [activeDistributiveForColor, setActiveDistributiveForColor] = useState<string | null>(null);
-  const [newDistributive, setNewDistributive] = useState('');
-  const [selectedPlans, setSelectedPlans] = useState<string[]>([]);
+  const [formState, setFormState] = useState<CourseFormState>(() => createEmptyCourseForm());
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+
+  const {
+    code,
+    title,
+    description,
+    credits,
+    distributives: selectedDistributives,
+    distributiveColors: selectedDistributiveColors,
+    activeDistributive: activeDistributiveForColor,
+    newDistributive,
+    planIds: selectedPlans,
+  } = formState;
+  const updateFormField = <K extends keyof CourseFormState>(key: K, value: CourseFormState[K]) => {
+    setFormState((prev) => ({ ...prev, [key]: value }));
+  };
 
   const planLookup = useMemo(() => new Map(plans.map((plan) => [plan.id, plan])), [plans]);
 
@@ -105,79 +136,87 @@ export const CourseCatalog = ({
     );
   }, [courses, search]);
 
-  const activeColorDistributive =
-    activeDistributiveForColor && selectedDistributives.includes(activeDistributiveForColor)
-      ? activeDistributiveForColor
-      : null;
-
   useEffect(() => {
     if (selectedDistributives.length === 0) {
       if (activeDistributiveForColor !== null) {
-        setActiveDistributiveForColor(null);
+        updateFormField('activeDistributive', null);
       }
       return;
     }
     if (!activeDistributiveForColor || !selectedDistributives.includes(activeDistributiveForColor)) {
-      setActiveDistributiveForColor(selectedDistributives[0]);
+      updateFormField('activeDistributive', selectedDistributives[0] ?? null);
     }
   }, [activeDistributiveForColor, selectedDistributives]);
 
   const updateDistributiveColor = (label: string, colorId: string) => {
-    setSelectedDistributiveColors((prev) => ({ ...prev, [label]: colorId }));
+    setFormState((prev) => ({
+      ...prev,
+      distributiveColors: { ...prev.distributiveColors, [label]: colorId },
+    }));
   };
 
   const removeDistributiveColor = (label: string) => {
-    setSelectedDistributiveColors((prev) => {
-      if (!(label in prev)) return prev;
-      const next = { ...prev };
-      delete next[label];
-      return next;
+    setFormState((prev) => {
+      if (!(label in prev.distributiveColors)) return prev;
+      const nextColors = { ...prev.distributiveColors };
+      delete nextColors[label];
+      return { ...prev, distributiveColors: nextColors };
     });
   };
 
   const toggleDistributive = (label: string) => {
-    setSelectedDistributives((prev) => {
-      const isSelected = prev.includes(label);
+    setFormState((prev) => {
+      const isSelected = prev.distributives.includes(label);
       if (!isSelected) {
-        setActiveDistributiveForColor(label);
-        return [...prev, label];
+        return {
+          ...prev,
+          distributives: [...prev.distributives, label],
+          activeDistributive: label,
+        };
       }
 
-      if (activeDistributiveForColor !== label) {
-        setActiveDistributiveForColor(label);
-        return prev;
+      if (prev.activeDistributive !== label) {
+        return {
+          ...prev,
+          activeDistributive: label,
+        };
       }
 
-      removeDistributiveColor(label);
-      const remaining = prev.filter((item) => item !== label);
-      setActiveDistributiveForColor(remaining[0] ?? null);
-      return remaining;
+      const remaining = prev.distributives.filter((item) => item !== label);
+      const nextColors = { ...prev.distributiveColors };
+      delete nextColors[label];
+      return {
+        ...prev,
+        distributives: remaining,
+        distributiveColors: nextColors,
+        activeDistributive: remaining[0] ?? null,
+      };
     });
   };
 
   const togglePlan = (planId: string) => {
-    setSelectedPlans((prev) => (prev.includes(planId) ? prev.filter((id) => id !== planId) : [...prev, planId]));
+    setFormState((prev) => ({
+      ...prev,
+      planIds: prev.planIds.includes(planId)
+        ? prev.planIds.filter((id) => id !== planId)
+        : [...prev.planIds, planId],
+    }));
   };
 
   const handleAddDistributive = () => {
     const created = onCreateDistributive(newDistributive);
     if (created) {
-      setSelectedDistributives((prev) => Array.from(new Set([...prev, created])));
-      setActiveDistributiveForColor(created);
+      setFormState((prev) => ({
+        ...prev,
+        distributives: Array.from(new Set([...prev.distributives, created])),
+        activeDistributive: created,
+      }));
     }
-    setNewDistributive('');
+    updateFormField('newDistributive', '');
   };
 
   const resetForm = () => {
-    setCode('');
-    setTitle('');
-    setDescription('');
-    setCredits(3);
-    setSelectedDistributives([]);
-    setSelectedDistributiveColors({});
-    setActiveDistributiveForColor(null);
-    setSelectedPlans([]);
-    setNewDistributive('');
+    setFormState(createEmptyCourseForm());
     setEditingCourse(null);
   };
 
@@ -188,15 +227,17 @@ export const CourseCatalog = ({
 
   const startEditCourse = (course: Course) => {
     setEditingCourse(course);
-    setCode(course.code);
-    setTitle(course.name);
-    setDescription(course.description ?? '');
-    setCredits(course.credits);
-    setSelectedDistributives(course.distributives);
-    setSelectedDistributiveColors(course.distributiveColors ?? {});
-    setActiveDistributiveForColor(course.distributives[0] ?? null);
-    setSelectedPlans(course.planIds);
-    setNewDistributive('');
+    setFormState({
+      code: course.code,
+      title: course.name,
+      description: course.description ?? '',
+      credits: course.credits,
+      distributives: course.distributives,
+      distributiveColors: course.distributiveColors ?? {},
+      activeDistributive: course.distributives[0] ?? null,
+      newDistributive: '',
+      planIds: course.planIds,
+    });
     setDialogOpen(true);
   };
 
@@ -386,7 +427,7 @@ export const CourseCatalog = ({
                   id="class-code"
                   placeholder="e.g., MATH210"
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
+                  onChange={(e) => updateFormField('code', e.target.value)}
                 />
               </div>
               <div className="space-y-2">
@@ -395,7 +436,7 @@ export const CourseCatalog = ({
                   id="class-title"
                   placeholder="Linear Algebra"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => updateFormField('title', e.target.value)}
                 />
               </div>
             </div>
@@ -404,15 +445,15 @@ export const CourseCatalog = ({
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="class-credits">Credits</Label>
-                  <Input
-                    id="class-credits"
-                    type="number"
-                    min={0}
-                    max={20}
-                    value={credits}
-                    onChange={(e) => setCredits(Number(e.target.value))}
-                  />
-                </div>
+                <Input
+                  id="class-credits"
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={credits}
+                  onChange={(e) => updateFormField('credits', Number(e.target.value))}
+                />
+              </div>
                 <div className="space-y-2">
                   <Label>Distributive colors</Label>
                   <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
@@ -468,7 +509,7 @@ export const CourseCatalog = ({
                     id="class-distributives"
                     placeholder="Add a distributive"
                     value={newDistributive}
-                    onChange={(e) => setNewDistributive(e.target.value)}
+                    onChange={(e) => updateFormField('newDistributive', e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -555,7 +596,7 @@ export const CourseCatalog = ({
                 id="class-description"
                 placeholder="What does this class cover?"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => updateFormField('description', e.target.value)}
               />
             </div>
 

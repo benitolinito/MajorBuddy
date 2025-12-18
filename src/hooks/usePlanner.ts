@@ -14,6 +14,7 @@ import {
   PlanInput,
 } from '@/types/planner';
 import { getDefaultColorId } from '@/lib/tagColors';
+import { DEFAULT_PLAN_NAME, ensureUniquePlanName } from '@/lib/plannerProfiles';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const CONFIG_STORAGE_KEY = 'plannerSetup';
@@ -146,19 +147,6 @@ const stripScheduledCourses = (state: PlannerState): PlannerState => ({
   })),
 });
 
-const normalizeProfileName = (name: string, existing: PlanProfile[]): string => {
-  const fallback = name.trim() || 'My plan';
-  const existingNames = new Set(existing.map((profile) => profile.name.toLowerCase()));
-  if (!existingNames.has(fallback.toLowerCase())) return fallback;
-  let suffix = 2;
-  let candidate = `${fallback} ${suffix}`;
-  while (existingNames.has(candidate.toLowerCase())) {
-    suffix += 1;
-    candidate = `${fallback} ${suffix}`;
-  }
-  return candidate;
-};
-
 const loadStoredPlanProfiles = (): { activeId: string; profiles: PlanProfileSnapshot[] } => {
   const fallback = { activeId: '', profiles: [] as PlanProfileSnapshot[] };
   const raw = loadJson<unknown>(PLAN_PROFILES_STORAGE_KEY, fallback);
@@ -174,7 +162,7 @@ const loadStoredPlanProfiles = (): { activeId: string; profiles: PlanProfileSnap
           const snapshotEntry = entry as Partial<PlanProfileSnapshot>;
           if (!snapshotEntry?.snapshot) return null;
           const id = isNonEmptyString(snapshotEntry.id) ? snapshotEntry.id : generateId();
-          const name = isNonEmptyString(snapshotEntry.name) ? snapshotEntry.name : 'My plan';
+          const name = isNonEmptyString(snapshotEntry.name) ? snapshotEntry.name : DEFAULT_PLAN_NAME;
           return {
             id,
             name,
@@ -381,7 +369,7 @@ const buildInitialPlanner = () => {
     years: initialYears,
   });
   const profileId = generateId();
-  const profileName = initialState.degreeName || initialState.config?.planName || 'My plan';
+  const profileName = initialState.degreeName || initialState.config?.planName || DEFAULT_PLAN_NAME;
 
   return {
     state: initialState,
@@ -461,8 +449,8 @@ export const usePlanner = () => {
 
       const snapshotBase = clonePlannerState(sourceSnapshot);
       const snapshot = options?.startBlank ? stripScheduledCourses(snapshotBase) : snapshotBase;
-      const profileName = normalizeProfileName(
-        name || snapshot.degreeName || snapshot.config?.planName || 'My plan',
+      const profileName = ensureUniquePlanName(
+        name || snapshot.degreeName || snapshot.config?.planName || DEFAULT_PLAN_NAME,
         planProfiles,
       );
       const newProfile: PlanProfile = { id: generateId(), name: profileName };
@@ -482,7 +470,7 @@ export const usePlanner = () => {
     if (!normalizedName) return;
     setPlanProfiles((prev) => {
       const existing = prev.filter((profile) => profile.id !== profileId);
-      const updatedName = normalizeProfileName(normalizedName, existing);
+      const updatedName = ensureUniquePlanName(normalizedName, existing);
       return prev.map((profile) => (profile.id === profileId ? { ...profile, name: updatedName } : profile));
     });
   }, []);

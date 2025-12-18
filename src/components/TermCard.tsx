@@ -1,10 +1,20 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { X } from 'lucide-react';
 import { Term, Course, PlannerPlan, CourseDropOptions } from '@/types/planner';
 import { CourseCard } from './CourseCard';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+
+const extractSource = (event: DragEvent): CourseDropOptions['source'] | undefined => {
+  const rawSource = event.dataTransfer.getData('course-source');
+  if (!rawSource) return undefined;
+  try {
+    return JSON.parse(rawSource);
+  } catch {
+    return undefined;
+  }
+};
 
 interface TermCardProps {
   yearId: string;
@@ -24,11 +34,6 @@ export const TermCard = ({ yearId, term, credits, plans, onRemoveCourse, onDropC
   const [recentCourseId, setRecentCourseId] = useState<string | null>(null);
   const dropHighlightTimeout = useRef<number | null>(null);
 
-  const handleDragOver = (e: DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
   const handleDragLeave = (event: DragEvent) => {
     const nextTarget = event.relatedTarget as Node | null;
     if (!event.currentTarget.contains(nextTarget)) {
@@ -37,69 +42,75 @@ export const TermCard = ({ yearId, term, credits, plans, onRemoveCourse, onDropC
     }
   };
 
-  const extractSource = (event: DragEvent): CourseDropOptions["source"] | undefined => {
-    const rawSource = event.dataTransfer.getData('course-source');
-    if (!rawSource) return undefined;
-    try {
-      return JSON.parse(rawSource);
-    } catch {
-      return undefined;
-    }
-  };
-
-  const getDropIndex = (event: DragEvent) => {
-    const container = listRef.current;
-    if (!container || term.courses.length === 0) return 0;
-    const courseNodes = Array.from(container.querySelectorAll<HTMLElement>('[data-course-index]'));
-    const cursorY = event.clientY;
-    for (const node of courseNodes) {
-      const idx = Number(node.dataset.courseIndex);
-      const rect = node.getBoundingClientRect();
-      if (cursorY < rect.top + rect.height / 2) {
-        return Number.isNaN(idx) ? 0 : idx;
+  const getDropIndex = useCallback(
+    (event: DragEvent) => {
+      const container = listRef.current;
+      if (!container || term.courses.length === 0) return 0;
+      const courseNodes = Array.from(container.querySelectorAll<HTMLElement>('[data-course-index]'));
+      const cursorY = event.clientY;
+      for (const node of courseNodes) {
+        const idx = Number(node.dataset.courseIndex);
+        const rect = node.getBoundingClientRect();
+        if (cursorY < rect.top + rect.height / 2) {
+          return Number.isNaN(idx) ? 0 : idx;
+        }
       }
-    }
-    return term.courses.length;
-  };
+      return term.courses.length;
+    },
+    [term.courses.length],
+  );
 
-  const handleDrop = (e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const insertionIndex = indicatorIndex ?? getDropIndex(e);
-    setIsDragOver(false);
-    setIndicatorIndex(null);
-    const courseData = e.dataTransfer.getData('course');
-    if (!courseData) return;
-    try {
-      const course = JSON.parse(courseData) as Course;
-      const source = extractSource(e);
-      onDropCourse(course, { targetIndex: insertionIndex, source });
-      setRecentCourseId(course.id);
-      if (dropHighlightTimeout.current) {
-        window.clearTimeout(dropHighlightTimeout.current);
+  const highlightCourse = useCallback((courseId: string) => {
+    setRecentCourseId(courseId);
+    if (dropHighlightTimeout.current) {
+      window.clearTimeout(dropHighlightTimeout.current);
+    }
+    dropHighlightTimeout.current = window.setTimeout(() => setRecentCourseId(null), 700);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const insertionIndex = indicatorIndex ?? getDropIndex(e);
+      setIsDragOver(false);
+      setIndicatorIndex(null);
+      const courseData = e.dataTransfer.getData('course');
+      if (!courseData) return;
+      try {
+        const course = JSON.parse(courseData) as Course;
+        const source = extractSource(e);
+        onDropCourse(course, { targetIndex: insertionIndex, source });
+        highlightCourse(course.id);
+      } catch {
+        // ignore malformed payloads
       }
-      dropHighlightTimeout.current = window.setTimeout(() => setRecentCourseId(null), 700);
-    } catch {
-      // ignore malformed payloads
-    }
-  };
+    },
+    [getDropIndex, highlightCourse, indicatorIndex, onDropCourse],
+  );
 
-  const handleTermDragOver = (e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-    const index = term.courses.length === 0 ? 0 : getDropIndex(e);
-    setIndicatorIndex(index);
-  };
+  const handleTermDragOver = useCallback(
+    (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragOver(true);
+      const index = term.courses.length === 0 ? 0 : getDropIndex(e);
+      setIndicatorIndex(index);
+    },
+    [getDropIndex, term.courses.length],
+  );
 
-  const handleCourseDragStart = (event: DragEvent, course: Course) => {
-    event.dataTransfer.setData('course', JSON.stringify(course));
-    event.dataTransfer.setData(
-      'course-source',
-      JSON.stringify({ yearId, termId: term.id, courseId: course.id }),
-    );
-    event.dataTransfer.effectAllowed = 'move';
-  };
+  const handleCourseDragStart = useCallback(
+    (event: DragEvent, course: Course) => {
+      event.dataTransfer.setData('course', JSON.stringify(course));
+      event.dataTransfer.setData(
+        'course-source',
+        JSON.stringify({ yearId, termId: term.id, courseId: course.id }),
+      );
+      event.dataTransfer.effectAllowed = 'move';
+    },
+    [term.id, yearId],
+  );
 
   const renderDropIndicator = (index: number) => (
     <div
@@ -109,6 +120,8 @@ export const TermCard = ({ yearId, term, credits, plans, onRemoveCourse, onDropC
       }`}
     />
   );
+
+  const showIndicatorAt = (index: number) => indicatorIndex !== null && indicatorIndex === index;
 
   useLayoutEffect(() => {
     const container = listRef.current;
@@ -143,15 +156,14 @@ export const TermCard = ({ yearId, term, credits, plans, onRemoveCourse, onDropC
     }
   }, []);
 
+  const isEmpty = term.courses.length === 0;
+  const containerClassName = cn(
+    'group relative bg-muted/50 rounded-xl p-4 min-w-[280px] max-w-[320px] flex-1 transition-all',
+    isDragOver && 'ring-2 ring-primary ring-offset-2 bg-primary/5',
+  );
+
   return (
-    <div
-      onDragOver={handleTermDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      className={`group relative bg-muted/50 rounded-xl p-4 min-w-[280px] max-w-[320px] flex-1 transition-all ${
-        isDragOver ? 'ring-2 ring-primary ring-offset-2 bg-primary/5' : ''
-      }`}
-    >
+    <div className={containerClassName} onDragOver={handleTermDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
       {onRemoveTerm && (
         <button
           type="button"
@@ -176,7 +188,7 @@ export const TermCard = ({ yearId, term, credits, plans, onRemoveCourse, onDropC
       </div>
       
       <div ref={listRef} className="space-y-2 min-h-[120px]">
-        {term.courses.length === 0 ? (
+        {isEmpty ? (
           <div
             className="h-[120px] flex items-center justify-center text-muted-foreground text-sm border-2 border-dashed border-border rounded-lg"
             onDragOver={handleTermDragOver}
@@ -195,7 +207,7 @@ export const TermCard = ({ yearId, term, credits, plans, onRemoveCourse, onDropC
                 recentCourseId === course.id && "animate-course-drop",
               )}
             >
-              {indicatorIndex !== null && indicatorIndex === index && renderDropIndicator(index)}
+              {showIndicatorAt(index) && renderDropIndicator(index)}
               <CourseCard
                 course={course}
                 plans={plans}
@@ -206,7 +218,7 @@ export const TermCard = ({ yearId, term, credits, plans, onRemoveCourse, onDropC
             </div>
           ))
         )}
-        {indicatorIndex !== null && indicatorIndex === term.courses.length && renderDropIndicator(term.courses.length)}
+        {showIndicatorAt(term.courses.length) && renderDropIndicator(term.courses.length)}
       </div>
     </div>
   );
