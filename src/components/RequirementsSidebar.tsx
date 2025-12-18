@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronsRight, Trash2 } from 'lucide-react';
+import { ChevronsRight, Pencil } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { PlanInput, PlannerPlan, PlanType } from '@/types/planner';
@@ -13,6 +13,7 @@ interface RequirementsProps {
   plans: PlannerPlan[];
   planProgress: Record<string, { scheduled: number; total: number }>;
   onAddPlan: (plan: PlanInput) => PlannerPlan | null;
+  onUpdatePlan: (planId: string, plan: PlanInput) => void;
   onRemovePlan: (planId: string) => void;
   onCollapsePanel?: () => void;
 }
@@ -23,6 +24,7 @@ export const RequirementsSidebar = ({
   plans,
   planProgress,
   onAddPlan,
+  onUpdatePlan,
   onRemovePlan,
   onCollapsePanel,
 }: RequirementsProps) => {
@@ -32,6 +34,7 @@ export const RequirementsSidebar = ({
   const [planCredits, setPlanCredits] = useState('');
   const [colorChoice, setColorChoice] = useState<string>(() => getDefaultColorId(''));
   const [showDialog, setShowDialog] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<PlannerPlan | null>(null);
 
   const sortedPlans = useMemo(
     () => [...plans].sort((a, b) => a.name.localeCompare(b.name)),
@@ -53,11 +56,24 @@ export const RequirementsSidebar = ({
     return Math.max(0, numeric);
   };
 
-  const handleAddPlan = () => {
+  const handleSavePlan = () => {
     const classTarget = normalizePositive(classesNeeded);
     if (!classTarget) return;
     if (!planName.trim()) return;
     const creditTarget = normalizePositive(planCredits);
+    if (editingPlan) {
+      onUpdatePlan(editingPlan.id, {
+        name: planName,
+        type: planType,
+        classesNeeded: classTarget,
+        requiredCredits: creditTarget,
+        color: colorChoice,
+      });
+      resetPlanForm();
+      setEditingPlan(null);
+      setShowDialog(false);
+      return;
+    }
     const created = onAddPlan({
       name: planName,
       type: planType,
@@ -75,6 +91,7 @@ export const RequirementsSidebar = ({
     setShowDialog(open);
     if (!open) {
       resetPlanForm();
+      setEditingPlan(null);
     }
   };
 
@@ -122,7 +139,11 @@ export const RequirementsSidebar = ({
           variant="secondary"
           size="sm"
           className="w-full"
-          onClick={() => setShowDialog(true)}
+          onClick={() => {
+            resetPlanForm();
+            setEditingPlan(null);
+            setShowDialog(true);
+          }}
         >
           Add major/minor
         </Button>
@@ -150,54 +171,72 @@ export const RequirementsSidebar = ({
             return (
               <div
                 key={plan.id}
-                className="border border-border rounded-lg p-3 space-y-2"
+                className="group relative rounded-2xl border border-border/70 bg-card/95 p-4 pb-8 shadow-sm"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${colorClass}`}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-3 bottom-3 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-transparent focus-visible:bg-transparent"
+                  onClick={() => {
+                    setEditingPlan(plan);
+                    setPlanName(plan.name);
+                    setPlanType(plan.type);
+                    setClassesNeeded(plan.classesNeeded?.toString() ?? '');
+                    setPlanCredits(plan.requiredCredits?.toString() ?? '');
+                    setColorChoice(plan.color ?? getDefaultColorId(''));
+                    setShowDialog(true);
+                  }}
+                  aria-label={`Edit ${plan.name}`}
+                >
+                  <Pencil className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                </Button>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${colorClass}`}>
                         {plan.type === 'major' ? 'Major' : 'Minor'}
                       </span>
-                      <span className="text-sm font-semibold text-foreground leading-none">{plan.name}</span>
+                      <span className="text-base font-semibold text-foreground">{plan.name}</span>
                     </div>
-                    <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground mt-2">
-                      <span>Goal: {plan.classesNeeded ? `${plan.classesNeeded} classes` : 'Set a class goal'}</span>
-                      <span>Tagged in library: {total || 0}</span>
-                      {plan.requiredCredits ? <span>Credits target: {plan.requiredCredits}</span> : null}
+                    <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" aria-hidden />
+                        Goal: {plan.classesNeeded ? `${plan.classesNeeded} classes` : 'Set a class goal'}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" aria-hidden />
+                        Tagged: {total || 0}
+                      </span>
+                      {plan.requiredCredits ? (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" aria-hidden />
+                          Credits: {plan.requiredCredits}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    onClick={() => onRemovePlan(plan.id)}
-                    aria-label={`Remove ${plan.name}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                 </div>
-                <div>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-muted-foreground">Progress</span>
-                    <span className="font-medium text-foreground">
-                      {scheduled}/{targetLabel} classes scheduled
+                <div className="mt-4 space-y-1.5">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs text-muted-foreground">Progress</span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {scheduled}/{targetLabel}
                     </span>
                   </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-1.5 rounded-full bg-muted/80">
                     <div
                       className={`h-full rounded-full transition-all ${accentClass || 'bg-primary'}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  {targetClasses === 0 ? (
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      Add a class goal to see progress here.
-                    </p>
-                  ) : total === 0 ? (
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      Tag classes to this plan in the Add class dialog to start tracking.
-                    </p>
-                  ) : null}
+                  <p className="text-[11px] text-muted-foreground">
+                    {targetClasses === 0
+                      ? 'Add a class goal to see progress here.'
+                      : total === 0
+                        ? 'No tagged classes yet. Add one from the library to begin tracking.'
+                        : `${scheduled} tagged from your library.`}
+                  </p>
                 </div>
               </div>
             );
@@ -208,7 +247,7 @@ export const RequirementsSidebar = ({
       <Dialog open={showDialog} onOpenChange={handleDialogChange}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add a major or minor</DialogTitle>
+            <DialogTitle>{editingPlan ? `Edit ${editingPlan.name}` : 'Add a major or minor'}</DialogTitle>
             <DialogDescription>
               Set how many classes you need, add optional credits, and pick a color for quick tagging.
             </DialogDescription>
@@ -218,7 +257,7 @@ export const RequirementsSidebar = ({
             className="space-y-4"
             onSubmit={(event) => {
               event.preventDefault();
-              handleAddPlan();
+              handleSavePlan();
             }}
           >
             <div className="flex gap-2">
@@ -305,13 +344,22 @@ export const RequirementsSidebar = ({
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="ghost" onClick={() => handleDialogChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={!canSavePlan}>
-                Save plan
-              </Button>
+            <div className="flex justify-between gap-2 pt-2">
+              {editingPlan ? (
+                <Button type="button" variant="destructive" onClick={() => { onRemovePlan(editingPlan.id); handleDialogChange(false); }}>
+                  Delete
+                </Button>
+              ) : (
+                <span />
+              )}
+              <div className="flex gap-2">
+                <Button type="button" variant="ghost" onClick={() => handleDialogChange(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={!canSavePlan}>
+                  {editingPlan ? 'Save changes' : 'Save plan'}
+                </Button>
+              </div>
             </div>
           </form>
         </DialogContent>

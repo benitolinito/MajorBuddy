@@ -42,6 +42,7 @@ const Index = () => {
     removeCourseFromCatalog,
     addDistributive,
     addPlan,
+    updatePlan,
     removePlan,
     applySnapshot,
     configurePlanner,
@@ -80,6 +81,8 @@ const Index = () => {
   const cloudBusy = cloudSaving || cloudLoading || authBusy;
   const canRemoveYear = state.years.length > 1;
   const isMobile = useIsMobile();
+  const activePlanProfile = planProfiles.find((profile) => profile.id === activePlanProfileId);
+  const plannerTitle = activePlanProfile?.name || state.degreeName;
 
   const handleDragStart = (course: Course) => {
     setDraggedCourse(course);
@@ -132,7 +135,7 @@ const Index = () => {
         onOpenChange={setShowExport}
         years={state.years}
         plans={state.plans}
-        degreeName={state.degreeName}
+        degreeName={plannerTitle}
         university={state.university}
       />
       <AuthDialog
@@ -148,7 +151,7 @@ const Index = () => {
       {isMobile ? (
         <>
           <PlannerHeader
-            degreeName={state.degreeName}
+            degreeName={plannerTitle}
             university={state.university}
             classYear={state.classYear}
             onReset={reset}
@@ -251,6 +254,7 @@ const Index = () => {
                 plans={state.plans}
                 planProgress={stats.planProgress}
                 onAddPlan={addPlan}
+                onUpdatePlan={updatePlan}
                 onRemovePlan={removePlan}
                 onCollapsePanel={() => setRequirementsOpen(false)}
               />
@@ -295,7 +299,7 @@ const Index = () => {
         <ResizablePanel defaultSize={78} minSize={50}>
           <div className="flex h-screen flex-col">
             <PlannerHeader
-              degreeName={state.degreeName}
+              degreeName={plannerTitle}
               university={state.university}
               classYear={state.classYear}
               onReset={reset}
@@ -355,13 +359,14 @@ const Index = () => {
                 {requirementsCollapsed ? (
                   <CollapsedRail side="right" ariaLabel="Expand requirements" onExpand={() => requirementsPanelRef.current?.expand()} />
                 ) : (
-                  <aside className="h-full border-l border-border bg-card/30 p-6">
+                  <aside className="h-full border-l border-border bg-card/30 p-6 overflow-y-auto">
                     <RequirementsSidebar
                       totalCredits={stats.totalCredits}
                       maxCredits={state.requirements.totalCredits}
                       plans={state.plans}
                       planProgress={stats.planProgress}
                       onAddPlan={addPlan}
+                      onUpdatePlan={updatePlan}
                       onRemovePlan={removePlan}
                       onCollapsePanel={() => requirementsPanelRef.current?.collapse()}
                     />

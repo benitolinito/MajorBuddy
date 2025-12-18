@@ -703,6 +703,38 @@ export const usePlanner = () => {
     return createdPlan;
   }, []);
 
+  const updatePlan = useCallback((planId: string, updates: PlanInput) => {
+    setState((prev) => {
+      const updatedPlans = prev.plans.map((plan) => {
+        if (plan.id !== planId) return plan;
+        const normalizedName = updates.name?.trim() ? updates.name.trim() : plan.name;
+        const type: PlanType = updates.type === 'minor' ? 'minor' : updates.type === 'major' ? 'major' : plan.type;
+        const creditsTarget =
+          Number.isFinite(Number(updates.requiredCredits)) && Number(updates.requiredCredits) > 0
+            ? Math.max(0, Number(updates.requiredCredits))
+            : null;
+        const classTarget =
+          Number.isFinite(Number(updates.classesNeeded)) && Number(updates.classesNeeded) > 0
+            ? Math.max(0, Number(updates.classesNeeded))
+            : null;
+        const resolvedColor =
+          typeof updates.color === 'string' && updates.color.trim()
+            ? updates.color.trim()
+            : plan.color ?? getDefaultColorId(normalizedName);
+        return {
+          ...plan,
+          name: normalizedName,
+          type,
+          requiredCredits: creditsTarget,
+          classesNeeded: classTarget ?? plan.classesNeeded ?? null,
+          color: resolvedColor,
+        };
+      });
+      persistJson(PLANS_STORAGE_KEY, updatedPlans);
+      return { ...prev, plans: updatedPlans };
+    });
+  }, []);
+
   const moveCourseBetweenTerms = useCallback(
     ({
       sourceYearId,
@@ -1089,6 +1121,7 @@ export const usePlanner = () => {
     deletePlanProfile,
     addDistributive,
     addPlan,
+    updatePlan,
     removePlan,
     removeCourse,
     removeTerm,

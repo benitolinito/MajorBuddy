@@ -34,12 +34,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Ensure static assets are present
-        run: |
-          cp dist/index.html dist/404.html
-          cp public/favicon-degree.svg dist/favicon-degree.svg
-          cp public/robots.txt dist/robots.txt
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
