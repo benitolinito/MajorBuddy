@@ -31,6 +31,7 @@ interface CourseCatalogProps {
   onCollapsePanel?: () => void;
   isMobile?: boolean;
   onQuickAddCourse?: (course: Course) => void;
+  addCourseTrigger?: number;
 }
 
 const TogglePill = ({
@@ -110,6 +111,7 @@ export const CourseCatalog = ({
   onCollapsePanel,
   isMobile = false,
   onQuickAddCourse,
+  addCourseTrigger,
 }: CourseCatalogProps) => {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -230,6 +232,13 @@ export const CourseCatalog = ({
     setDialogOpen(true);
   };
 
+  useEffect(() => {
+    if (!addCourseTrigger) return;
+    setFormState(createEmptyCourseForm());
+    setEditingCourse(null);
+    setDialogOpen(true);
+  }, [addCourseTrigger]);
+
   const startEditCourse = (course: Course) => {
     setEditingCourse(course);
     setFormState({
@@ -323,7 +332,7 @@ export const CourseCatalog = ({
             <div>
               <h2 className="font-semibold text-foreground leading-tight">Class Library</h2>
               <p className="text-xs text-muted-foreground">
-                {mobileQuickAdd ? 'Tap “Add to term” from a class card to place it in your schedule.' : 'Add your classes, then drag to a term.'}
+                {mobileQuickAdd ? 'Tap "Add to term" from a class card to place it in your schedule.' : 'Add your classes, then drag to a term.'}
               </p>
             </div>
           </div>
@@ -441,7 +450,7 @@ export const CourseCatalog = ({
       </ScrollArea>
 
       <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEditing ? 'Edit class' : 'Add a class'}</DialogTitle>
             <DialogDescription>

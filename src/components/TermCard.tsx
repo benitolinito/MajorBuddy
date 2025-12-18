@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { X } from 'lucide-react';
 import { Term, Course, PlannerPlan, CourseDropOptions } from '@/types/planner';
 import { CourseCard } from './CourseCard';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { getTagColorClasses } from '@/lib/tagColors';
 
 const extractSource = (event: DragEvent): CourseDropOptions['source'] | undefined => {
   const rawSource = event.dataTransfer.getData('course-source');
@@ -25,6 +26,7 @@ interface TermCardProps {
   onDropCourse: (course: Course, options?: CourseDropOptions) => void;
   onRemoveTerm?: () => void;
   isStacked?: boolean;
+  onRequestCourseAction?: (course: Course) => void;
 }
 
 export const TermCard = ({
@@ -36,6 +38,7 @@ export const TermCard = ({
   onDropCourse,
   onRemoveTerm,
   isStacked = false,
+  onRequestCourseAction,
 }: TermCardProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [indicatorIndex, setIndicatorIndex] = useState<number | null>(null);
@@ -167,10 +170,66 @@ export const TermCard = ({
   }, []);
 
   const isEmpty = term.courses.length === 0;
+  const planLookup = useMemo(() => new Map(plans.map((plan) => [plan.id, plan])), [plans]);
+  const termPlans = useMemo(() => {
+    const unique = new Map<string, PlannerPlan>();
+    term.courses.forEach((course) => {
+      course.planIds.forEach((planId) => {
+        const plan = planLookup.get(planId);
+        if (plan && !unique.has(plan.id)) {
+          unique.set(plan.id, plan);
+        }
+      });
+    });
+    return Array.from(unique.values());
+  }, [planLookup, term.courses]);
+  const termDistributives = useMemo(() => {
+    const unique = new Map<string, { label: string; color?: string }>();
+    term.courses.forEach((course) => {
+      course.distributives.forEach((dist) => {
+        if (!unique.has(dist)) {
+          unique.set(dist, { label: dist, color: course.distributiveColors?.[dist] });
+        }
+      });
+    });
+    return Array.from(unique.values());
+  }, [term.courses]);
+  const maxSummaryChips = isStacked ? 3 : 4;
+  const summaryChips = [
+    {
+      key: 'credits',
+      label: `${credits} credits`,
+      className: 'bg-card text-foreground border border-border/70',
+    },
+    ...termPlans.map((plan) => ({
+      key: `plan-${plan.id}`,
+      label: `${plan.type === 'major' ? 'Major' : 'Minor'} • ${plan.name}`,
+      className: getTagColorClasses(plan.name, plan.color),
+    })),
+    ...termDistributives.map((dist) => ({
+      key: `dist-${dist.label}`,
+      label: dist.label,
+      className: getTagColorClasses(dist.label, dist.color),
+    })),
+  ];
+  const visibleSummaryChips = summaryChips.slice(0, maxSummaryChips);
+  const remainingSummary = summaryChips.length - visibleSummaryChips.length;
+  const emptyMessage = isStacked
+    ? 'Tap "Add to term" in the Class Library to place a class.'
+    : 'Drag courses here';
+
   const containerClassName = cn(
-    'group relative bg-muted/50 rounded-xl p-4 transition-all',
-    isStacked ? 'w-full' : 'min-w-[280px] max-w-[320px] flex-1',
+    'group relative bg-muted/50 rounded-xl transition-all',
+    isStacked ? 'w-full p-3' : 'min-w-[280px] max-w-[320px] flex-1 p-4',
     isDragOver && 'ring-2 ring-primary ring-offset-2 bg-primary/5',
+  );
+
+  const handleCourseSelect = useCallback(
+    (course: Course) => {
+      if (!isStacked || !onRequestCourseAction) return;
+      onRequestCourseAction(course);
+    },
+    [isStacked, onRequestCourseAction],
   );
 
   return (
@@ -193,15 +252,35 @@ export const TermCard = ({
           <X className="h-4 w-4" />
         </button>
       )}
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-3">
         <div>
-          <p className="text-sm font-semibold text-primary uppercase tracking-wide">{term.name}</p>
-          <p className="text-lg font-bold text-foreground">{term.year}</p>
+          <p className="text-xs font-semibold text-primary uppercase tracking-wide">{term.name}</p>
+          <p className="text-lg font-bold text-foreground leading-tight">{term.year}</p>
         </div>
-        <Badge variant="outline" className="text-xs font-medium bg-card">
+        <Badge variant="outline" className="text-xs font-medium bg-card hidden sm:inline-flex">
           {credits} Credits
         </Badge>
       </div>
+      {summaryChips.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1.5 text-[11px]">
+          {visibleSummaryChips.map((chip) => (
+            <span
+              key={chip.key}
+              className={cn(
+                'inline-flex items-center rounded-full px-2 py-0.5 border text-[11px] font-medium tracking-tight',
+                chip.className,
+              )}
+            >
+              {chip.label}
+            </span>
+          ))}
+          {remainingSummary > 0 && (
+            <span className="inline-flex items-center rounded-full border border-border/50 px-2 py-0.5 text-[11px] text-muted-foreground">
+              +{remainingSummary} more
+            </span>
+          )}
+        </div>
+      )}
       
       <div ref={listRef} className={cn('space-y-2', isStacked ? 'min-h-[100px]' : 'min-h-[120px]')}>
         {isEmpty ? (
@@ -213,7 +292,7 @@ export const TermCard = ({
             onDragOver={handleTermDragOver}
             onDrop={handleDrop}
           >
-            Drag courses here
+            {emptyMessage}
           </div>
         ) : (
           term.courses.map((course, index) => (
@@ -233,6 +312,7 @@ export const TermCard = ({
                 onRemove={() => onRemoveCourse(course.id)}
                 draggable
                 onDragStart={handleCourseDragStart}
+                onSelect={isStacked ? () => handleCourseSelect(course) : undefined}
               />
             </div>
           ))
