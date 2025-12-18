@@ -17,6 +17,7 @@ interface RequirementsProps {
   onUpdatePlan: (planId: string, plan: PlanInput) => void;
   onRemovePlan: (planId: string) => void;
   onCollapsePanel?: () => void;
+  isMobile?: boolean;
 }
 
 export const RequirementsSidebar = ({
@@ -28,6 +29,7 @@ export const RequirementsSidebar = ({
   onUpdatePlan,
   onRemovePlan,
   onCollapsePanel,
+  isMobile = false,
 }: RequirementsProps) => {
   const [planName, setPlanName] = useState('');
   const [planType, setPlanType] = useState<PlanType>('major');
@@ -107,7 +109,7 @@ export const RequirementsSidebar = ({
             Track overall credits and see progress for each major/minor.
           </p>
         </div>
-        {onCollapsePanel && (
+        {onCollapsePanel && !isMobile && (
           <Button
             variant="ghost"
             size="icon"

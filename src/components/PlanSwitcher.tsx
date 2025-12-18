@@ -27,6 +27,7 @@ type PlanSwitcherProps = {
   onCreatePlan: (name: string, options?: { startBlank?: boolean }) => PlanProfile | void;
   onRenamePlan: (planId: string, name: string) => void;
   onDeletePlan: (planId: string) => void;
+  compact?: boolean;
 };
 
 export const PlanSwitcher = ({
@@ -36,6 +37,7 @@ export const PlanSwitcher = ({
   onCreatePlan,
   onRenamePlan,
   onDeletePlan,
+  compact = false,
 }: PlanSwitcherProps) => {
   const activePlan = useMemo(() => plans.find((plan) => plan.id === activePlanId), [plans, activePlanId]);
   const [dialogMode, setDialogMode] = useState<PlanDialogMode>('create');
@@ -81,22 +83,15 @@ export const PlanSwitcher = ({
     onDeletePlan(activePlanId);
   };
 
-  return (
-    <div className="rounded-lg border border-border bg-card/80 p-3 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">My Plans</p>
-          <p className="text-sm font-semibold text-foreground">{activePlan?.name ?? 'Select a plan'}</p>
-          <p className="text-[11px] text-muted-foreground">Save variations and swap quickly.</p>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-1">
-              My Plans
-              <ChevronDown className="h-4 w-4" aria-hidden />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-72" align="start" sideOffset={8}>
+  const dropdown = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1">
+          My Plans
+          <ChevronDown className="h-4 w-4" aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-72" align={compact ? "end" : "start"} sideOffset={8}>
             <DropdownMenuLabel>Saved plans</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuRadioGroup value={activePlanId} onValueChange={onSelectPlan}>
@@ -145,14 +140,15 @@ export const PlanSwitcher = ({
               <Trash2 className="h-4 w-4 mr-2" aria-hidden />
               Delete current plan
             </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
-      <Dialog
-        open={dialogOpen}
-        onOpenChange={(open) => {
-          setDialogOpen(open);
+  const dialog = (
+    <Dialog
+      open={dialogOpen}
+      onOpenChange={(open) => {
+        setDialogOpen(open);
           if (!open) {
             setStartBlank(false);
           }
@@ -200,6 +196,28 @@ export const PlanSwitcher = ({
           </div>
         </DialogContent>
       </Dialog>
+  );
+
+  if (compact) {
+    return (
+      <>
+        <div className="flex items-center justify-end gap-2">{dropdown}</div>
+        {dialog}
+      </>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-card/80 p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">My Plans</p>
+          <p className="text-sm font-semibold text-foreground">{activePlan?.name ?? 'Select a plan'}</p>
+          <p className="text-[11px] text-muted-foreground">Save variations and swap quickly.</p>
+        </div>
+        {dropdown}
+      </div>
+      {dialog}
     </div>
   );
 };

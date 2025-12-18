@@ -459,6 +459,12 @@ const Index = () => {
               onOpenExport={() => setShowExport(true)}
               sticky={false}
               isMobile
+              planProfiles={planProfiles}
+              activePlanProfileId={activePlanProfileId}
+              onSelectPlanProfile={selectPlanProfile}
+              onCreatePlanProfile={createPlanProfile}
+              onRenamePlanProfile={renamePlanProfile}
+              onDeletePlanProfile={deletePlanProfile}
             />
             <MobileYearNavigator
               years={state.years}
@@ -534,6 +540,7 @@ const Index = () => {
                 onUpdatePlan={updatePlan}
                 onRemovePlan={removePlan}
                 onCollapsePanel={() => setRequirementsOpen(false)}
+                isMobile
               />
             </SheetContent>
           </Sheet>
@@ -596,6 +603,12 @@ const Index = () => {
               onSignOut={signOut}
               onOpenSettings={() => setShowSetup(true)}
               onOpenExport={() => setShowExport(true)}
+              planProfiles={planProfiles}
+              activePlanProfileId={activePlanProfileId}
+              onSelectPlanProfile={selectPlanProfile}
+              onCreatePlanProfile={createPlanProfile}
+              onRenamePlanProfile={renamePlanProfile}
+              onDeletePlanProfile={deletePlanProfile}
             />
             
             <ResizablePanelGroup direction="horizontal" className="flex-1">

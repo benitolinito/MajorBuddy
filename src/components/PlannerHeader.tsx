@@ -2,6 +2,8 @@ import { GraduationCap, RotateCcw, Download, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { PlanSwitcher } from '@/components/PlanSwitcher';
+import { PlanProfile } from '@/types/planner';
 
 interface PlannerHeaderProps {
   degreeName: string;
@@ -17,6 +19,12 @@ interface PlannerHeaderProps {
   onOpenExport?: () => void;
   sticky?: boolean;
   isMobile?: boolean;
+  planProfiles?: PlanProfile[];
+  activePlanProfileId?: string;
+  onSelectPlanProfile?: (planId: string) => void;
+  onCreatePlanProfile?: (name: string, options?: { startBlank?: boolean }) => PlanProfile | void;
+  onRenamePlanProfile?: (planId: string, name: string) => void;
+  onDeletePlanProfile?: (planId: string) => void;
 }
 
 export const PlannerHeader = ({
@@ -33,13 +41,27 @@ export const PlannerHeader = ({
   onOpenExport,
   sticky = true,
   isMobile = false,
+  planProfiles,
+  activePlanProfileId,
+  onSelectPlanProfile,
+  onCreatePlanProfile,
+  onRenamePlanProfile,
+  onDeletePlanProfile,
 }: PlannerHeaderProps) => {
   const showAuth = Boolean(onSignIn || onSignOut);
   const signedIn = Boolean(userLabel);
   const authAction = signedIn ? onSignOut : onSignIn;
+  const handlersReady =
+    planProfiles &&
+    onSelectPlanProfile &&
+    onCreatePlanProfile &&
+    onRenamePlanProfile &&
+    onDeletePlanProfile;
   const headerClass = `bg-card border-b border-border ${isMobile ? 'px-4 py-3' : 'px-6 py-4'} ${
     sticky ? 'sticky top-0 z-10' : 'relative z-10'
   }`;
+  const canShowPlanSwitcher = !isMobile && handlersReady;
+  const canShowPlanSwitcherMobile = isMobile && handlersReady;
 
   if (isMobile) {
     return (
@@ -57,7 +79,20 @@ export const PlannerHeader = ({
                 </p>
               </div>
             </div>
-            <ThemeToggle className="h-8 w-8" />
+            <div className="flex items-center gap-2">
+              {canShowPlanSwitcherMobile && (
+                <PlanSwitcher
+                  plans={planProfiles}
+                  activePlanId={activePlanProfileId ?? planProfiles![0]?.id ?? ''}
+                  onSelectPlan={onSelectPlanProfile!}
+                  onCreatePlan={onCreatePlanProfile!}
+                  onRenamePlan={onRenamePlanProfile!}
+                  onDeletePlan={onDeletePlanProfile!}
+                  compact
+                />
+              )}
+              <ThemeToggle className="h-8 w-8" />
+            </div>
           </div>
           <div className="flex gap-2">
             {showAuth && (
@@ -108,6 +143,19 @@ export const PlannerHeader = ({
 
         <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
           <div className="flex items-center gap-2">
+            {canShowPlanSwitcher && (
+              <div className="hidden lg:block">
+                <PlanSwitcher
+                  plans={planProfiles}
+                  activePlanId={activePlanProfileId ?? planProfiles[0]?.id ?? ''}
+                  onSelectPlan={onSelectPlanProfile}
+                  onCreatePlan={onCreatePlanProfile}
+                  onRenamePlan={onRenamePlanProfile}
+                  onDeletePlan={onDeletePlanProfile}
+                  compact
+                />
+              </div>
+            )}
             <ConfirmDialog
               trigger={
                 <Button variant="outline" size="sm">

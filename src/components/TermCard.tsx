@@ -214,9 +214,10 @@ export const TermCard = ({
   ];
   const visibleSummaryChips = summaryChips.slice(0, maxSummaryChips);
   const remainingSummary = summaryChips.length - visibleSummaryChips.length;
-  const emptyMessage = isStacked
+  const emptyTitle = isStacked ? 'No classes scheduled' : 'Drag courses here';
+  const emptyDescription = isStacked
     ? 'Tap "Add to term" in the Class Library to place a class.'
-    : 'Drag courses here';
+    : 'Drop classes into this term to schedule them.';
 
   const containerClassName = cn(
     'group relative bg-muted/50 rounded-xl transition-all',
@@ -286,13 +287,16 @@ export const TermCard = ({
         {isEmpty ? (
           <div
             className={cn(
-              'flex items-center justify-center text-muted-foreground text-sm border-2 border-dashed border-border rounded-lg',
-              isStacked ? 'min-h-[100px]' : 'h-[120px]',
+              'flex items-center justify-center rounded-lg border-2 border-dashed border-border text-center text-sm text-muted-foreground',
+              isStacked ? 'min-h-[110px]' : 'h-[130px]',
             )}
             onDragOver={handleTermDragOver}
             onDrop={handleDrop}
           >
-            {emptyMessage}
+            <div className="px-6 py-4 text-center">
+              <p className="text-sm font-semibold text-foreground">{emptyTitle}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{emptyDescription}</p>
+            </div>
           </div>
         ) : (
           term.courses.map((course, index) => (

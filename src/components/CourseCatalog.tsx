@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, BookOpen, ChevronsLeft, Pencil, Plus, Search, Tag, Trash } from 'lucide-react';
 import { Course, NewCourseInput, PlanProfile, PlannerPlan } from '@/types/planner';
 import { Input } from '@/components/ui/input';
@@ -232,8 +232,12 @@ export const CourseCatalog = ({
     setDialogOpen(true);
   };
 
+  const lastAddTrigger = useRef<number | null>(null);
+
   useEffect(() => {
     if (!addCourseTrigger) return;
+    if (lastAddTrigger.current === addCourseTrigger) return;
+    lastAddTrigger.current = addCourseTrigger;
     setFormState(createEmptyCourseForm());
     setEditingCourse(null);
     setDialogOpen(true);
@@ -318,14 +322,6 @@ export const CourseCatalog = ({
   return (
     <aside className="bg-card border-r border-border flex flex-col h-screen sticky top-0 min-w-[260px] max-w-full">
       <div className="p-4 border-b border-border space-y-4">
-        <PlanSwitcher
-          plans={planProfiles}
-          activePlanId={activePlanProfileId}
-          onSelectPlan={onSelectPlanProfile}
-          onCreatePlan={onCreatePlanProfile}
-          onRenamePlan={onRenamePlanProfile}
-          onDeletePlan={onDeletePlanProfile}
-        />
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-muted-foreground" />
@@ -341,12 +337,13 @@ export const CourseCatalog = ({
               <Plus className="h-4 w-4 mr-1" />
               Add class
             </Button>
-            {onCollapsePanel && (
+            {onCollapsePanel && !isMobile && (
               <Button
                 size="icon"
                 variant="ghost"
                 className="h-8 w-8"
                 onClick={onCollapsePanel}
+                aria-label="Collapse class library"
               >
                 <ChevronsLeft className="h-4 w-4" />
               </Button>
