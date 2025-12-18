@@ -9,7 +9,8 @@
     "postbuild": "cp dist/index.html dist/404.html",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate:universities": "node scripts/generate-universities.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
