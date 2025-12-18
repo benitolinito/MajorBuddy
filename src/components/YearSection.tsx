@@ -31,6 +31,11 @@ export const YearSection = ({
 }: YearSectionProps) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
 
+  const termContainerClass = cn(
+    'flex gap-4',
+    isMobile && 'flex-col gap-3',
+  );
+
   return (
     <section className="group mb-8">
       <div className="mb-4 flex items-center gap-2">
@@ -60,7 +65,7 @@ export const YearSection = ({
         )}
       </div>
       
-      <div className={cn("flex gap-4", isMobile && "snap-x snap-mandatory overflow-x-auto py-2")}>
+      <div className={termContainerClass}>
         {year.terms.map((term) => (
           <TermCard
             key={term.id}
@@ -71,13 +76,22 @@ export const YearSection = ({
             onRemoveCourse={(courseId) => onRemoveCourse(term.id, courseId)}
             onDropCourse={(course, options) => onDropCourse(year.id, term.id, course, options)}
             onRemoveTerm={() => onRemoveTerm(term.id)}
+            isStacked={isMobile}
           />
         ))}
         
-        <div className="min-w-[200px] flex items-center justify-center">
+        <div
+          className={cn(
+            'flex items-center justify-center',
+            isMobile ? 'w-full rounded-xl border border-dashed border-border/70 py-2' : 'min-w-[200px]',
+          )}
+        >
           <Button
             variant="ghost"
-            className="text-primary hover:text-primary hover:bg-primary/10"
+            className={cn(
+              'text-primary hover:text-primary hover:bg-primary/10',
+              isMobile && 'w-full justify-center border-0',
+            )}
             onClick={onAddTerm}
           >
             <Plus className="h-4 w-4 mr-1.5" />

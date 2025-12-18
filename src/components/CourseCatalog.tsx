@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BookOpen, ChevronsLeft, Pencil, Plus, Search, Tag, Trash } from 'lucide-react';
+import { ArrowRight, BookOpen, ChevronsLeft, Pencil, Plus, Search, Tag, Trash } from 'lucide-react';
 import { Course, NewCourseInput, PlanProfile, PlannerPlan } from '@/types/planner';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -29,6 +29,8 @@ interface CourseCatalogProps {
   onRenamePlanProfile: (planId: string, name: string) => void;
   onDeletePlanProfile: (planId: string) => void;
   onCollapsePanel?: () => void;
+  isMobile?: boolean;
+  onQuickAddCourse?: (course: Course) => void;
 }
 
 const TogglePill = ({
@@ -106,6 +108,8 @@ export const CourseCatalog = ({
   onRenamePlanProfile,
   onDeletePlanProfile,
   onCollapsePanel,
+  isMobile = false,
+  onQuickAddCourse,
 }: CourseCatalogProps) => {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -300,6 +304,7 @@ export const CourseCatalog = ({
   };
 
   const isEditing = Boolean(editingCourse);
+  const mobileQuickAdd = isMobile && Boolean(onQuickAddCourse);
 
   return (
     <aside className="bg-card border-r border-border flex flex-col h-screen sticky top-0 min-w-[260px] max-w-full">
@@ -317,7 +322,9 @@ export const CourseCatalog = ({
             <BookOpen className="h-5 w-5 text-muted-foreground" />
             <div>
               <h2 className="font-semibold text-foreground leading-tight">Class Library</h2>
-              <p className="text-xs text-muted-foreground">Add your classes, then drag to a term.</p>
+              <p className="text-xs text-muted-foreground">
+                {mobileQuickAdd ? 'Tap “Add to term” from a class card to place it in your schedule.' : 'Add your classes, then drag to a term.'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -363,14 +370,18 @@ export const CourseCatalog = ({
             return (
               <div
                 key={course.id}
-                draggable
+                draggable={!mobileQuickAdd}
                 onDragStart={(e) => {
+                  if (mobileQuickAdd) return;
                   e.dataTransfer.setData('course', JSON.stringify(course));
                   e.dataTransfer.setData('course-source', '');
                   e.dataTransfer.effectAllowed = 'copy';
                   onDragStart(course);
                 }}
-                className="group relative bg-card border border-border rounded-lg p-3 cursor-grab hover:shadow-md hover:border-primary/30 transition-all active:cursor-grabbing"
+                className={cn(
+                  'group relative bg-card border border-border rounded-lg p-3 transition-all',
+                  mobileQuickAdd ? 'cursor-default' : 'cursor-grab hover:shadow-md hover:border-primary/30 active:cursor-grabbing',
+                )}
               >
                 <Button
                   type="button"
@@ -411,6 +422,18 @@ export const CourseCatalog = ({
                     </Badge>
                   ))}
                 </div>
+                {mobileQuickAdd && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="mt-3 w-full justify-center gap-2"
+                    onClick={() => onQuickAddCourse?.(course)}
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                    Add to term
+                  </Button>
+                )}
               </div>
             );
           })}

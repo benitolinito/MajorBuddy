@@ -24,9 +24,19 @@ interface TermCardProps {
   onRemoveCourse: (courseId: string) => void;
   onDropCourse: (course: Course, options?: CourseDropOptions) => void;
   onRemoveTerm?: () => void;
+  isStacked?: boolean;
 }
 
-export const TermCard = ({ yearId, term, credits, plans, onRemoveCourse, onDropCourse, onRemoveTerm }: TermCardProps) => {
+export const TermCard = ({
+  yearId,
+  term,
+  credits,
+  plans,
+  onRemoveCourse,
+  onDropCourse,
+  onRemoveTerm,
+  isStacked = false,
+}: TermCardProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [indicatorIndex, setIndicatorIndex] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -158,12 +168,18 @@ export const TermCard = ({ yearId, term, credits, plans, onRemoveCourse, onDropC
 
   const isEmpty = term.courses.length === 0;
   const containerClassName = cn(
-    'group relative bg-muted/50 rounded-xl p-4 min-w-[280px] max-w-[320px] flex-1 transition-all',
+    'group relative bg-muted/50 rounded-xl p-4 transition-all',
+    isStacked ? 'w-full' : 'min-w-[280px] max-w-[320px] flex-1',
     isDragOver && 'ring-2 ring-primary ring-offset-2 bg-primary/5',
   );
 
   return (
-    <div className={containerClassName} onDragOver={handleTermDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+    <div
+      className={containerClassName}
+      onDragOver={handleTermDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       {onRemoveTerm && (
         <button
           type="button"
@@ -187,10 +203,13 @@ export const TermCard = ({ yearId, term, credits, plans, onRemoveCourse, onDropC
         </Badge>
       </div>
       
-      <div ref={listRef} className="space-y-2 min-h-[120px]">
+      <div ref={listRef} className={cn('space-y-2', isStacked ? 'min-h-[100px]' : 'min-h-[120px]')}>
         {isEmpty ? (
           <div
-            className="h-[120px] flex items-center justify-center text-muted-foreground text-sm border-2 border-dashed border-border rounded-lg"
+            className={cn(
+              'flex items-center justify-center text-muted-foreground text-sm border-2 border-dashed border-border rounded-lg',
+              isStacked ? 'min-h-[100px]' : 'h-[120px]',
+            )}
             onDragOver={handleTermDragOver}
             onDrop={handleDrop}
           >

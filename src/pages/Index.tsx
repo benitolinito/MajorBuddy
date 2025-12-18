@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CourseCatalog } from '@/components/CourseCatalog';
 import { PlannerHeader } from '@/components/PlannerHeader';
 import { YearSection } from '@/components/YearSection';
@@ -19,6 +19,8 @@ import { AuthDialog } from '@/components/AuthDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const Index = () => {
   const {
@@ -86,12 +88,29 @@ const Index = () => {
     targetTermId: string;
     targetIndex?: number;
   } | null>(null);
+  const [quickAddCourse, setQuickAddCourse] = useState<Course | null>(null);
+  const [quickAddTarget, setQuickAddTarget] = useState('');
   const userLabel = user?.displayName || user?.email || undefined;
   const cloudBusy = cloudSaving || cloudLoading || authBusy;
   const canRemoveYear = state.years.length > 1;
   const isMobile = useIsMobile();
   const activePlanProfile = planProfiles.find((profile) => profile.id === activePlanProfileId);
   const plannerTitle = activePlanProfile?.name || state.degreeName;
+  const quickAddOptions = useMemo(() => {
+    const options: { value: string; label: string }[] = [];
+    state.years.forEach((year) => {
+      year.terms.forEach((term) => {
+        options.push({
+          value: `${year.id}:${term.id}`,
+          label: `${year.name} • ${term.name} ${term.year}`,
+        });
+      });
+    });
+    return options;
+  }, [state.years]);
+  const quickAddCourseLabel = quickAddCourse
+    ? ([quickAddCourse.code, quickAddCourse.name].filter(Boolean).join(' ').trim() || 'this class')
+    : 'this class';
 
   const handleDragStart = (course: Course) => {
     setDraggedCourse(course);
@@ -130,6 +149,29 @@ const Index = () => {
       addCourseToTerm(yearId, termId, course, options?.targetIndex);
     }
     setDraggedCourse(null);
+  };
+
+  const handleQuickAddRequest = (course: Course) => {
+    setQuickAddCourse(course);
+    if (quickAddOptions.length > 0) {
+      setQuickAddTarget(quickAddOptions[0].value);
+    } else {
+      setQuickAddTarget('');
+    }
+  };
+
+  const closeQuickAddDialog = () => {
+    setQuickAddCourse(null);
+    setQuickAddTarget('');
+  };
+
+  const handleQuickAddConfirm = () => {
+    if (!quickAddCourse || !quickAddTarget) return;
+    const [targetYearId, targetTermId] = quickAddTarget.split(':');
+    if (!targetYearId || !targetTermId) return;
+    handleDropCourse(targetYearId, targetTermId, quickAddCourse);
+    setQuickAddCourse(null);
+    setQuickAddTarget('');
   };
 
   const handleSaveSetup = (config: PlannerConfig) => {
@@ -209,6 +251,54 @@ const Index = () => {
         onEmailSignIn={signInWithEmail}
         onEmailRegister={registerWithEmail}
       />
+      <Dialog
+        open={Boolean(quickAddCourse)}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeQuickAddDialog();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add {quickAddCourseLabel} to a term</DialogTitle>
+            <DialogDescription>
+              Choose where this class should appear in your schedule.
+            </DialogDescription>
+          </DialogHeader>
+          {quickAddOptions.length > 0 ? (
+            <>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">Destination term</p>
+                <Select value={quickAddTarget} onValueChange={setQuickAddTarget}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a term" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {quickAddOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter className="gap-2 pt-4">
+                <Button type="button" variant="outline" onClick={closeQuickAddDialog}>
+                  Cancel
+                </Button>
+                <Button type="button" onClick={handleQuickAddConfirm} disabled={!quickAddTarget}>
+                  Add class
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Add a year or term to choose a destination for {quickAddCourseLabel}.
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {isMobile ? (
         <>
@@ -225,17 +315,7 @@ const Index = () => {
             onOpenSettings={() => setShowSetup(true)}
             onOpenExport={() => setShowExport(true)}
           />
-          <div className="space-y-4 px-4 py-4 pb-28">
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="justify-start gap-2" onClick={() => setLibraryOpen(true)}>
-                <BookOpen className="h-4 w-4" />
-                Class Library
-              </Button>
-              <Button variant="outline" className="justify-start gap-2" onClick={() => setRequirementsOpen(true)}>
-                <ListChecks className="h-4 w-4" />
-                Requirements
-              </Button>
-            </div>
+          <div className="space-y-4 px-4 py-4 pb-40">
             <div className="flex gap-2 overflow-x-auto pb-2">
               {state.years.map((year) => (
                 <button
@@ -299,6 +379,8 @@ const Index = () => {
                   onRenamePlanProfile={renamePlanProfile}
                   onDeletePlanProfile={deletePlanProfile}
                   onCollapsePanel={() => setLibraryOpen(false)}
+                  isMobile
+                  onQuickAddCourse={handleQuickAddRequest}
                 />
               </div>
             </SheetContent>
@@ -322,6 +404,11 @@ const Index = () => {
               />
             </SheetContent>
           </Sheet>
+          <MobilePlannerToolbar
+            onOpenLibrary={() => setLibraryOpen(true)}
+            onOpenRequirements={() => setRequirementsOpen(true)}
+            onAddYear={addYear}
+          />
         </>
       ) : (
       <ResizablePanelGroup direction="horizontal" className="h-screen w-full">
@@ -466,6 +553,31 @@ const CollapsedRail = ({ side, ariaLabel, onExpand }: CollapsedRailProps) => (
       <ChevronsLeft className="h-4 w-4" aria-hidden />
     )}
   </button>
+);
+
+type MobileToolbarProps = {
+  onOpenLibrary: () => void;
+  onOpenRequirements: () => void;
+  onAddYear: () => void;
+};
+
+const MobilePlannerToolbar = ({ onOpenLibrary, onOpenRequirements, onAddYear }: MobileToolbarProps) => (
+  <div className="fixed inset-x-0 bottom-0 border-t border-border bg-card/95 px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.2)] backdrop-blur">
+    <div className="flex gap-3">
+      <Button variant="outline" className="flex-1 justify-center gap-2" onClick={onOpenLibrary}>
+        <BookOpen className="h-4 w-4" />
+        Library
+      </Button>
+      <Button variant="outline" className="flex-1 justify-center gap-2" onClick={onOpenRequirements}>
+        <ListChecks className="h-4 w-4" />
+        Requirements
+      </Button>
+      <Button variant="default" className="flex-1 justify-center gap-2" onClick={onAddYear}>
+        <Plus className="h-4 w-4" />
+        Add Year
+      </Button>
+    </div>
+  </div>
 );
 
 export default Index;
