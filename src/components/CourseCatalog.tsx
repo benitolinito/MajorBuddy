@@ -8,9 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getTagAccentClass, getTagColorClasses, TAG_COLOR_OPTIONS, getDefaultColorId } from '@/lib/tagColors';
+import { getTagAccentClass, getTagColorClasses } from '@/lib/tagColors';
 import { cn } from '@/lib/utils';
 import { PlanSwitcher } from '@/components/PlanSwitcher';
+import { TagColorPicker } from '@/components/TagColorPicker';
 
 interface CourseCatalogProps {
   courses: Course[];
@@ -284,6 +285,20 @@ export const CourseCatalog = ({
     if (!open) resetForm();
   };
 
+  const activeDistributiveColor =
+    activeDistributiveForColor && selectedDistributives.includes(activeDistributiveForColor)
+      ? selectedDistributiveColors[activeDistributiveForColor] ?? null
+      : null;
+
+  const handleActiveColorSelect = (colorId: string | null) => {
+    if (!activeDistributiveForColor) return;
+    if (colorId) {
+      updateDistributiveColor(activeDistributiveForColor, colorId);
+    } else {
+      removeDistributiveColor(activeDistributiveForColor);
+    }
+  };
+
   const isEditing = Boolean(editingCourse);
 
   return (
@@ -445,61 +460,25 @@ export const CourseCatalog = ({
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="class-credits">Credits</Label>
-                <Input
-                  id="class-credits"
-                  type="number"
-                  min={0}
-                  max={20}
-                  value={credits}
-                  onChange={(e) => updateFormField('credits', Number(e.target.value))}
-                />
-              </div>
+                  <Input
+                    id="class-credits"
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={credits}
+                    onChange={(e) => updateFormField('credits', Number(e.target.value))}
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label>Distributive colors</Label>
-                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                    {(() => {
-                      const activeColorId = activeDistributiveForColor
-                        ? selectedDistributiveColors[activeDistributiveForColor]
-                        : undefined;
-                      const disabled = !activeDistributiveForColor;
-                      return TAG_COLOR_OPTIONS.map((option) => {
-                        const isSelected = Boolean(activeDistributiveForColor && activeColorId === option.id);
-                        return (
-                          <button
-                            key={`color-${option.id}`}
-                            type="button"
-                            disabled={disabled}
-                            onClick={() =>
-                              activeDistributiveForColor
-                                ? isSelected
-                                  ? removeDistributiveColor(activeDistributiveForColor)
-                                  : updateDistributiveColor(activeDistributiveForColor, option.id)
-                                : null
-                            }
-                            className={cn(
-                              'flex h-8 items-center rounded-lg border px-2.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-                              isSelected
-                                ? 'border-primary bg-primary/5 text-foreground focus-visible:ring-primary'
-                                : 'border-border bg-card text-muted-foreground hover:border-primary/40',
-                              disabled && 'cursor-not-allowed opacity-50 hover:border-border'
-                            )}
-                            aria-label={
-                              activeDistributiveForColor
-                                ? isSelected
-                                  ? `Remove color from ${activeDistributiveForColor}`
-                                  : `Set ${activeDistributiveForColor} color to ${option.label}`
-                                : `Select a distributive before choosing ${option.label}`
-                            }
-                          >
-                            <span className="flex flex-1 items-center gap-2 text-left">
-                              <span className={cn('h-3 w-3 shrink-0 rounded-full border border-transparent', option.accentClass)} aria-hidden />
-                              <span className="truncate">{option.label}</span>
-                            </span>
-                          </button>
-                        );
-                      });
-                    })()}
-                  </div>
+                  <TagColorPicker
+                    value={activeDistributiveColor}
+                    onSelect={handleActiveColorSelect}
+                    disabled={!activeDistributiveForColor}
+                    allowDeselect
+                    size="compact"
+                    className="gap-1.5"
+                  />
                 </div>
               </div>
               <div className="space-y-2">

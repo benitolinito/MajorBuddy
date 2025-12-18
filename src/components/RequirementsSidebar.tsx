@@ -5,7 +5,8 @@ import { ChevronsRight, Pencil } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { PlanInput, PlannerPlan, PlanType } from '@/types/planner';
-import { TAG_COLOR_OPTIONS, getDefaultColorId, getTagAccentClass, getTagColorClasses } from '@/lib/tagColors';
+import { getDefaultColorId, getTagAccentClass, getTagColorClasses } from '@/lib/tagColors';
+import { TagColorPicker } from '@/components/TagColorPicker';
 
 interface RequirementsProps {
   totalCredits: number;
@@ -324,24 +325,12 @@ export const RequirementsSidebar = ({
               <p className="text-[11px] text-muted-foreground">
                 This color appears on plan badges in the Class Library and schedule.
               </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {TAG_COLOR_OPTIONS.map((option) => {
-                  const isActive = colorChoice === option.id;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => setColorChoice(option.id)}
-                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition ${
-                        isActive ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-primary/50'
-                      }`}
-                    >
-                      <span className={`h-4 w-4 rounded-full ${option.accentClass}`} />
-                      <span className="text-xs font-medium text-foreground">{option.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <TagColorPicker
+                value={colorChoice}
+                onSelect={(colorId) => {
+                  if (colorId) setColorChoice(colorId);
+                }}
+              />
             </div>
 
             <div className="flex justify-between gap-2 pt-2">
