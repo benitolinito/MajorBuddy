@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { PlannerConfig, TermSystem } from "@/types/planner";
+import { UNIVERSITY_SUGGESTIONS } from '@/data/universities';
 
 const formatInitialValue = (value?: number | string | null) =>
   (value !== null && value !== undefined ? String(value) : "");
@@ -35,6 +36,13 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: Pla
   const [termSystem, setTermSystem] = useState<TermSystem | "">(() => initialConfig?.termSystem ?? "");
   const [planName, setPlanName] = useState(() => initialConfig?.planName ?? "");
   const [university, setUniversity] = useState(() => initialConfig?.university ?? "");
+  const [universityFocused, setUniversityFocused] = useState(false);
+  const [universityQuery, setUniversityQuery] = useState('');
+  const filteredUniversities = useMemo(() => {
+    const query = university.trim().toLowerCase();
+    if (!query) return UNIVERSITY_SUGGESTIONS.slice(0, 6);
+    return UNIVERSITY_SUGGESTIONS.filter((school) => school.toLowerCase().includes(query)).slice(0, 6);
+  }, [university]);
 
   useEffect(() => {
     setStartYear(formatInitialValue(initialConfig?.startYear));
@@ -100,13 +108,39 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: Pla
             </div>
             <div className="space-y-2">
               <Label htmlFor="university">School</Label>
-              <Input
-                id="university"
-                type="text"
-                value={university}
-                onChange={(e) => setUniversity(e.target.value)}
-                placeholder=""
-              />
+              <div className="relative">
+                <Input
+                  id="university"
+                  type="text"
+                  value={university}
+                  onFocus={() => setUniversityFocused(true)}
+                  onBlur={() => setTimeout(() => setUniversityFocused(false), 150)}
+                  onChange={(e) => setUniversity(e.target.value)}
+                  placeholder="e.g., Stanford University"
+                  autoComplete="off"
+                />
+                {universityFocused && filteredUniversities.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-border bg-popover shadow-lg">
+                    <ul className="max-h-48 overflow-y-auto py-2 text-sm">
+                      {filteredUniversities.map((school) => (
+                        <li key={school}>
+                          <button
+                            type="button"
+                            className="w-full px-3 py-1.5 text-left hover:bg-muted"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setUniversity(school);
+                              setUniversityFocused(false);
+                            }}
+                          >
+                            {school}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

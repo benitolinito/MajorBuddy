@@ -21,8 +21,8 @@ export const TAG_COLOR_OPTIONS: TagColorOption[] = [
     accentClass: 'bg-purple-500',
   },
   {
-    id: 'emerald',
-    label: 'Emerald',
+    id: 'green',
+    label: 'Green',
     className:
       'border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-100',
     accentClass: 'bg-emerald-500',

@@ -47,7 +47,11 @@ export const CourseCard = ({ course, plans = [], onRemove, draggable = false, on
           </Badge>
         ))}
         {course.distributives.map((dist) => (
-          <Badge key={dist} variant="outline" className={`text-[11px] font-medium ${getTagColorClasses(dist)}`}>
+          <Badge
+            key={dist}
+            variant="outline"
+            className={`text-[11px] font-medium ${getTagColorClasses(dist, course.distributiveColors?.[dist])}`}
+          >
             {dist}
           </Badge>
         ))}

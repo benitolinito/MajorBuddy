@@ -21,6 +21,7 @@ export interface Course {
   description?: string;
   credits: number;
   distributives: string[];
+  distributiveColors?: Record<string, string>;
   planIds: string[];
 }
 
@@ -30,6 +31,7 @@ export interface NewCourseInput {
   description?: string;
   credits: number;
   distributives: string[];
+  distributiveColors?: Record<string, string>;
   planIds: string[];
 }
 

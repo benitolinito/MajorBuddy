@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, ChevronsLeft, Pencil, Plus, Search, Tag, Trash } from 'lucide-react';
 import { Course, NewCourseInput, PlanProfile, PlannerPlan } from '@/types/planner';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getTagAccentClass, getTagColorClasses } from '@/lib/tagColors';
+import { getTagAccentClass, getTagColorClasses, TAG_COLOR_OPTIONS, getDefaultColorId } from '@/lib/tagColors';
+import { cn } from '@/lib/utils';
 import { PlanSwitcher } from '@/components/PlanSwitcher';
 
 interface CourseCatalogProps {
@@ -88,6 +89,8 @@ export const CourseCatalog = ({
   const [description, setDescription] = useState('');
   const [credits, setCredits] = useState(3);
   const [selectedDistributives, setSelectedDistributives] = useState<string[]>([]);
+  const [selectedDistributiveColors, setSelectedDistributiveColors] = useState<Record<string, string>>({});
+  const [activeDistributiveForColor, setActiveDistributiveForColor] = useState<string | null>(null);
   const [newDistributive, setNewDistributive] = useState('');
   const [selectedPlans, setSelectedPlans] = useState<string[]>([]);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
@@ -102,10 +105,54 @@ export const CourseCatalog = ({
     );
   }, [courses, search]);
 
+  const activeColorDistributive =
+    activeDistributiveForColor && selectedDistributives.includes(activeDistributiveForColor)
+      ? activeDistributiveForColor
+      : null;
+
+  useEffect(() => {
+    if (selectedDistributives.length === 0) {
+      if (activeDistributiveForColor !== null) {
+        setActiveDistributiveForColor(null);
+      }
+      return;
+    }
+    if (!activeDistributiveForColor || !selectedDistributives.includes(activeDistributiveForColor)) {
+      setActiveDistributiveForColor(selectedDistributives[0]);
+    }
+  }, [activeDistributiveForColor, selectedDistributives]);
+
+  const updateDistributiveColor = (label: string, colorId: string) => {
+    setSelectedDistributiveColors((prev) => ({ ...prev, [label]: colorId }));
+  };
+
+  const removeDistributiveColor = (label: string) => {
+    setSelectedDistributiveColors((prev) => {
+      if (!(label in prev)) return prev;
+      const next = { ...prev };
+      delete next[label];
+      return next;
+    });
+  };
+
   const toggleDistributive = (label: string) => {
-    setSelectedDistributives((prev) =>
-      prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
-    );
+    setSelectedDistributives((prev) => {
+      const isSelected = prev.includes(label);
+      if (!isSelected) {
+        setActiveDistributiveForColor(label);
+        return [...prev, label];
+      }
+
+      if (activeDistributiveForColor !== label) {
+        setActiveDistributiveForColor(label);
+        return prev;
+      }
+
+      removeDistributiveColor(label);
+      const remaining = prev.filter((item) => item !== label);
+      setActiveDistributiveForColor(remaining[0] ?? null);
+      return remaining;
+    });
   };
 
   const togglePlan = (planId: string) => {
@@ -116,6 +163,7 @@ export const CourseCatalog = ({
     const created = onCreateDistributive(newDistributive);
     if (created) {
       setSelectedDistributives((prev) => Array.from(new Set([...prev, created])));
+      setActiveDistributiveForColor(created);
     }
     setNewDistributive('');
   };
@@ -126,6 +174,8 @@ export const CourseCatalog = ({
     setDescription('');
     setCredits(3);
     setSelectedDistributives([]);
+    setSelectedDistributiveColors({});
+    setActiveDistributiveForColor(null);
     setSelectedPlans([]);
     setNewDistributive('');
     setEditingCourse(null);
@@ -143,6 +193,8 @@ export const CourseCatalog = ({
     setDescription(course.description ?? '');
     setCredits(course.credits);
     setSelectedDistributives(course.distributives);
+    setSelectedDistributiveColors(course.distributiveColors ?? {});
+    setActiveDistributiveForColor(course.distributives[0] ?? null);
     setSelectedPlans(course.planIds);
     setNewDistributive('');
     setDialogOpen(true);
@@ -160,12 +212,21 @@ export const CourseCatalog = ({
     const normalizedCredits = Number.isFinite(Number(credits)) ? Math.max(0, Number(credits)) : 0;
     const activePlanIds = selectedPlans.filter((id) => planLookup.has(id));
 
+    const sanitizedColors = selectedDistributives.reduce<Record<string, string>>((acc, label) => {
+      const colorId = selectedDistributiveColors[label];
+      if (colorId) {
+        acc[label] = colorId;
+      }
+      return acc;
+    }, {});
+
     const payload: NewCourseInput = {
       code: trimmedCode || 'NEW-000',
       name: trimmedTitle || 'Untitled class',
       description: description.trim() || undefined,
       credits: normalizedCredits,
       distributives: selectedDistributives,
+      distributiveColors: Object.keys(sanitizedColors).length ? sanitizedColors : undefined,
       planIds: activePlanIds,
     };
 
@@ -339,17 +400,66 @@ export const CourseCatalog = ({
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="class-credits">Credits</Label>
-                <Input
-                  id="class-credits"
-                  type="number"
-                  min={0}
-                  max={20}
-                  value={credits}
-                  onChange={(e) => setCredits(Number(e.target.value))}
-                />
+            <div className="grid gap-3 sm:grid-cols-2 items-start">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="class-credits">Credits</Label>
+                  <Input
+                    id="class-credits"
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={credits}
+                    onChange={(e) => setCredits(Number(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Distributive colors</Label>
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                    {(() => {
+                      const activeColorId = activeDistributiveForColor
+                        ? selectedDistributiveColors[activeDistributiveForColor]
+                        : undefined;
+                      const disabled = !activeDistributiveForColor;
+                      return TAG_COLOR_OPTIONS.map((option) => {
+                        const isSelected = Boolean(activeDistributiveForColor && activeColorId === option.id);
+                        return (
+                          <button
+                            key={`color-${option.id}`}
+                            type="button"
+                            disabled={disabled}
+                            onClick={() =>
+                              activeDistributiveForColor
+                                ? isSelected
+                                  ? removeDistributiveColor(activeDistributiveForColor)
+                                  : updateDistributiveColor(activeDistributiveForColor, option.id)
+                                : null
+                            }
+                            className={cn(
+                              'flex h-8 items-center rounded-lg border px-2.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+                              isSelected
+                                ? 'border-primary bg-primary/5 text-foreground focus-visible:ring-primary'
+                                : 'border-border bg-card text-muted-foreground hover:border-primary/40',
+                              disabled && 'cursor-not-allowed opacity-50 hover:border-border'
+                            )}
+                            aria-label={
+                              activeDistributiveForColor
+                                ? isSelected
+                                  ? `Remove color from ${activeDistributiveForColor}`
+                                  : `Set ${activeDistributiveForColor} color to ${option.label}`
+                                : `Select a distributive before choosing ${option.label}`
+                            }
+                          >
+                            <span className="flex flex-1 items-center gap-2 text-left">
+                              <span className={cn('h-3 w-3 shrink-0 rounded-full border border-transparent', option.accentClass)} aria-hidden />
+                              <span className="truncate">{option.label}</span>
+                            </span>
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="class-distributives">Distributives</Label>
@@ -377,6 +487,16 @@ export const CourseCatalog = ({
                       key={dist}
                       label={dist}
                       active={selectedDistributives.includes(dist)}
+                      colorClassName={
+                        selectedDistributiveColors[dist]
+                          ? getTagColorClasses(dist, selectedDistributiveColors[dist])
+                          : undefined
+                      }
+                      colorAccentClass={
+                        selectedDistributiveColors[dist]
+                          ? getTagAccentClass(dist, selectedDistributiveColors[dist])
+                          : undefined
+                      }
                       onClick={() => toggleDistributive(dist)}
                     />
                   ))}
@@ -387,13 +507,20 @@ export const CourseCatalog = ({
                         key={dist}
                         label={dist}
                         active
+                        colorClassName={
+                          selectedDistributiveColors[dist]
+                            ? getTagColorClasses(dist, selectedDistributiveColors[dist])
+                            : undefined
+                        }
+                        colorAccentClass={
+                          selectedDistributiveColors[dist]
+                            ? getTagAccentClass(dist, selectedDistributiveColors[dist])
+                            : undefined
+                        }
                         onClick={() => toggleDistributive(dist)}
                       />
                     ))}
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Click to tag this class or create your own distributives.
-                </p>
               </div>
             </div>
 

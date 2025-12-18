@@ -92,6 +92,17 @@ const normalizeCourse = (value: unknown): Course => {
   const distributives = normalizeDistributives(distributivesSource);
   const planIds = Array.isArray(course.planIds) ? course.planIds.filter(isNonEmptyString) : [];
   const sourceId = isNonEmptyString(course.sourceId) ? course.sourceId.trim() : undefined;
+  const colorSource = course.distributiveColors;
+  const distributiveColors =
+    colorSource && typeof colorSource === 'object'
+      ? distributives.reduce<Record<string, string>>((acc, label) => {
+          const raw = (colorSource as Record<string, unknown>)[label];
+          if (isNonEmptyString(raw)) {
+            acc[label] = raw.trim();
+          }
+          return acc;
+        }, {})
+      : undefined;
   return {
     id: isNonEmptyString(course.id) ? course.id : generateId(),
     sourceId,
@@ -100,6 +111,7 @@ const normalizeCourse = (value: unknown): Course => {
     description: typeof course.description === 'string' ? course.description : undefined,
     credits: Number.isFinite(Number(course.credits)) ? Number(course.credits) : 0,
     distributives,
+    distributiveColors,
     planIds,
   };
 };
