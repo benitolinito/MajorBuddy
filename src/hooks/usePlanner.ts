@@ -413,19 +413,31 @@ const persistConfig = (config: PlannerConfig) => {
   localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
 };
 
-export const usePlanner = () => {
-  const initialLoad = useMemo(() => buildInitialPlanner(), []);
+type PlanProfileManagerParams = {
+  initialPlanProfiles: PlanProfile[];
+  initialActiveId: string;
+  initialSnapshots: Map<string, PlannerState>;
+  state: PlannerState;
+  setPlannerState: React.Dispatch<React.SetStateAction<PlannerState>>;
+  setHasConfig: React.Dispatch<React.SetStateAction<boolean>>;
+};
 
-  const [state, setState] = useState<PlannerState>(() => initialLoad.state);
-  const [hasConfig, setHasConfig] = useState(Boolean(initialLoad.hasConfig));
-  const [planProfiles, setPlanProfiles] = useState<PlanProfile[]>(initialLoad.planProfiles);
-  const [activePlanProfileId, setActivePlanProfileId] = useState<string>(initialLoad.activePlanProfileId);
-  const profileSnapshotsRef = useRef<Map<string, PlannerState>>(initialLoad.profileSnapshots);
+const usePlanProfilesManager = ({
+  initialPlanProfiles,
+  initialActiveId,
+  initialSnapshots,
+  state,
+  setPlannerState,
+  setHasConfig,
+}: PlanProfileManagerParams) => {
+  const [planProfiles, setPlanProfiles] = useState<PlanProfile[]>(initialPlanProfiles);
+  const [activePlanProfileId, setActivePlanProfileId] = useState<string>(initialActiveId);
+  const profileSnapshotsRef = useRef<Map<string, PlannerState>>(initialSnapshots);
+  const latestStateRef = useRef(state);
 
-  const clampIndex = (length: number, index?: number) => {
-    if (index == null || Number.isNaN(index)) return length;
-    return Math.max(0, Math.min(index, length));
-  };
+  useEffect(() => {
+    latestStateRef.current = state;
+  }, [state]);
 
   const selectPlanProfile = useCallback(
     (profileId: string) => {
@@ -433,10 +445,10 @@ export const usePlanner = () => {
       const snapshot = profileSnapshotsRef.current.get(profileId);
       if (!snapshot) return;
       setActivePlanProfileId(profileId);
-      setState(clonePlannerState(snapshot));
+      setPlannerState(clonePlannerState(snapshot));
       setHasConfig(Boolean(snapshot.config));
     },
-    [activePlanProfileId],
+    [activePlanProfileId, setHasConfig, setPlannerState],
   );
 
   const createPlanProfile = useCallback(
@@ -445,7 +457,7 @@ export const usePlanner = () => {
       const sourceSnapshot =
         profileSnapshotsRef.current.get(baseProfileId) ??
         profileSnapshotsRef.current.get(activePlanProfileId) ??
-        state;
+        latestStateRef.current;
 
       const snapshotBase = clonePlannerState(sourceSnapshot);
       const snapshot = options?.startBlank ? stripScheduledCourses(snapshotBase) : snapshotBase;
@@ -458,11 +470,11 @@ export const usePlanner = () => {
       profileSnapshotsRef.current.set(newProfile.id, snapshot);
       setPlanProfiles((prev) => [...prev, newProfile]);
       setActivePlanProfileId(newProfile.id);
-      setState(snapshot);
+      setPlannerState(snapshot);
       setHasConfig(Boolean(snapshot.config));
       return newProfile;
     },
-    [activePlanProfileId, planProfiles, state],
+    [activePlanProfileId, planProfiles, setHasConfig, setPlannerState],
   );
 
   const renamePlanProfile = useCallback((profileId: string, nextName: string) => {
@@ -488,8 +500,8 @@ export const usePlanner = () => {
           const nextSnapshot =
             profileSnapshotsRef.current.get(nextProfile.id) ??
             profileSnapshotsRef.current.get(activePlanProfileId) ??
-            state;
-          setState(clonePlannerState(nextSnapshot));
+            latestStateRef.current;
+          setPlannerState(clonePlannerState(nextSnapshot));
           setHasConfig(Boolean(nextSnapshot.config));
           setActivePlanProfileId(nextProfile.id);
         }
@@ -497,14 +509,14 @@ export const usePlanner = () => {
         return remaining;
       });
     },
-    [activePlanProfileId, state],
+    [activePlanProfileId, setHasConfig, setPlannerState],
   );
 
   const getCoursePlacement = useCallback(
     (course: Course | { id: string; sourceId?: string }) => {
       const sourceId = course.sourceId ?? course.id;
       if (!sourceId) return null;
-      for (const year of state.years) {
+      for (const year of latestStateRef.current.years) {
         for (const term of year.terms) {
           const match = term.courses.find((item) => (item.sourceId ?? item.id) === sourceId);
           if (match) {
@@ -520,8 +532,46 @@ export const usePlanner = () => {
       }
       return null;
     },
-    [state.years],
+    [],
   );
+
+  return {
+    planProfiles,
+    activePlanProfileId,
+    selectPlanProfile,
+    createPlanProfile,
+    renamePlanProfile,
+    deletePlanProfile,
+    getCoursePlacement,
+  };
+};
+
+export const usePlanner = () => {
+  const initialLoad = useMemo(() => buildInitialPlanner(), []);
+
+  const [state, setState] = useState<PlannerState>(() => initialLoad.state);
+  const [hasConfig, setHasConfig] = useState(Boolean(initialLoad.hasConfig));
+  const {
+    planProfiles,
+    activePlanProfileId,
+    selectPlanProfile,
+    createPlanProfile,
+    renamePlanProfile,
+    deletePlanProfile,
+    getCoursePlacement,
+  } = usePlanProfilesManager({
+    initialPlanProfiles: initialLoad.planProfiles,
+    initialActiveId: initialLoad.activePlanProfileId,
+    initialSnapshots: initialLoad.profileSnapshots,
+    state,
+    setPlannerState: setState,
+    setHasConfig,
+  });
+
+  const clampIndex = (length: number, index?: number) => {
+    if (index == null || Number.isNaN(index)) return length;
+    return Math.max(0, Math.min(index, length));
+  };
 
   const addCourseToTerm = useCallback((yearId: string, termId: string, course: Course, targetIndex?: number) => {
     const normalizedCourse = normalizeCourse(course);
@@ -559,19 +609,6 @@ export const usePlanner = () => {
   useEffect(() => {
     persistJson(YEARS_STORAGE_KEY, state.years);
   }, [state.years]);
-
-  useEffect(() => {
-    if (!activePlanProfileId) return;
-    profileSnapshotsRef.current.set(activePlanProfileId, clonePlannerState(state));
-    const profilesWithSnapshots = planProfiles
-      .map((profile) => {
-        const snapshot = profileSnapshotsRef.current.get(profile.id);
-        if (!snapshot) return null;
-        return { ...profile, snapshot };
-      })
-      .filter(Boolean) as PlanProfileSnapshot[];
-    persistPlanProfiles(activePlanProfileId, profilesWithSnapshots);
-  }, [activePlanProfileId, planProfiles, state]);
 
   const addCourseToCatalog = useCallback((courseInput: NewCourseInput) => {
     const normalizedCourse = normalizeCourse({ ...courseInput, id: generateId() });

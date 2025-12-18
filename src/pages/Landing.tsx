@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import {
   ArrowRight,
   CalendarDays,
@@ -11,11 +11,13 @@ import {
   Share2,
   ShieldCheck,
   Sparkles,
-} from "lucide-react";
+} from 'lucide-react';
 
-import { AuthDialog } from "@/components/AuthDialog";
-import { Button } from "@/components/ui/button";
-import { auth, googleProvider } from "@/firebaseClient";
+import { AuthDialog } from '@/components/AuthDialog';
+import { Button } from '@/components/ui/button';
+import { auth, googleProvider } from '@/firebaseClient';
+import { FeatureCard } from '@/components/landing/FeatureCard';
+import { WorkflowStep } from '@/components/landing/WorkflowStep';
 
 const featureHighlights = [
   {
@@ -63,6 +65,42 @@ const workflowSteps = [
 ] as const;
 
 const showMarketingSections = true;
+const MarketingFeatures = () => (
+  <section id="features" className="mx-auto w-full max-w-6xl px-6 py-16">
+    <p className="text-sm font-semibold uppercase tracking-[0.25rem] text-primary">Why students choose MajorBuddy</p>
+    <h2 className="mt-3 text-3xl font-semibold text-foreground sm:text-4xl">
+      Everything you need to plan four years with confidence.
+    </h2>
+    <p className="mt-2 max-w-3xl text-lg text-muted-foreground">
+      From orientation to graduation audits, MajorBuddy keeps students, advisors, and career coaches aligned on the same course roadmap.
+    </p>
+    <div className="mt-10 grid gap-5 md:grid-cols-2">
+      {featureHighlights.map((feature) => (
+        <FeatureCard key={feature.title} {...feature} />
+      ))}
+    </div>
+  </section>
+);
+
+const MarketingWorkflow = () => (
+  <section className="bg-muted/30 py-16" id="workflow">
+    <div className="mx-auto flex max-w-5xl flex-col gap-8 px-6">
+      <header className="space-y-2 text-center">
+        <p className="text-xs uppercase tracking-[0.4rem] text-muted-foreground">How it works</p>
+        <h2 className="text-3xl font-semibold text-foreground">Plan faster in three lightweight steps.</h2>
+        <p className="text-base text-muted-foreground">
+          Answer a few onboarding questions, drag your catalog into place, and ship a professional-looking schedule to advisors or recruiters.
+        </p>
+      </header>
+      <ol className="space-y-6">
+        {workflowSteps.map((step, index) => (
+          <WorkflowStep key={step.title} index={index} {...step} />
+        ))}
+      </ol>
+    </div>
+  </section>
+);
+
 const Landing = () => {
   const navigate = useNavigate();
   const [authBusy, setAuthBusy] = useState(false);
@@ -241,61 +279,10 @@ const Landing = () => {
         </div>
 
         {showMarketingSections && (
-        <section id="features" className="mx-auto w-full max-w-6xl px-6 py-16">
-          <p className="text-sm font-semibold uppercase tracking-[0.25rem] text-primary">Why students choose MajorBuddy</p>
-          <h2 className="mt-3 text-3xl font-semibold text-foreground sm:text-4xl">
-            Everything you need to plan four years with confidence.
-          </h2>
-          <p className="mt-2 max-w-3xl text-lg text-muted-foreground">
-            From orientation to graduation audits, MajorBuddy keeps students, advisors, and career coaches aligned on the same course roadmap.
-          </p>
-          <div className="mt-10 grid gap-5 md:grid-cols-2">
-            {featureHighlights.map(({ title, description, detail, icon: Icon }) => (
-              <article key={title} className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm backdrop-blur">
-                <div className="flex items-center gap-3">
-                  <span className="rounded-full bg-primary/10 p-2 text-primary">
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-                </div>
-                <p className="mt-3 text-base text-muted-foreground">{description}</p>
-                <p className="mt-2 text-sm text-muted-foreground/90">{detail}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-        )}
-
-        {showMarketingSections && (
-        <section className="bg-muted/30 py-16" id="workflow">
-          <div className="mx-auto flex max-w-5xl flex-col gap-8 px-6">
-            <header className="space-y-2 text-center">
-              <p className="text-xs uppercase tracking-[0.4rem] text-muted-foreground">How it works</p>
-              <h2 className="text-3xl font-semibold text-foreground">Plan faster in three lightweight steps.</h2>
-              <p className="text-base text-muted-foreground">
-                Answer a few onboarding questions, drag your catalog into place, and ship a professional-looking schedule to advisors or recruiters.
-              </p>
-            </header>
-            <ol className="space-y-6">
-              {workflowSteps.map(({ title, description, icon: Icon }, index) => (
-                <li key={title} className="rounded-2xl border border-border bg-card/70 p-5 shadow-sm backdrop-blur">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold">
-                      {String(index + 1).padStart(2, "0")}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Icon className="h-5 w-5 text-primary" />
-                        <h3 className="text-lg font-semibold">{title}</h3>
-                      </div>
-                      <p className="mt-2 text-base text-muted-foreground">{description}</p>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
+          <>
+            <MarketingFeatures />
+            <MarketingWorkflow />
+          </>
         )}
 
       </main>
