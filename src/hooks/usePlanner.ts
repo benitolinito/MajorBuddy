@@ -500,6 +500,29 @@ export const usePlanner = () => {
     [activePlanProfileId, state],
   );
 
+  const getCoursePlacement = useCallback(
+    (course: Course | { id: string; sourceId?: string }) => {
+      const sourceId = course.sourceId ?? course.id;
+      if (!sourceId) return null;
+      for (const year of state.years) {
+        for (const term of year.terms) {
+          const match = term.courses.find((item) => (item.sourceId ?? item.id) === sourceId);
+          if (match) {
+            return {
+              yearId: year.id,
+              yearName: year.name,
+              termId: term.id,
+              termName: term.name,
+              termYear: term.year,
+            };
+          }
+        }
+      }
+      return null;
+    },
+    [state.years],
+  );
+
   const addCourseToTerm = useCallback((yearId: string, termId: string, course: Course, targetIndex?: number) => {
     const normalizedCourse = normalizeCourse(course);
     setState((prev) => {
@@ -509,10 +532,7 @@ export const usePlanner = () => {
         planIds: validPlanIds,
         sourceId: normalizedCourse.sourceId ?? normalizedCourse.id,
       };
-      const scheduledCourse: Course = {
-        ...courseWithPlans,
-        id: generateId(),
-      };
+
       return {
         ...prev,
         years: prev.years.map((year) =>
@@ -1110,6 +1130,7 @@ export const usePlanner = () => {
     state,
     planProfiles,
     activePlanProfileId,
+    getCoursePlacement,
     addCourseToTerm,
     moveCourseBetweenTerms,
     addCourseToCatalog,

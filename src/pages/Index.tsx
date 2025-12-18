@@ -18,12 +18,14 @@ import { cn } from '@/lib/utils';
 import { AuthDialog } from '@/components/AuthDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 const Index = () => {
   const {
     state,
     planProfiles,
     activePlanProfileId,
+    getCoursePlacement,
     createPlanProfile,
     selectPlanProfile,
     renamePlanProfile,
@@ -77,6 +79,13 @@ const Index = () => {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [requirementsOpen, setRequirementsOpen] = useState(false);
   const [activeMobileYear, setActiveMobileYear] = useState(() => state.years[0]?.id ?? "");
+  const [duplicatePrompt, setDuplicatePrompt] = useState<{
+    course: Course;
+    placement: { yearName: string; termName: string; termYear: number };
+    targetYearId: string;
+    targetTermId: string;
+    targetIndex?: number;
+  } | null>(null);
   const userLabel = user?.displayName || user?.email || undefined;
   const cloudBusy = cloudSaving || cloudLoading || authBusy;
   const canRemoveYear = state.years.length > 1;
@@ -104,6 +113,19 @@ const Index = () => {
         targetTermId: termId,
         targetIndex: options?.targetIndex,
       });
+      setDraggedCourse(null);
+      return;
+    }
+
+    const placement = getCoursePlacement(course);
+    if (placement) {
+      setDuplicatePrompt({
+        course,
+        placement,
+        targetYearId: yearId,
+        targetTermId: termId,
+        targetIndex: options?.targetIndex,
+      });
     } else {
       addCourseToTerm(yearId, termId, course, options?.targetIndex);
     }
@@ -118,6 +140,21 @@ const Index = () => {
   useEffect(() => {
     setShowSetup(!hasConfig);
   }, [hasConfig]);
+
+  const handleConfirmDuplicate = () => {
+    if (!duplicatePrompt) return;
+    addCourseToTerm(
+      duplicatePrompt.targetYearId,
+      duplicatePrompt.targetTermId,
+      duplicatePrompt.course,
+      duplicatePrompt.targetIndex,
+    );
+    setDuplicatePrompt(null);
+  };
+
+  const handleCancelDuplicate = () => {
+    setDuplicatePrompt(null);
+  };
 
   return (
     <div
@@ -137,6 +174,31 @@ const Index = () => {
         plans={state.plans}
         degreeName={plannerTitle}
         university={state.university}
+      />
+      <ConfirmDialog
+        open={Boolean(duplicatePrompt)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDuplicatePrompt(null);
+          }
+        }}
+        title="Add this class again?"
+        description={
+          duplicatePrompt ? (
+            <>
+              <span className="font-medium text-foreground">
+                {[duplicatePrompt.course.code, duplicatePrompt.course.name].filter(Boolean).join(' ').trim() ||
+                  'This class'}
+              </span>{' '}
+              is already scheduled in {duplicatePrompt.placement.termName} {duplicatePrompt.placement.termYear}. Would you
+              like to add another copy to this term?
+            </>
+          ) : undefined
+        }
+        confirmLabel="Add anyway"
+        cancelLabel="Keep existing"
+        onConfirm={handleConfirmDuplicate}
+        onCancel={handleCancelDuplicate}
       />
       <AuthDialog
         open={showAuth}
