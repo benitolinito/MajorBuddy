@@ -38,6 +38,8 @@ export const YearSection = ({
   onRemoveYear,
   canRemoveYear,
 }: YearSectionProps) => {
+  const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
+
   return (
     <section className="group mb-8">
       <div className="mb-4 flex items-center gap-2">
@@ -73,7 +75,7 @@ export const YearSection = ({
         )}
       </div>
       
-      <div className="flex gap-4">
+      <div className={cn("flex gap-4", isMobile && "snap-x snap-mandatory overflow-x-auto py-2")}>
         {year.terms.map((term) => (
           <TermCard
             key={term.id}

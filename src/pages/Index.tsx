@@ -12,10 +12,12 @@ import { ExportScheduleDialog } from '@/components/ExportScheduleDialog';
 import { PlannerConfig } from '@/types/planner';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
-import { ChevronsLeft, ChevronsRight, Plus } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks } from 'lucide-react';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { cn } from '@/lib/utils';
 import { AuthDialog } from '@/components/AuthDialog';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 const Index = () => {
   const {
@@ -71,9 +73,13 @@ const Index = () => {
   const [showSetup, setShowSetup] = useState(!hasConfig);
   const [showExport, setShowExport] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [requirementsOpen, setRequirementsOpen] = useState(false);
+  const [activeMobileYear, setActiveMobileYear] = useState(() => state.years[0]?.id ?? "");
   const userLabel = user?.displayName || user?.email || undefined;
   const cloudBusy = cloudSaving || cloudLoading || authBusy;
   const canRemoveYear = state.years.length > 1;
+  const isMobile = useIsMobile();
 
   const handleDragStart = (course: Course) => {
     setDraggedCourse(course);
@@ -139,6 +145,119 @@ const Index = () => {
         onEmailRegister={registerWithEmail}
       />
 
+      {isMobile ? (
+        <>
+          <PlannerHeader
+            degreeName={state.degreeName}
+            university={state.university}
+            classYear={state.classYear}
+            onReset={reset}
+            userLabel={userLabel}
+            cloudStatus={cloudStatus}
+            cloudBusy={cloudBusy}
+            onSignIn={() => setShowAuth(true)}
+            onSignOut={signOut}
+            onOpenSettings={() => setShowSetup(true)}
+            onOpenExport={() => setShowExport(true)}
+          />
+          <div className="space-y-4 px-4 py-4 pb-28">
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" className="justify-start gap-2" onClick={() => setLibraryOpen(true)}>
+                <BookOpen className="h-4 w-4" />
+                Class Library
+              </Button>
+              <Button variant="outline" className="justify-start gap-2" onClick={() => setRequirementsOpen(true)}>
+                <ListChecks className="h-4 w-4" />
+                Requirements
+              </Button>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {state.years.map((year) => (
+                <button
+                  key={year.id}
+                  type="button"
+                  onClick={() => setActiveMobileYear(year.id)}
+                  className={cn(
+                    "rounded-full border px-4 py-1 text-sm font-medium",
+                    activeMobileYear === year.id
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-card text-muted-foreground",
+                  )}
+                >
+                  {year.name}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-6">
+              {state.years
+                .filter((year) => !activeMobileYear || year.id === activeMobileYear)
+                .map((year) => (
+                  <YearSection
+                    key={year.id}
+                    year={year}
+                    getTermCredits={(termId) => getTermCredits(year.id, termId)}
+                    plans={state.plans}
+                    onRemoveCourse={(termId, courseId) => removeCourse(year.id, termId, courseId)}
+                    onDropCourse={handleDropCourse}
+                    onAddTerm={() => addTerm(year.id)}
+                    onRemoveTerm={(termId) => removeTerm(year.id, termId)}
+                    onRemoveYear={() => removeYear(year.id)}
+                    canRemoveYear={canRemoveYear}
+                  />
+                ))}
+            </div>
+            <Button variant="outline" className="w-full border-dashed" onClick={addYear}>
+              <Plus className="mr-2 h-4 w-4" /> Add another academic year
+            </Button>
+          </div>
+
+          <Sheet open={libraryOpen} onOpenChange={setLibraryOpen}>
+            <SheetContent side="bottom" className="h-[90vh] overflow-y-auto px-2">
+              <SheetHeader className="pb-2 text-left">
+                <SheetTitle>Class Library</SheetTitle>
+                <SheetDescription>Browse and edit your saved courses.</SheetDescription>
+              </SheetHeader>
+              <div className="pb-6">
+                <CourseCatalog
+                  courses={state.courseCatalog}
+                  distributives={state.distributives}
+                  plans={state.plans}
+                  planProfiles={planProfiles}
+                  activePlanProfileId={activePlanProfileId}
+                  onDragStart={handleDragStart}
+                  onCreateCourse={addCourseToCatalog}
+                  onUpdateCourse={updateCourseInCatalog}
+                  onRemoveCourse={removeCourseFromCatalog}
+                  onCreateDistributive={addDistributive}
+                  onCreatePlanProfile={createPlanProfile}
+                  onSelectPlanProfile={selectPlanProfile}
+                  onRenamePlanProfile={renamePlanProfile}
+                  onDeletePlanProfile={deletePlanProfile}
+                  onCollapsePanel={() => setLibraryOpen(false)}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          <Sheet open={requirementsOpen} onOpenChange={setRequirementsOpen}>
+            <SheetContent side="bottom" className="h-[85vh] overflow-y-auto px-4">
+              <SheetHeader className="pb-2 text-left">
+                <SheetTitle>Requirements</SheetTitle>
+                <SheetDescription>Track majors, minors, and distributives.</SheetDescription>
+              </SheetHeader>
+              <RequirementsSidebar
+                totalCredits={stats.totalCredits}
+                maxCredits={state.requirements.totalCredits}
+                plans={state.plans}
+                planProgress={stats.planProgress}
+                onAddPlan={addPlan}
+                onRemovePlan={removePlan}
+                onCollapsePanel={() => setRequirementsOpen(false)}
+              />
+            </SheetContent>
+          </Sheet>
+        </>
+      ) : (
       <ResizablePanelGroup direction="horizontal" className="h-screen w-full">
         <ResizablePanel
           ref={catalogPanelRef}
@@ -253,6 +372,7 @@ const Index = () => {
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
+      )}
     </div>
   );
 };
