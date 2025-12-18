@@ -6,8 +6,25 @@ export type PlannerSnapshot = PlannerState;
 
 const db = getFirestore(app);
 const plannerDoc = (uid: string) => doc(db, "users", uid, "plannerV2", "current");
+
+const pruneUndefined = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => pruneUndefined(item));
+  }
+  if (value && typeof value === "object") {
+    return Object.entries(value).reduce<Record<string, unknown>>((acc, [key, val]) => {
+      if (val === undefined) {
+        return acc;
+      }
+      acc[key] = pruneUndefined(val);
+      return acc;
+    }, {});
+  }
+  return value;
+};
+
 const sanitizeSnapshot = (snapshot: PlannerSnapshot): PlannerSnapshot =>
-  JSON.parse(JSON.stringify(snapshot));
+  pruneUndefined(snapshot) as PlannerSnapshot;
 
 export const savePlannerSnapshot = async (uid: string, snapshot: PlannerSnapshot) => {
   await setDoc(plannerDoc(uid), { snapshot: sanitizeSnapshot(snapshot), updatedAt: serverTimestamp() });
