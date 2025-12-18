@@ -150,9 +150,6 @@ export const RequirementsSidebar = ({
         >
           Add major/minor
         </Button>
-        <p className="text-[11px] text-muted-foreground text-center">
-          Capture class counts, credits, and colors for each plan.
-        </p>
       </div>
 
       <div className="space-y-3">
@@ -233,13 +230,11 @@ export const RequirementsSidebar = ({
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    {targetClasses === 0
-                      ? 'Add a class goal to see progress here.'
-                      : total === 0
-                        ? 'No tagged classes yet. Add one from the library to begin tracking.'
-                        : `${scheduled} tagged from your library.`}
-                  </p>
+                  {targetClasses === 0 ? (
+                    <p className="text-[11px] text-muted-foreground">Add a class goal to see progress here.</p>
+                  ) : scheduled > 0 ? (
+                    <p className="text-[11px] text-muted-foreground">{`${scheduled} tagged from your library.`}</p>
+                  ) : null}
                 </div>
               </div>
             );

@@ -57,6 +57,12 @@ export const PlannerHeader = ({
     onCreatePlanProfile &&
     onRenamePlanProfile &&
     onDeletePlanProfile;
+  const activePlanProfile =
+    planProfiles && activePlanProfileId ? planProfiles.find((plan) => plan.id === activePlanProfileId) : null;
+  const planVariantLabel =
+    activePlanProfile && activePlanProfile.name && activePlanProfile.name !== degreeName
+      ? activePlanProfile.name
+      : null;
   const headerClass = `bg-card border-b border-border ${isMobile ? 'px-4 py-3' : 'px-6 py-4'} ${
     sticky ? 'sticky top-0 z-10' : 'relative z-10'
   }`;
@@ -77,6 +83,9 @@ export const PlannerHeader = ({
                 <p className="text-xs text-muted-foreground">
                   {university} • Class of {classYear}
                 </p>
+                {planVariantLabel && (
+                  <p className="text-[11px] text-muted-foreground">Plan profile: {planVariantLabel}</p>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -138,6 +147,9 @@ export const PlannerHeader = ({
             <p className="text-sm text-muted-foreground">
               {university} • Class of {classYear}
             </p>
+            {planVariantLabel && (
+              <p className="text-xs text-muted-foreground">Plan profile: {planVariantLabel}</p>
+            )}
           </div>
         </div>
 

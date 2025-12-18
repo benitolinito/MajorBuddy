@@ -935,10 +935,15 @@ export const usePlanner = () => {
     setState((prev) => {
       const termSystem = prev.config?.termSystem ?? createDefaultConfig().termSystem;
       const termSequence = TERM_SEQUENCE[termSystem] ?? TERM_SEQUENCE.semester;
+      const termLimit = termSystem === "quarter" ? 4 : termSequence.length;
       return {
         ...prev,
         years: prev.years.map((year) => {
           if (year.id !== yearId) return year;
+
+          if (year.terms.length >= termLimit) {
+            return year;
+          }
 
           const existingNames = year.terms.map((t) => t.name);
           const nextTermName =

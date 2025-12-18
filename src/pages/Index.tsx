@@ -22,6 +22,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/components/ui/sonner';
+import { DEFAULT_PLAN_NAME } from '@/lib/plannerProfiles';
 
 const Index = () => {
   const {
@@ -104,7 +105,7 @@ const Index = () => {
   const canRemoveYear = state.years.length > 1;
   const isMobile = useIsMobile();
   const activePlanProfile = planProfiles.find((profile) => profile.id === activePlanProfileId);
-  const plannerTitle = activePlanProfile?.name || state.degreeName;
+  const plannerTitle = state.degreeName || activePlanProfile?.name || DEFAULT_PLAN_NAME;
   const quickAddOptions = useMemo(() => {
     const options: { value: string; label: string }[] = [];
     state.years.forEach((year) => {
@@ -236,6 +237,9 @@ const Index = () => {
 
   const handleSaveSetup = (config: PlannerConfig) => {
     configurePlanner(config);
+    if (activePlanProfileId) {
+      renamePlanProfile(activePlanProfileId, config.planName);
+    }
     setShowSetup(false);
   };
 
