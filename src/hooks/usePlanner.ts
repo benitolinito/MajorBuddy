@@ -13,7 +13,7 @@ import {
   PlanProfile,
   PlanInput,
 } from '@/types/planner';
-import { getDefaultColorId } from '@/lib/tagColors';
+import { getDefaultColorId, normalizeColorHex } from '@/lib/tagColors';
 import { DEFAULT_PLAN_NAME, ensureUniquePlanName } from '@/lib/plannerProfiles';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -23,12 +23,31 @@ const DISTRIBUTIVES_STORAGE_KEY = 'plannerDistributives';
 const PLANS_STORAGE_KEY = 'plannerPlans';
 const YEARS_STORAGE_KEY = 'plannerAcademicYears';
 const PLAN_PROFILES_STORAGE_KEY = 'plannerPlanProfiles';
+const COLOR_PALETTE_STORAGE_KEY = 'plannerColorPalette';
 const DEFAULT_MAJOR_CREDITS = 48;
 const DEFAULT_MINOR_CREDITS = 24;
+const PLANNER_STORAGE_KEYS = [
+  CONFIG_STORAGE_KEY,
+  COURSE_STORAGE_KEY,
+  DISTRIBUTIVES_STORAGE_KEY,
+  PLANS_STORAGE_KEY,
+  YEARS_STORAGE_KEY,
+  PLAN_PROFILES_STORAGE_KEY,
+  COLOR_PALETTE_STORAGE_KEY,
+];
+
+export const clearPlannerStorage = () => {
+  if (typeof window === 'undefined') return;
+  PLANNER_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+};
 
 const persistJson = (key: string, value: unknown) => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(key, JSON.stringify(value));
+};
+
+const persistPalette = (palette: string[]) => {
+  persistJson(COLOR_PALETTE_STORAGE_KEY, palette);
 };
 
 const isNonEmptyString = (value: unknown): value is string =>
@@ -46,6 +65,19 @@ const loadJson = <T>(key: string, fallback: T): T => {
     return fallback;
   }
 };
+
+const normalizePalette = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  value.forEach((entry) => {
+    if (typeof entry !== 'string') return;
+    const normalized = normalizeColorHex(entry);
+    if (normalized) seen.add(normalized);
+  });
+  return Array.from(seen);
+};
+
+const loadStoredPalette = (): string[] => normalizePalette(loadJson(COLOR_PALETTE_STORAGE_KEY, []));
 
 const normalizeDistributives = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
@@ -82,7 +114,7 @@ const normalizePlan = (value: unknown): PlannerPlan => {
   };
 };
 
-const normalizeCourse = (value: unknown): Course => {
+const normalizeCourse = (value: unknown, termSystem?: TermSystem): Course => {
   const course = (value ?? {}) as Record<string, unknown>;
   const distributivesSource =
     'distributives' in course
@@ -104,6 +136,13 @@ const normalizeCourse = (value: unknown): Course => {
           return acc;
         }, {})
       : undefined;
+  const offeredTermsSource =
+    'offeredTerms' in course
+      ? course.offeredTerms
+      : 'offeredIn' in course
+        ? course.offeredIn
+        : undefined;
+  const offeredTerms = normalizeOfferedTerms(offeredTermsSource, termSystem);
   return {
     id: isNonEmptyString(course.id) ? course.id : generateId(),
     sourceId,
@@ -114,6 +153,7 @@ const normalizeCourse = (value: unknown): Course => {
     distributives,
     distributiveColors,
     planIds,
+    offeredTerms,
   };
 };
 
@@ -149,6 +189,7 @@ const stripScheduledCourses = (state: PlannerState): PlannerState => ({
 
 const loadStoredPlanProfiles = (): { activeId: string; profiles: PlanProfileSnapshot[] } => {
   const fallback = { activeId: '', profiles: [] as PlanProfileSnapshot[] };
+  const storedPalette = loadStoredPalette();
   const raw = loadJson<unknown>(PLAN_PROFILES_STORAGE_KEY, fallback);
   if (!raw || typeof raw !== 'object') return fallback;
   if (Array.isArray(raw)) {
@@ -163,10 +204,14 @@ const loadStoredPlanProfiles = (): { activeId: string; profiles: PlanProfileSnap
           if (!snapshotEntry?.snapshot) return null;
           const id = isNonEmptyString(snapshotEntry.id) ? snapshotEntry.id : generateId();
           const name = isNonEmptyString(snapshotEntry.name) ? snapshotEntry.name : DEFAULT_PLAN_NAME;
+          const snapshot = snapshotEntry.snapshot as PlannerState;
           return {
             id,
             name,
-            snapshot: snapshotEntry.snapshot as PlannerState,
+            snapshot: {
+              ...snapshot,
+              colorPalette: normalizePalette((snapshot as PlannerState)?.colorPalette ?? storedPalette),
+            },
           };
         })
         .filter(Boolean) as PlanProfileSnapshot[]
@@ -193,8 +238,10 @@ const INITIAL_TERMS: Record<TermSystem, TermName[]> = {
   quarter: ['Fall', 'Winter', 'Spring'],
 };
 
+const getTermSequenceForSystem = (termSystem: TermSystem) => TERM_SEQUENCE[termSystem] ?? TERM_SEQUENCE.semester;
+
 const sortTermsForSystem = (terms: Term[], termSystem: TermSystem) => {
-  const termSequence = TERM_SEQUENCE[termSystem] ?? TERM_SEQUENCE.semester;
+  const termSequence = getTermSequenceForSystem(termSystem);
   const orderLookup = new Map(termSequence.map((name, index) => [name, index]));
   return [...terms].sort((a, b) => {
     const orderA = orderLookup.get(a.name) ?? termSequence.length;
@@ -216,6 +263,108 @@ const createTerm = (termName: TermName, academicStartYear: number) => ({
 const isTermName = (value: unknown): value is TermName =>
   value === 'Fall' || value === 'Winter' || value === 'Spring' || value === 'Summer';
 
+const toTermName = (value: unknown): TermName | null => {
+  if (isTermName(value)) return value;
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'fall') return 'Fall';
+  if (normalized === 'winter') return 'Winter';
+  if (normalized === 'spring') return 'Spring';
+  if (normalized === 'summer') return 'Summer';
+  return null;
+};
+
+const normalizeTermNameForSystem = (value: unknown, termSystem: TermSystem, fallback?: TermName): TermName => {
+  const termSequence = getTermSequenceForSystem(termSystem);
+  const defaultName = fallback ?? termSequence[0] ?? 'Fall';
+  const normalized = toTermName(value);
+  if (!normalized) return defaultName;
+
+  if (termSystem === 'semester' && normalized === 'Winter') {
+    return termSequence.includes('Summer') ? 'Summer' : defaultName;
+  }
+
+  return termSequence.includes(normalized) ? normalized : defaultName;
+};
+
+const normalizeOfferedTerms = (value: unknown, termSystem?: TermSystem): TermName[] => {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<TermName>();
+  const allowedTerms = termSystem ? getTermSequenceForSystem(termSystem) : null;
+  const fallback = allowedTerms?.[0] ?? 'Fall';
+  value.forEach((entry) => {
+    const normalized = toTermName(entry);
+    if (!normalized) return;
+    const termName = termSystem
+      ? normalizeTermNameForSystem(normalized, termSystem, fallback)
+      : normalized;
+    if (allowedTerms && !allowedTerms.includes(termName)) return;
+    seen.add(termName);
+  });
+  return Array.from(seen);
+};
+
+const inferAcademicStartYear = (year: AcademicYear, fallbackStartYear: number): number => {
+  if (Number.isFinite(Number(year?.startYear))) return Number(year.startYear);
+
+  const derived = (year?.terms ?? []).reduce<number | null>((result, term) => {
+    const termYear = Number(term?.year);
+    if (!Number.isFinite(termYear)) return result;
+    const normalizedName = toTermName(term?.name) ?? 'Fall';
+    const academicYear = normalizedName === 'Fall' ? termYear : termYear - 1;
+    return result == null ? academicYear : Math.min(result, academicYear);
+  }, null);
+
+  return derived ?? fallbackStartYear;
+};
+
+const convertSemesterYearsToQuarter = (years: AcademicYear[], fallbackStartYear: number): AcademicYear[] => {
+  if (!Array.isArray(years)) return [];
+
+  return years.map((year) => {
+    const academicStartYear = inferAcademicStartYear(year, fallbackStartYear);
+    const normalizedTerms = Array.isArray(year?.terms)
+      ? year.terms.map((term) => {
+          const termName = normalizeTermNameForSystem(term?.name, 'quarter');
+          const termYear = Number.isFinite(Number(term?.year))
+            ? Number(term.year)
+            : getCalendarYearForTerm(academicStartYear, termName);
+          return { ...term, name: termName, year: termYear };
+        })
+      : [];
+    const hasWinter = normalizedTerms.some((term) => term.name === 'Winter');
+
+    if (!hasWinter) {
+      const springTerm = normalizedTerms.find((term) => term.name === 'Spring');
+      const winterTerm: Term = {
+        id: generateId(),
+        name: 'Winter',
+        year: getCalendarYearForTerm(academicStartYear, 'Winter'),
+        courses: springTerm?.courses ?? [],
+      };
+
+      const termsWithWinter = [
+        ...normalizedTerms.map((term) => (term.name === 'Spring' ? { ...term, courses: [] } : term)),
+        winterTerm,
+      ];
+
+      return {
+        ...year,
+        startYear: Number.isFinite(Number(year?.startYear)) ? Number(year.startYear) : academicStartYear,
+        endYear: Number.isFinite(Number(year?.endYear)) ? Number(year.endYear) : academicStartYear + 1,
+        terms: sortTermsForSystem(termsWithWinter, 'quarter'),
+      };
+    }
+
+    return {
+      ...year,
+      startYear: Number.isFinite(Number(year?.startYear)) ? Number(year.startYear) : academicStartYear,
+      endYear: Number.isFinite(Number(year?.endYear)) ? Number(year.endYear) : academicStartYear + 1,
+      terms: sortTermsForSystem(normalizedTerms, 'quarter'),
+    };
+  });
+};
+
 const loadStoredYears = (): AcademicYear[] | null => {
   if (typeof window === 'undefined') return null;
   const raw = localStorage.getItem(YEARS_STORAGE_KEY);
@@ -233,18 +382,18 @@ const sanitizeYears = (provided: AcademicYear[] | null | undefined, config: Plan
     return createInitialYears(config.startYear, config.termSystem);
   }
 
-  const defaultTermName = TERM_SEQUENCE[config.termSystem][0] ?? 'Fall';
+  const defaultTermName = getTermSequenceForSystem(config.termSystem)[0] ?? 'Fall';
 
   return provided.map((year, index) => {
     const fallbackStart = Number.isFinite(Number(year?.startYear)) ? Number(year?.startYear) : config.startYear + index;
     const normalizedTerms = Array.isArray(year?.terms) && year.terms.length
       ? year.terms.map((term) => {
-          const termName = isTermName(term?.name) ? term.name : defaultTermName;
+          const termName = normalizeTermNameForSystem(term?.name, config.termSystem, defaultTermName);
           const termYear = Number.isFinite(Number(term?.year))
             ? Number(term.year)
             : getCalendarYearForTerm(fallbackStart, termName);
           const courses = Array.isArray(term?.courses)
-            ? term.courses.map((course) => normalizeCourse(course))
+            ? term.courses.map((course) => normalizeCourse(course, config.termSystem))
             : [];
           return {
             id: isNonEmptyString(term?.id) ? term.id : generateId(),
@@ -277,6 +426,16 @@ const createDefaultConfig = (): PlannerConfig => {
   };
 };
 
+const sanitizeSnapshotForPlanner = (snapshot: PlannerState): PlannerState => {
+  const config = snapshot.config ?? createDefaultConfig();
+  const termSystem = config.termSystem;
+  return {
+    ...snapshot,
+    courseCatalog: (snapshot.courseCatalog ?? []).map((course) => normalizeCourse(course, termSystem)),
+    years: sanitizeYears(snapshot.years, config),
+  };
+};
+
 const createInitialYears = (startYear: number, termSystem: TermSystem, yearsCount = 4): AcademicYear[] => {
   const termOrder = INITIAL_TERMS[termSystem] ?? INITIAL_TERMS.semester;
   return Array.from({ length: yearsCount }, (_, index) => {
@@ -291,6 +450,89 @@ const createInitialYears = (startYear: number, termSystem: TermSystem, yearsCoun
   });
 };
 
+const ensureDefaultTermsForReset = (
+  terms: Term[] | undefined,
+  academicStartYear: number,
+  termSystem: TermSystem,
+): Term[] => {
+  const defaultTerms = INITIAL_TERMS[termSystem] ?? INITIAL_TERMS.semester;
+  const primaryTermName = defaultTerms[0] ?? 'Fall';
+  const normalizedExisting = Array.isArray(terms)
+    ? terms.map((term) => {
+        const name = normalizeTermNameForSystem(term?.name, termSystem, primaryTermName);
+        const termYear = Number.isFinite(Number(term?.year))
+          ? Number(term.year)
+          : getCalendarYearForTerm(academicStartYear, name);
+        return {
+          ...term,
+          name,
+          year: termYear,
+          courses: [],
+        };
+      })
+    : [];
+
+  const termByName = new Map<TermName, Term>();
+  normalizedExisting.forEach((term) => {
+    termByName.set(term.name, term);
+  });
+
+  defaultTerms.forEach((name) => {
+    if (!termByName.has(name)) {
+      termByName.set(name, createTerm(name, academicStartYear));
+    }
+  });
+
+  return sortTermsForSystem(Array.from(termByName.values()), termSystem);
+};
+
+const rebuildYearsForReset = (existingYears: AcademicYear[], config: PlannerConfig): AcademicYear[] => {
+  const baseYears = createInitialYears(config.startYear, config.termSystem);
+  const targetCount = Math.max(existingYears.length, baseYears.length);
+  const templates = createInitialYears(config.startYear, config.termSystem, targetCount);
+  const yearByStart = new Map<number, AcademicYear>();
+
+  existingYears.forEach((year) => {
+    if (!year) return;
+    const startYear = Number(year.startYear);
+    if (Number.isFinite(startYear)) {
+      yearByStart.set(startYear, year);
+    }
+  });
+
+  const rebuilt = templates.map((template) => {
+    const existing = yearByStart.get(template.startYear);
+    const terms = ensureDefaultTermsForReset(existing?.terms, template.startYear, config.termSystem);
+
+    return {
+      ...template,
+      ...(existing ?? {}),
+      id: existing?.id ?? template.id,
+      name: isNonEmptyString(existing?.name) ? existing.name : template.name,
+      startYear: template.startYear,
+      endYear: Number.isFinite(Number(existing?.endYear)) ? Number(existing?.endYear) : template.endYear,
+      terms,
+    };
+  });
+
+  const coveredYears = new Set(rebuilt.map((year) => year.startYear));
+  const extraYears = existingYears
+    .filter((year) => Number.isFinite(Number(year.startYear)) && !coveredYears.has(Number(year.startYear)))
+    .map((year) => {
+      const startYear = Number(year.startYear);
+      const endYear = Number.isFinite(Number(year.endYear)) ? Number(year.endYear) : startYear + 1;
+      return {
+        ...year,
+        name: isNonEmptyString(year.name) ? year.name : formatYearLabel(startYear),
+        startYear,
+        endYear,
+        terms: ensureDefaultTermsForReset(year.terms, startYear, config.termSystem),
+      };
+    });
+
+  return [...rebuilt, ...extraYears].sort((a, b) => a.startYear - b.startYear);
+};
+
 type PlannerMeta = { degreeName?: string; university?: string };
 
 const createPlannerState = (
@@ -301,15 +543,17 @@ const createPlannerState = (
     plans?: PlannerPlan[];
     meta?: PlannerMeta;
     years?: AcademicYear[];
+    colorPalette?: string[];
   },
 ): PlannerState => {
   const defaults = createDefaultConfig();
   const effectiveConfig = config ? { ...defaults, ...config } : defaults;
   const { startYear, totalCredits, termSystem, planName, university } = effectiveConfig;
-  const courseCatalog = options?.courseCatalog?.map(normalizeCourse) ?? [];
+  const courseCatalog = options?.courseCatalog?.map((course) => normalizeCourse(course, termSystem)) ?? [];
   const distributives = normalizeDistributives(options?.distributives ?? []);
   const plans = options?.plans?.map(normalizePlan) ?? [];
   const years = sanitizeYears(options?.years ?? loadStoredYears(), effectiveConfig);
+  const colorPalette = normalizePalette(options?.colorPalette ?? loadStoredPalette());
 
   return {
     degreeName: options?.meta?.degreeName ?? planName,
@@ -324,6 +568,7 @@ const createPlannerState = (
     courseCatalog,
     distributives,
     plans,
+    colorPalette,
     config: effectiveConfig,
   };
 };
@@ -333,7 +578,7 @@ const buildInitialPlanner = () => {
   if (storedProfiles.profiles.length > 0) {
     const profileSnapshots = new Map<string, PlannerState>();
     storedProfiles.profiles.forEach((profile) => {
-      profileSnapshots.set(profile.id, profile.snapshot);
+      profileSnapshots.set(profile.id, sanitizeSnapshotForPlanner(profile.snapshot));
     });
     const activeId = profileSnapshots.has(storedProfiles.activeId)
       ? storedProfiles.activeId
@@ -574,8 +819,9 @@ export const usePlanner = () => {
   };
 
   const addCourseToTerm = useCallback((yearId: string, termId: string, course: Course, targetIndex?: number) => {
-    const normalizedCourse = normalizeCourse(course);
     setState((prev) => {
+      const termSystem = prev.config?.termSystem ?? createDefaultConfig().termSystem;
+      const normalizedCourse = normalizeCourse(course, termSystem);
       const validPlanIds = normalizedCourse.planIds.filter((id) => prev.plans.some((plan) => plan.id === id));
       const courseWithPlans = {
         ...normalizedCourse,
@@ -611,8 +857,12 @@ export const usePlanner = () => {
   }, [state.years]);
 
   const addCourseToCatalog = useCallback((courseInput: NewCourseInput) => {
-    const normalizedCourse = normalizeCourse({ ...courseInput, id: generateId() });
+    const courseId = generateId();
+    let normalizedCourse: Course | null = null;
+
     setState((prev) => {
+      const termSystem = prev.config?.termSystem ?? createDefaultConfig().termSystem;
+      normalizedCourse = normalizeCourse({ ...courseInput, id: courseId }, termSystem);
       const validPlanIds = normalizedCourse.planIds.filter((id) => prev.plans.some((plan) => plan.id === id));
       const courseWithPlans = { ...normalizedCourse, planIds: validPlanIds };
       const updatedCatalog = [...prev.courseCatalog, courseWithPlans];
@@ -626,12 +876,17 @@ export const usePlanner = () => {
         distributives: updatedDistributives,
       };
     });
-    return normalizedCourse;
+
+    return (
+      normalizedCourse ??
+      normalizeCourse({ ...courseInput, id: courseId }, createDefaultConfig().termSystem)
+    );
   }, []);
 
   const updateCourseInCatalog = useCallback((courseId: string, courseInput: NewCourseInput) => {
     setState((prev) => {
-      const normalizedCourse = normalizeCourse({ ...courseInput, id: courseId });
+      const termSystem = prev.config?.termSystem ?? createDefaultConfig().termSystem;
+      const normalizedCourse = normalizeCourse({ ...courseInput, id: courseId }, termSystem);
       const validPlanIds = normalizedCourse.planIds.filter((id) => prev.plans.some((plan) => plan.id === id));
       const courseWithPlans: Course = {
         ...normalizedCourse,
@@ -646,7 +901,9 @@ export const usePlanner = () => {
         description: courseWithPlans.description,
         credits: courseWithPlans.credits,
         distributives: courseWithPlans.distributives,
+        distributiveColors: courseWithPlans.distributiveColors,
         planIds: courseWithPlans.planIds,
+        offeredTerms: courseWithPlans.offeredTerms,
         sourceId: existing.sourceId ?? courseWithPlans.sourceId,
       });
 
@@ -721,6 +978,21 @@ export const usePlanner = () => {
     return normalized;
   }, []);
 
+  const addColorToPalette = useCallback((color: string) => {
+    const normalized = normalizeColorHex(color);
+    if (!normalized) return '';
+    let added = normalized;
+    setState((prev) => {
+      const nextPalette = normalizePalette(prev.colorPalette ?? []);
+      if (nextPalette.includes(normalized)) return prev;
+      const updated = [...nextPalette, normalized];
+      persistPalette(updated);
+      added = normalized;
+      return { ...prev, colorPalette: updated };
+    });
+    return added;
+  }, []);
+
   const addPlan = useCallback((input: PlanInput) => {
     const normalizedName = input.name.trim();
     if (!normalizedName) return null;
@@ -733,8 +1005,9 @@ export const usePlanner = () => {
       Number.isFinite(Number(input.classesNeeded)) && Number(input.classesNeeded) > 0
         ? Math.max(0, Number(input.classesNeeded))
         : null;
-    const resolvedColor =
+    const inputColor =
       typeof input.color === 'string' && input.color.trim() ? input.color.trim() : getDefaultColorId(normalizedName);
+    const resolvedColor = normalizeColorHex(inputColor) ?? inputColor;
     let createdPlan: PlannerPlan | null = null;
     setState((prev) => {
       const existing = prev.plans.find(
@@ -774,10 +1047,11 @@ export const usePlanner = () => {
           Number.isFinite(Number(updates.classesNeeded)) && Number(updates.classesNeeded) > 0
             ? Math.max(0, Number(updates.classesNeeded))
             : null;
-        const resolvedColor =
+        const inputColor =
           typeof updates.color === 'string' && updates.color.trim()
             ? updates.color.trim()
             : plan.color ?? getDefaultColorId(normalizedName);
+        const resolvedColor = normalizeColorHex(inputColor) ?? inputColor;
         return {
           ...plan,
           name: normalizedName,
@@ -934,16 +1208,23 @@ export const usePlanner = () => {
   const addTerm = useCallback((yearId: string) => {
     setState((prev) => {
       const termSystem = prev.config?.termSystem ?? createDefaultConfig().termSystem;
+      const maxTerms = termSystem === 'quarter' ? 4 : 3;
+      const targetYear = prev.years.find((year) => year.id === yearId);
+      if (!targetYear || targetYear.terms.length >= maxTerms) {
+        return prev;
+      }
       const termSequence = TERM_SEQUENCE[termSystem] ?? TERM_SEQUENCE.semester;
       return {
         ...prev,
         years: prev.years.map((year) => {
           if (year.id !== yearId) return year;
 
-          const existingNames = year.terms.map((t) => t.name);
+          const existingNames = targetYear.terms.map((t) => t.name);
           const nextTermName =
             termSequence.find((name) => !existingNames.includes(name)) ?? termSequence[termSequence.length - 1];
-          const academicStart = Number.isFinite(year.startYear) ? year.startYear : createDefaultConfig().startYear;
+          const academicStart = Number.isFinite(targetYear.startYear)
+            ? targetYear.startYear
+            : createDefaultConfig().startYear;
           const newTerm = createTerm(nextTermName, academicStart);
 
           return {
@@ -1053,24 +1334,26 @@ export const usePlanner = () => {
   const reset = useCallback(() => {
     setState((prev) => {
       const config = prev.config ?? loadStoredConfig() ?? createDefaultConfig();
-      const clearedYears = prev.years.map((year) => ({
-        ...year,
-        terms: year.terms.map((term) => ({
-          ...term,
-          courses: [],
-        })),
-      }));
-
-      return createPlannerState(config, {
+      const restoredYears = rebuildYearsForReset(prev.years, config);
+      const nextState = createPlannerState(config, {
         courseCatalog: prev.courseCatalog,
         distributives: prev.distributives,
         plans: prev.plans,
-        years: clearedYears,
+        years: restoredYears,
+        colorPalette: prev.colorPalette,
         meta: {
           degreeName: prev.degreeName,
           university: prev.university,
         },
       });
+
+      const classYear = nextState.years.reduce(
+        (max, year) =>
+          Number.isFinite(Number(year.endYear)) ? Math.max(max, Number(year.endYear)) : max,
+        config.startYear + Math.max(nextState.years.length, 4),
+      );
+
+      return { ...nextState, classYear };
     });
   }, []);
 
@@ -1094,13 +1377,18 @@ export const usePlanner = () => {
     persistConfig(normalizedConfig);
     setHasConfig(true);
 
+    const normalizeCatalogForSystem = (courses: Course[] | undefined | null) =>
+      (courses ?? []).map((course) => normalizeCourse(course, normalizedConfig.termSystem));
+
     const normalizedCatalog = snapshot.courseCatalog?.length
-      ? snapshot.courseCatalog.map(normalizeCourse)
-      : loadStoredCourses();
+      ? normalizeCatalogForSystem(snapshot.courseCatalog)
+      : normalizeCatalogForSystem(loadStoredCourses());
     const normalizedDistributives = snapshot.distributives?.length
       ? normalizeDistributives(snapshot.distributives)
       : loadStoredDistributives();
     const normalizedPlans = snapshot.plans?.length ? snapshot.plans.map(normalizePlan) : loadStoredPlans();
+    const normalizedPalette =
+      snapshot.colorPalette?.length ? normalizePalette(snapshot.colorPalette) : loadStoredPalette();
     const planIdSet = new Set(normalizedPlans.map((plan) => plan.id));
     const sanitizedCatalog = normalizedCatalog.map((course) => ({
       ...course,
@@ -1110,6 +1398,7 @@ export const usePlanner = () => {
     persistJson(COURSE_STORAGE_KEY, sanitizedCatalog);
     persistJson(DISTRIBUTIVES_STORAGE_KEY, normalizedDistributives);
     persistJson(PLANS_STORAGE_KEY, normalizedPlans);
+    persistPalette(normalizedPalette);
 
     setState({
       ...snapshot,
@@ -1120,19 +1409,29 @@ export const usePlanner = () => {
       courseCatalog: sanitizedCatalog,
       distributives: normalizedDistributives,
       plans: normalizedPlans,
+      colorPalette: normalizedPalette,
       years: snapshot.years.map((year, index) => {
         const startYear = year.startYear ?? year.terms?.[0]?.year ?? (normalizedConfig.startYear + index);
+        const defaultTermName = getTermSequenceForSystem(normalizedConfig.termSystem)[0] ?? 'Fall';
         const orderedTerms = sortTermsForSystem(
-          (year.terms ?? []).map((term) => ({
-            ...term,
-            courses: term.courses?.map((course) => {
-              const normalizedCourse = normalizeCourse(course);
-              return {
-                ...normalizedCourse,
-                planIds: normalizedCourse.planIds.filter((id) => planIdSet.has(id)),
-              };
-            }) ?? [],
-          })),
+          (year.terms ?? []).map((term) => {
+            const termName = normalizeTermNameForSystem(term?.name, normalizedConfig.termSystem, defaultTermName);
+            const termYear = Number.isFinite(Number(term?.year))
+              ? Number(term.year)
+              : getCalendarYearForTerm(startYear, termName);
+            return {
+              ...term,
+              name: termName,
+              year: termYear,
+              courses: term.courses?.map((course) => {
+                const normalizedCourse = normalizeCourse(course, normalizedConfig.termSystem);
+                return {
+                  ...normalizedCourse,
+                  planIds: normalizedCourse.planIds.filter((id) => planIdSet.has(id)),
+                };
+              }) ?? [],
+            };
+          }),
           normalizedConfig.termSystem
         );
         return {
@@ -1149,18 +1448,25 @@ export const usePlanner = () => {
   const configurePlanner = useCallback((config: PlannerConfig) => {
     persistConfig(config);
     setHasConfig(true);
-    setState((prev) =>
-      createPlannerState(
+    setState((prev) => {
+      const previousTermSystem: TermSystem = prev.config?.termSystem ?? 'semester';
+      const years =
+        previousTermSystem === 'semester' && config.termSystem === 'quarter'
+          ? convertSemesterYearsToQuarter(prev.years, config.startYear)
+          : prev.years;
+
+      return createPlannerState(
         config,
         {
           courseCatalog: prev.courseCatalog,
           distributives: prev.distributives,
           plans: prev.plans,
-          years: prev.years,
+          years,
+          colorPalette: prev.colorPalette,
           meta: { degreeName: config.planName, university: config.university },
         },
-      )
-    );
+      );
+    });
   }, []);
 
   return {
@@ -1188,6 +1494,8 @@ export const usePlanner = () => {
     removeYear,
     getTermCredits,
     stats,
+    colorPalette: state.colorPalette,
+    addColorToPalette,
     reset,
     applySnapshot,
     configurePlanner,

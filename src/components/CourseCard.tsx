@@ -2,7 +2,8 @@ import type { DragEvent } from 'react';
 import { X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Course, PlannerPlan } from '@/types/planner';
-import { getTagColorClasses } from '@/lib/tagColors';
+import { getTagColorClasses, getTagColorStyle } from '@/lib/tagColors';
+import { cn } from '@/lib/utils';
 
 interface CourseCardProps {
   course: Course;
@@ -10,22 +11,33 @@ interface CourseCardProps {
   onRemove: () => void;
   draggable?: boolean;
   onDragStart?: (event: DragEvent, course: Course) => void;
+  showDeleteControls?: boolean;
 }
 
-export const CourseCard = ({ course, plans = [], onRemove, draggable = false, onDragStart }: CourseCardProps) => {
+export const CourseCard = ({
+  course,
+  plans = [],
+  onRemove,
+  draggable = false,
+  onDragStart,
+  showDeleteControls = false,
+}: CourseCardProps) => {
   const coursePlans = course.planIds
     .map((id) => plans.find((plan) => plan.id === id))
     .filter((plan): plan is PlannerPlan => Boolean(plan));
 
   return (
     <div
-      className="group relative bg-card border border-border rounded-lg p-3 hover:shadow-sm transition-all"
+      className="relative bg-card border border-border rounded-lg p-3 hover:shadow-sm transition-all"
       draggable={draggable}
       onDragStart={(event) => onDragStart?.(event, course)}
     >
       <button
         onClick={onRemove}
-        className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-card border border-border flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-destructive-foreground hover:border-destructive"
+        className={cn(
+          "absolute -top-2 -right-2 h-5 w-5 rounded-full bg-card border border-border flex items-center justify-center transition-opacity hover:bg-destructive hover:text-destructive-foreground hover:border-destructive hover:opacity-100 focus-visible:opacity-100",
+          showDeleteControls ? "opacity-100" : "opacity-0",
+        )}
       >
         <X className="h-3 w-3" />
       </button>
@@ -42,6 +54,7 @@ export const CourseCard = ({ course, plans = [], onRemove, draggable = false, on
             key={plan.id}
             variant="outline"
             className={`text-[11px] font-medium ${getTagColorClasses(plan.name, plan.color)}`}
+            style={getTagColorStyle(plan.name, plan.color)}
           >
             {plan.type === 'major' ? 'Major' : 'Minor'} • {plan.name}
           </Badge>
@@ -51,6 +64,7 @@ export const CourseCard = ({ course, plans = [], onRemove, draggable = false, on
             key={dist}
             variant="outline"
             className={`text-[11px] font-medium ${getTagColorClasses(dist, course.distributiveColors?.[dist])}`}
+            style={getTagColorStyle(dist, course.distributiveColors?.[dist])}
           >
             {dist}
           </Badge>

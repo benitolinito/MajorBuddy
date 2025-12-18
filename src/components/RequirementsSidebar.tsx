@@ -5,7 +5,13 @@ import { ChevronsRight, Pencil } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { PlanInput, PlannerPlan, PlanType } from '@/types/planner';
-import { getDefaultColorId, getTagAccentClass, getTagColorClasses } from '@/lib/tagColors';
+import {
+  getDefaultColorId,
+  getTagAccentClass,
+  getTagAccentStyle,
+  getTagColorClasses,
+  getTagColorStyle,
+} from '@/lib/tagColors';
 import { TagColorPicker } from '@/components/TagColorPicker';
 
 interface RequirementsProps {
@@ -16,6 +22,8 @@ interface RequirementsProps {
   onAddPlan: (plan: PlanInput) => PlannerPlan | null;
   onUpdatePlan: (planId: string, plan: PlanInput) => void;
   onRemovePlan: (planId: string) => void;
+  colorPalette: string[];
+  onAddPaletteColor: (hex: string) => string | void;
   onCollapsePanel?: () => void;
 }
 
@@ -27,6 +35,8 @@ export const RequirementsSidebar = ({
   onAddPlan,
   onUpdatePlan,
   onRemovePlan,
+  colorPalette,
+  onAddPaletteColor,
   onCollapsePanel,
 }: RequirementsProps) => {
   const [planName, setPlanName] = useState('');
@@ -104,7 +114,7 @@ export const RequirementsSidebar = ({
         <div>
           <h3 className="font-semibold text-foreground mb-1">Requirements</h3>
           <p className="text-xs text-muted-foreground">
-            Track overall credits and see progress for each major/minor.
+            {/* Track overall credits and see progress for each major/minor. */}
           </p>
         </div>
         {onCollapsePanel && (
@@ -149,7 +159,7 @@ export const RequirementsSidebar = ({
           Add major/minor
         </Button>
         <p className="text-[11px] text-muted-foreground text-center">
-          Capture class counts, credits, and colors for each plan.
+          {/* Capture class counts, credits, and colors for each plan. */}
         </p>
       </div>
 
@@ -157,7 +167,7 @@ export const RequirementsSidebar = ({
         <p className="text-xs font-medium text-muted-foreground">Majors &amp; minors</p>
         {sortedPlans.length === 0 ? (
           <div className="text-xs text-muted-foreground bg-muted/50 border border-dashed border-border rounded-lg p-3">
-            Add a major or minor to track progress.
+            Add a major or minor to track here.
           </div>
         ) : (
           sortedPlans.map((plan) => {
@@ -169,6 +179,8 @@ export const RequirementsSidebar = ({
             const targetLabel = targetClasses || '—';
             const colorClass = getTagColorClasses(plan.name, plan.color);
             const accentClass = getTagAccentClass(plan.name, plan.color);
+            const colorStyle = getTagColorStyle(plan.name, plan.color);
+            const accentStyle = getTagAccentStyle(plan.name, plan.color);
             return (
               <div
                 key={plan.id}
@@ -195,7 +207,10 @@ export const RequirementsSidebar = ({
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${colorClass}`}>
+                      <span
+                        className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${colorClass}`}
+                        style={colorStyle}
+                      >
                         {plan.type === 'major' ? 'Major' : 'Minor'}
                       </span>
                       <span className="text-base font-semibold text-foreground">{plan.name}</span>
@@ -228,7 +243,7 @@ export const RequirementsSidebar = ({
                   <div className="h-1.5 rounded-full bg-muted/80">
                     <div
                       className={`h-full rounded-full transition-all ${accentClass || 'bg-primary'}`}
-                      style={{ width: `${pct}%` }}
+                      style={{ width: `${pct}%`, ...(accentStyle ?? {}) }}
                     />
                   </div>
                   <p className="text-[11px] text-muted-foreground">
@@ -329,6 +344,15 @@ export const RequirementsSidebar = ({
                 value={colorChoice}
                 onSelect={(colorId) => {
                   if (colorId) setColorChoice(colorId);
+                }}
+                customColors={colorPalette}
+                onAddCustomColor={(hex) => {
+                  const added = onAddPaletteColor(hex);
+                  if (added) {
+                    setColorChoice(added);
+                  } else {
+                    setColorChoice(hex);
+                  }
                 }}
               />
             </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import {
@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { auth, googleProvider } from '@/firebaseClient';
 import { FeatureCard } from '@/components/landing/FeatureCard';
 import { WorkflowStep } from '@/components/landing/WorkflowStep';
+import { cn } from '@/lib/utils';
 
 const featureHighlights = [
   {
@@ -106,12 +107,26 @@ const Landing = () => {
   const [authBusy, setAuthBusy] = useState(false);
   const [authStatus, setAuthStatus] = useState<string | null>(null);
   const [showAuth, setShowAuth] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleContinue = () => navigate("/planner");
+  useEffect(() => {
+    return () => {
+      if (exitTimer.current) {
+        clearTimeout(exitTimer.current);
+      }
+    };
+  }, []);
+
+  const handleContinue = () => {
+    if (isLeaving) return;
+    setIsLeaving(true);
+    exitTimer.current = setTimeout(() => navigate("/planner"), 320);
+  };
 
   const handleAuthSuccess = () => {
     setAuthStatus("Signed in. Redirecting to your planner...");
-    navigate("/planner");
+    handleContinue();
   };
 
   const handleLogin = () => {
@@ -181,7 +196,12 @@ const Landing = () => {
         onEmailRegister={registerWithEmail}
       />
 
-      <main className="relative min-h-screen overflow-hidden bg-gradient-to-br from-primary/10 via-background to-background text-foreground">
+      <main
+        className={cn(
+          "relative min-h-screen overflow-hidden bg-gradient-to-br from-primary/10 via-background to-background text-foreground transition-[opacity,transform,filter] duration-500 ease-out",
+          isLeaving ? "pointer-events-none translate-y-3 opacity-0 blur-[1px]" : "translate-y-0 opacity-100"
+        )}
+      >
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -left-12 top-10 h-56 w-56 rounded-full bg-primary/25 blur-3xl" />
           <div className="absolute right-0 bottom-10 h-64 w-64 rounded-full bg-amber-200/50 blur-3xl" />
@@ -201,7 +221,12 @@ const Landing = () => {
               start mapping right away.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button size="lg" onClick={handleContinue} className="min-w-[140px] shadow-md shadow-primary/20">
+              <Button
+                size="lg"
+                onClick={handleContinue}
+                disabled={isLeaving}
+                className="min-w-[140px] shadow-md shadow-primary/20"
+              >
                 Continue
                 <ArrowRight className="h-4 w-4" />
               </Button>
@@ -251,7 +276,7 @@ const Landing = () => {
                     <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Preview</p>
                     <p className="text-lg font-semibold">Semester Snapshot</p>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={handleContinue}>
+                  <Button variant="ghost" size="sm" onClick={handleContinue} disabled={isLeaving}>
                     Open planner
                     <ArrowRight className="h-4 w-4" />
                   </Button>

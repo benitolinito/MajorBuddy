@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { CSSProperties, useEffect, useMemo, useState } from 'react';
 import { ArrowRight, BookOpen, ChevronsLeft, Pencil, Plus, Search, Tag, Trash } from 'lucide-react';
-import { Course, NewCourseInput, PlanProfile, PlannerPlan } from '@/types/planner';
+import { Course, NewCourseInput, PlanProfile, PlannerPlan, TermName, TermSystem } from '@/types/planner';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -8,15 +8,18 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getTagAccentClass, getTagColorClasses } from '@/lib/tagColors';
+import { getTagAccentClass, getTagAccentStyle, getTagColorClasses, getTagColorStyle } from '@/lib/tagColors';
 import { cn } from '@/lib/utils';
 import { PlanSwitcher } from '@/components/PlanSwitcher';
 import { TagColorPicker } from '@/components/TagColorPicker';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface CourseCatalogProps {
   courses: Course[];
   distributives: string[];
   plans: PlannerPlan[];
+  colorPalette: string[];
+  onAddPaletteColor: (hex: string) => string | void;
   planProfiles: PlanProfile[];
   activePlanProfileId: string;
   onDragStart: (course: Course) => void;
@@ -29,6 +32,7 @@ interface CourseCatalogProps {
   onRenamePlanProfile: (planId: string, name: string) => void;
   onDeletePlanProfile: (planId: string) => void;
   onCollapsePanel?: () => void;
+  termSystem: TermSystem;
   isMobile?: boolean;
   onQuickAddCourse?: (course: Course) => void;
 }
@@ -39,6 +43,8 @@ const TogglePill = ({
   tone = 'neutral',
   colorClassName,
   colorAccentClass,
+  colorStyle,
+  colorAccentStyle,
   onClick,
 }: {
   label: string;
@@ -46,6 +52,8 @@ const TogglePill = ({
   tone?: 'neutral' | 'major' | 'minor';
   colorClassName?: string;
   colorAccentClass?: string;
+  colorStyle?: CSSProperties;
+  colorAccentStyle?: CSSProperties;
   onClick: () => void;
 }) => {
   const base = 'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors';
@@ -59,9 +67,18 @@ const TogglePill = ({
         : 'bg-secondary text-foreground border-primary/40';
   const idleStyles = 'bg-card text-foreground border-border hover:border-primary/50 hover:text-primary';
   return (
-    <button type="button" onClick={onClick} className={`${base} ${active ? activeStyles : idleStyles}`}>
-      {colorAccentClass && (
-        <span className={`mr-1.5 inline-flex h-2.5 w-2.5 rounded-full ${colorAccentClass}`} aria-hidden />
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${base} ${active ? activeStyles : idleStyles}`}
+      style={active ? colorStyle : undefined}
+    >
+      {(colorAccentClass || colorAccentStyle) && (
+        <span
+          className={`mr-1.5 inline-flex h-2.5 w-2.5 rounded-full ${colorAccentClass ?? ''}`}
+          style={colorAccentStyle}
+          aria-hidden
+        />
       )}
       {label}
     </button>
@@ -78,6 +95,7 @@ type CourseFormState = {
   activeDistributive: string | null;
   newDistributive: string;
   planIds: string[];
+  offeredTerms: TermName[];
 };
 
 const createEmptyCourseForm = (): CourseFormState => ({
@@ -90,12 +108,15 @@ const createEmptyCourseForm = (): CourseFormState => ({
   activeDistributive: null,
   newDistributive: '',
   planIds: [],
+  offeredTerms: [],
 });
 
 export const CourseCatalog = ({
   courses,
   distributives,
   plans,
+  colorPalette,
+  onAddPaletteColor,
   planProfiles,
   activePlanProfileId,
   onDragStart,
@@ -108,6 +129,7 @@ export const CourseCatalog = ({
   onRenamePlanProfile,
   onDeletePlanProfile,
   onCollapsePanel,
+  termSystem,
   isMobile = false,
   onQuickAddCourse,
 }: CourseCatalogProps) => {
@@ -126,6 +148,7 @@ export const CourseCatalog = ({
     activeDistributive: activeDistributiveForColor,
     newDistributive,
     planIds: selectedPlans,
+    offeredTerms,
   } = formState;
   const updateFormField = <K extends keyof CourseFormState>(key: K, value: CourseFormState[K]) => {
     setFormState((prev) => ({ ...prev, [key]: value }));
@@ -140,6 +163,16 @@ export const CourseCatalog = ({
       (c) => c.code.toLowerCase().includes(term) || c.name.toLowerCase().includes(term) || c.distributives.some((d) => d.toLowerCase().includes(term))
     );
   }, [courses, search]);
+
+  const baseTermOptions = useMemo<TermName[]>(
+    () => (termSystem === 'quarter' ? ['Fall', 'Winter', 'Spring', 'Summer'] : ['Fall', 'Spring', 'Summer']),
+    [termSystem],
+  );
+
+  const termOptions = useMemo<TermName[]>(() => {
+    const extras = offeredTerms.filter((term) => !baseTermOptions.includes(term));
+    return [...baseTermOptions, ...extras];
+  }, [baseTermOptions, offeredTerms]);
 
   useEffect(() => {
     if (selectedDistributives.length === 0) {
@@ -199,6 +232,19 @@ export const CourseCatalog = ({
     });
   };
 
+  const setOfferedTerm = (term: TermName, include: boolean) => {
+    setFormState((prev) => {
+      const exists = prev.offeredTerms.includes(term);
+      if (include && !exists) {
+        return { ...prev, offeredTerms: [...prev.offeredTerms, term] };
+      }
+      if (!include && exists) {
+        return { ...prev, offeredTerms: prev.offeredTerms.filter((item) => item !== term) };
+      }
+      return prev;
+    });
+  };
+
   const togglePlan = (planId: string) => {
     setFormState((prev) => ({
       ...prev,
@@ -242,6 +288,7 @@ export const CourseCatalog = ({
       activeDistributive: course.distributives[0] ?? null,
       newDistributive: '',
       planIds: course.planIds,
+      offeredTerms: course.offeredTerms ?? [],
     });
     setDialogOpen(true);
   };
@@ -257,6 +304,10 @@ export const CourseCatalog = ({
     const trimmedCode = code.trim();
     const normalizedCredits = Number.isFinite(Number(credits)) ? Math.max(0, Number(credits)) : 0;
     const activePlanIds = selectedPlans.filter((id) => planLookup.has(id));
+    const normalizedOfferedTerms = Array.from(new Set(offeredTerms));
+    const orderedOfferedTerms = (['Fall', 'Winter', 'Spring', 'Summer'] as TermName[]).filter((term) =>
+      normalizedOfferedTerms.includes(term),
+    );
 
     const sanitizedColors = selectedDistributives.reduce<Record<string, string>>((acc, label) => {
       const colorId = selectedDistributiveColors[label];
@@ -274,6 +325,7 @@ export const CourseCatalog = ({
       distributives: selectedDistributives,
       distributiveColors: Object.keys(sanitizedColors).length ? sanitizedColors : undefined,
       planIds: activePlanIds,
+      offeredTerms: orderedOfferedTerms,
     };
 
     if (editingCourse) {
@@ -412,12 +464,18 @@ export const CourseCatalog = ({
                       key={plan.id}
                       variant="outline"
                       className={`text-[11px] font-medium ${getTagColorClasses(plan.name, plan.color)}`}
+                      style={getTagColorStyle(plan.name, plan.color)}
                     >
                       {plan.type === 'major' ? 'Major' : 'Minor'} • {plan.name}
                     </Badge>
                   ))}
                   {course.distributives.map((dist) => (
-                    <Badge key={dist} variant="outline" className={`text-[11px] font-medium ${getTagColorClasses(dist)}`}>
+                    <Badge
+                      key={dist}
+                      variant="outline"
+                      className={`text-[11px] font-medium ${getTagColorClasses(dist)}`}
+                      style={getTagColorStyle(dist)}
+                    >
                       {dist}
                     </Badge>
                   ))}
@@ -501,6 +559,11 @@ export const CourseCatalog = ({
                     allowDeselect
                     size="compact"
                     className="gap-1.5"
+                    customColors={colorPalette}
+                    onAddCustomColor={(hex) => {
+                      const added = onAddPaletteColor(hex);
+                      handleActiveColorSelect(added || hex);
+                    }}
                   />
                 </div>
               </div>
@@ -540,6 +603,16 @@ export const CourseCatalog = ({
                           ? getTagAccentClass(dist, selectedDistributiveColors[dist])
                           : undefined
                       }
+                      colorStyle={
+                        selectedDistributiveColors[dist]
+                          ? getTagColorStyle(dist, selectedDistributiveColors[dist])
+                          : undefined
+                      }
+                      colorAccentStyle={
+                        selectedDistributiveColors[dist]
+                          ? getTagAccentStyle(dist, selectedDistributiveColors[dist])
+                          : undefined
+                      }
                       onClick={() => toggleDistributive(dist)}
                     />
                   ))}
@@ -558,6 +631,16 @@ export const CourseCatalog = ({
                         colorAccentClass={
                           selectedDistributiveColors[dist]
                             ? getTagAccentClass(dist, selectedDistributiveColors[dist])
+                            : undefined
+                        }
+                        colorStyle={
+                          selectedDistributiveColors[dist]
+                            ? getTagColorStyle(dist, selectedDistributiveColors[dist])
+                            : undefined
+                        }
+                        colorAccentStyle={
+                          selectedDistributiveColors[dist]
+                            ? getTagAccentStyle(dist, selectedDistributiveColors[dist])
                             : undefined
                         }
                         onClick={() => toggleDistributive(dist)}
@@ -586,9 +669,45 @@ export const CourseCatalog = ({
                     tone={plan.type === 'major' ? 'major' : 'minor'}
                     colorClassName={getTagColorClasses(plan.name, plan.color)}
                     colorAccentClass={getTagAccentClass(plan.name, plan.color)}
+                    colorStyle={getTagColorStyle(plan.name, plan.color)}
+                    colorAccentStyle={getTagAccentStyle(plan.name, plan.color)}
                     onClick={() => togglePlan(plan.id)}
                   />
                 ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <Label>Typical terms offered</Label>
+                <p className="text-[11px] text-muted-foreground">
+                  Pick every term this class usually runs in your {termSystem === 'quarter' ? 'quarter' : 'semester'} system.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {termOptions.map((term) => {
+                  const selected = offeredTerms.includes(term);
+                  const isExtra = !baseTermOptions.includes(term);
+                  return (
+                    <label
+                      key={term}
+                      className={cn(
+                        'flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5',
+                        selected && 'border-primary bg-primary/10',
+                      )}
+                    >
+                      <Checkbox
+                        checked={selected}
+                        onCheckedChange={(checked) => setOfferedTerm(term, Boolean(checked))}
+                        aria-label={`Typically offered in ${term}`}
+                      />
+                      <div className="leading-tight">
+                        <p>{term}</p>
+                        {isExtra && <p className="text-[11px] text-muted-foreground">From a previous setup</p>}
+                      </div>
+                    </label>
+                  );
+                })}
               </div>
             </div>
 

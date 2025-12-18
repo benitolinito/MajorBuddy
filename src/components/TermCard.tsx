@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
-import { X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { Term, Course, PlannerPlan, CourseDropOptions } from '@/types/planner';
 import { CourseCard } from './CourseCard';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 const extractSource = (event: DragEvent): CourseDropOptions['source'] | undefined => {
@@ -25,6 +26,8 @@ interface TermCardProps {
   onDropCourse: (course: Course, options?: CourseDropOptions) => void;
   onRemoveTerm?: () => void;
   isStacked?: boolean;
+  showDeleteControls?: boolean;
+  onAddCourseClick?: () => void;
 }
 
 export const TermCard = ({
@@ -36,6 +39,8 @@ export const TermCard = ({
   onDropCourse,
   onRemoveTerm,
   isStacked = false,
+  showDeleteControls = false,
+  onAddCourseClick,
 }: TermCardProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [indicatorIndex, setIndicatorIndex] = useState<number | null>(null);
@@ -167,8 +172,9 @@ export const TermCard = ({
   }, []);
 
   const isEmpty = term.courses.length === 0;
+  const showMobileAddCTA = isStacked && Boolean(onAddCourseClick);
   const containerClassName = cn(
-    'group relative bg-muted/50 rounded-xl p-4 transition-all',
+    'relative bg-muted/50 rounded-xl p-4 transition-all',
     isStacked ? 'w-full' : 'min-w-[280px] max-w-[320px] flex-1',
     isDragOver && 'ring-2 ring-primary ring-offset-2 bg-primary/5',
   );
@@ -187,7 +193,10 @@ export const TermCard = ({
             e.stopPropagation();
             onRemoveTerm();
           }}
-          className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card text-muted-foreground opacity-0 p-0 leading-none transition hover:border-destructive hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+          className={cn(
+            "absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card text-muted-foreground p-0 leading-none transition hover:border-destructive hover:text-destructive hover:opacity-100 focus-visible:opacity-100",
+            showDeleteControls ? "opacity-100" : "opacity-0",
+          )}
           aria-label={`Remove ${term.name} ${term.year}`}
         >
           <X className="h-4 w-4" />
@@ -213,7 +222,23 @@ export const TermCard = ({
             onDragOver={handleTermDragOver}
             onDrop={handleDrop}
           >
-            Drag courses here
+            {showMobileAddCTA ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="w-full justify-center gap-2"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAddCourseClick?.();
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                Add course
+              </Button>
+            ) : (
+              'Drag courses here'
+            )}
           </div>
         ) : (
           term.courses.map((course, index) => (
@@ -233,6 +258,7 @@ export const TermCard = ({
                 onRemove={() => onRemoveCourse(course.id)}
                 draggable
                 onDragStart={handleCourseDragStart}
+                showDeleteControls={showDeleteControls}
               />
             </div>
           ))

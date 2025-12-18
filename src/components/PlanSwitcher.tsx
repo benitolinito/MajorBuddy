@@ -51,7 +51,7 @@ export const PlanSwitcher = ({
 
   const openCreateDialog = (blank = false) => {
     setDialogMode('create');
-    setPlanName(defaultNewPlanName);
+    setPlanName(blank ? '' : defaultNewPlanName);
     setStartBlank(blank);
     setDialogOpen(true);
   };
@@ -64,14 +64,15 @@ export const PlanSwitcher = ({
   };
 
   const handleSubmitDialog = () => {
-    if (!planName.trim() && dialogMode === 'rename') {
+    const normalizedName = planName.trim();
+    if (!normalizedName) {
       return;
     }
 
     if (dialogMode === 'create') {
-      onCreatePlan(planName, { startBlank });
+      onCreatePlan(normalizedName, { startBlank });
     } else if (activePlanId) {
-      onRenamePlan(activePlanId, planName);
+      onRenamePlan(activePlanId, normalizedName);
     }
     setDialogOpen(false);
   };
@@ -87,7 +88,7 @@ export const PlanSwitcher = ({
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">My Plans</p>
           <p className="text-sm font-semibold text-foreground">{activePlan?.name ?? 'Select a plan'}</p>
-          <p className="text-[11px] text-muted-foreground">Save variations and swap quickly.</p>
+          {/* <p className="text-[11px] text-muted-foreground">Save variations and swap quickly.</p> */}
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -194,7 +195,7 @@ export const PlanSwitcher = ({
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmitDialog}>
+            <Button onClick={handleSubmitDialog} disabled={!planName.trim()}>
               {dialogMode === 'create' ? 'Create plan' : 'Save name'}
             </Button>
           </div>

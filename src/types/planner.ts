@@ -23,6 +23,7 @@ export interface Course {
   distributives: string[];
   distributiveColors?: Record<string, string>;
   planIds: string[];
+  offeredTerms?: TermName[];
 }
 
 export interface NewCourseInput {
@@ -33,6 +34,7 @@ export interface NewCourseInput {
   distributives: string[];
   distributiveColors?: Record<string, string>;
   planIds: string[];
+  offeredTerms?: TermName[];
 }
 
 export interface Term {
@@ -74,6 +76,7 @@ export interface PlannerState {
   courseCatalog: Course[];
   distributives: string[];
   plans: PlannerPlan[];
+  colorPalette: string[];
   config?: PlannerConfig;
 }
 

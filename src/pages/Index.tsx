@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CourseCatalog } from '@/components/CourseCatalog';
 import { PlannerHeader } from '@/components/PlannerHeader';
 import { YearSection } from '@/components/YearSection';
 import { RequirementsSidebar } from '@/components/RequirementsSidebar';
-import { usePlanner } from '@/hooks/usePlanner';
+import { usePlanner, clearPlannerStorage } from '@/hooks/usePlanner';
 import { useCloudPlanner } from '@/hooks/useCloudPlanner';
 import { Course, CourseDropOptions } from '@/types/planner';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -12,7 +13,7 @@ import { ExportScheduleDialog } from '@/components/ExportScheduleDialog';
 import { PlannerConfig } from '@/types/planner';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
-import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks, PenLine } from 'lucide-react';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { cn } from '@/lib/utils';
 import { AuthDialog } from '@/components/AuthDialog';
@@ -23,6 +24,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const Index = () => {
+  const navigate = useNavigate();
   const {
     state,
     planProfiles,
@@ -40,6 +42,8 @@ const Index = () => {
     removeYear,
     getTermCredits,
     stats,
+    colorPalette,
+    addColorToPalette,
     reset,
     addCourseToCatalog,
     updateCourseInCatalog,
@@ -71,6 +75,7 @@ const Index = () => {
 
   const catalogPanelRef = useRef<ImperativePanelHandle>(null);
   const requirementsPanelRef = useRef<ImperativePanelHandle>(null);
+  const hasAuthenticatedRef = useRef(false);
 
   const [catalogCollapsed, setCatalogCollapsed] = useState(false);
   const [requirementsCollapsed, setRequirementsCollapsed] = useState(false);
@@ -81,6 +86,7 @@ const Index = () => {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [requirementsOpen, setRequirementsOpen] = useState(false);
   const [activeMobileYear, setActiveMobileYear] = useState(() => state.years[0]?.id ?? "");
+  const [showDeleteControls, setShowDeleteControls] = useState(false);
   const [duplicatePrompt, setDuplicatePrompt] = useState<{
     course: Course;
     placement: { yearName: string; termName: string; termYear: number };
@@ -90,10 +96,12 @@ const Index = () => {
   } | null>(null);
   const [quickAddCourse, setQuickAddCourse] = useState<Course | null>(null);
   const [quickAddTarget, setQuickAddTarget] = useState('');
+  const [preferredQuickAddTarget, setPreferredQuickAddTarget] = useState<string | null>(null);
   const userLabel = user?.displayName || user?.email || undefined;
   const cloudBusy = cloudSaving || cloudLoading || authBusy;
   const canRemoveYear = state.years.length > 1;
   const isMobile = useIsMobile();
+  const termSystem = state.config?.termSystem ?? 'semester';
   const activePlanProfile = planProfiles.find((profile) => profile.id === activePlanProfileId);
   const plannerTitle = activePlanProfile?.name || state.degreeName;
   const quickAddOptions = useMemo(() => {
@@ -153,11 +161,11 @@ const Index = () => {
 
   const handleQuickAddRequest = (course: Course) => {
     setQuickAddCourse(course);
-    if (quickAddOptions.length > 0) {
-      setQuickAddTarget(quickAddOptions[0].value);
-    } else {
-      setQuickAddTarget('');
-    }
+    const defaultTarget =
+      (preferredQuickAddTarget && quickAddOptions.find((option) => option.value === preferredQuickAddTarget)?.value) ||
+      quickAddOptions[0]?.value ||
+      '';
+    setQuickAddTarget(defaultTarget);
   };
 
   const closeQuickAddDialog = () => {
@@ -183,6 +191,18 @@ const Index = () => {
     setShowSetup(!hasConfig);
   }, [hasConfig]);
 
+  // If a signed-in user signs out, clear local planner storage and return to the landing page.
+  useEffect(() => {
+    if (user) {
+      hasAuthenticatedRef.current = true;
+      return;
+    }
+    if (!hasAuthenticatedRef.current) return;
+    clearPlannerStorage();
+    hasAuthenticatedRef.current = false;
+    navigate("/", { replace: true });
+  }, [navigate, user]);
+
   const handleConfirmDuplicate = () => {
     if (!duplicatePrompt) return;
     addCourseToTerm(
@@ -196,6 +216,13 @@ const Index = () => {
 
   const handleCancelDuplicate = () => {
     setDuplicatePrompt(null);
+  };
+
+  const handleRequestAddCourse = (yearId: string, termId: string) => {
+    const target = `${yearId}:${termId}`;
+    setPreferredQuickAddTarget(target);
+    setActiveMobileYear(yearId);
+    setLibraryOpen(true);
   };
 
   return (
@@ -333,6 +360,19 @@ const Index = () => {
                 </button>
               ))}
             </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant={showDeleteControls ? "default" : "outline"}
+                size="sm"
+                className="gap-2"
+                aria-pressed={showDeleteControls}
+                onClick={() => setShowDeleteControls((prev) => !prev)}
+              >
+                <PenLine className="h-4 w-4" />
+                {showDeleteControls ? "Done editing" : "Quick edit"}
+              </Button>
+              <p className="text-xs text-muted-foreground">Show delete buttons without hovering.</p>
+            </div>
             <div className="space-y-6">
               {state.years
                 .filter((year) => !activeMobileYear || year.id === activeMobileYear)
@@ -343,13 +383,16 @@ const Index = () => {
                     getTermCredits={(termId) => getTermCredits(year.id, termId)}
                     plans={state.plans}
                     onRemoveCourse={(termId, courseId) => removeCourse(year.id, termId, courseId)}
-                    onDropCourse={handleDropCourse}
-                    onAddTerm={() => addTerm(year.id)}
-                    onRemoveTerm={(termId) => removeTerm(year.id, termId)}
-                    onRemoveYear={() => removeYear(year.id)}
-                    canRemoveYear={canRemoveYear}
-                  />
-                ))}
+                  onDropCourse={handleDropCourse}
+                  onAddTerm={() => addTerm(year.id)}
+                  onRemoveTerm={(termId) => removeTerm(year.id, termId)}
+                  onRemoveYear={() => removeYear(year.id)}
+                  canRemoveYear={canRemoveYear}
+                  termSystem={termSystem}
+                  showDeleteControls={showDeleteControls}
+                  onRequestAddCourse={handleRequestAddCourse}
+                />
+              ))}
             </div>
             <Button variant="outline" className="w-full border-dashed" onClick={addYear}>
               <Plus className="mr-2 h-4 w-4" /> Add another academic year
@@ -367,6 +410,8 @@ const Index = () => {
                   courses={state.courseCatalog}
                   distributives={state.distributives}
                   plans={state.plans}
+                  colorPalette={state.colorPalette}
+                  onAddPaletteColor={addColorToPalette}
                   planProfiles={planProfiles}
                   activePlanProfileId={activePlanProfileId}
                   onDragStart={handleDragStart}
@@ -381,6 +426,7 @@ const Index = () => {
                   onCollapsePanel={() => setLibraryOpen(false)}
                   isMobile
                   onQuickAddCourse={handleQuickAddRequest}
+                  termSystem={termSystem}
                 />
               </div>
             </SheetContent>
@@ -400,6 +446,8 @@ const Index = () => {
                 onAddPlan={addPlan}
                 onUpdatePlan={updatePlan}
                 onRemovePlan={removePlan}
+                colorPalette={state.colorPalette}
+                onAddPaletteColor={addColorToPalette}
                 onCollapsePanel={() => setRequirementsOpen(false)}
               />
             </SheetContent>
@@ -429,6 +477,8 @@ const Index = () => {
               courses={state.courseCatalog} 
               distributives={state.distributives}
               plans={state.plans}
+              colorPalette={state.colorPalette}
+              onAddPaletteColor={addColorToPalette}
               planProfiles={planProfiles}
               activePlanProfileId={activePlanProfileId}
               onDragStart={handleDragStart}
@@ -441,6 +491,7 @@ const Index = () => {
               onRenamePlanProfile={renamePlanProfile}
               onDeletePlanProfile={deletePlanProfile}
               onCollapsePanel={() => catalogPanelRef.current?.collapse()}
+              termSystem={termSystem}
             />
           )}
         </ResizablePanel>
@@ -465,6 +516,19 @@ const Index = () => {
               <ResizablePanel minSize={55}>
                 <ScrollArea className="h-full px-6 py-6">
                   <div className="w-max min-w-full space-y-8 pr-6">
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant={showDeleteControls ? "default" : "outline"}
+                        size="sm"
+                        className="gap-2"
+                        aria-pressed={showDeleteControls}
+                        onClick={() => setShowDeleteControls((prev) => !prev)}
+                      >
+                        <PenLine className="h-4 w-4" />
+                        {showDeleteControls ? "Done editing" : "Quick edit"}
+                      </Button>
+                      <p className="text-sm text-muted-foreground">Show delete buttons without hovering.</p>
+                    </div>
                     {state.years.map((year) => (
                       <YearSection
                         key={year.id}
@@ -477,6 +541,9 @@ const Index = () => {
                         onRemoveTerm={(termId) => removeTerm(year.id, termId)}
                         onRemoveYear={() => removeYear(year.id)}
                         canRemoveYear={canRemoveYear}
+                        termSystem={termSystem}
+                        showDeleteControls={showDeleteControls}
+                        onRequestAddCourse={handleRequestAddCourse}
                       />
                     ))}
                     <div className="flex pt-2">
@@ -517,6 +584,8 @@ const Index = () => {
                       onAddPlan={addPlan}
                       onUpdatePlan={updatePlan}
                       onRemovePlan={removePlan}
+                      colorPalette={state.colorPalette}
+                      onAddPaletteColor={addColorToPalette}
                       onCollapsePanel={() => requirementsPanelRef.current?.collapse()}
                     />
                   </aside>

@@ -36,20 +36,24 @@ export const PlannerHeader = ({
 
   return (
     <header className="bg-card border-b border-border px-6 py-4 sticky top-0 z-10">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="p-2 rounded-lg bg-primary text-primary-foreground">
             <GraduationCap className="h-5 w-5" />
           </div>
-          <div>
-            <h1 className="font-semibold text-lg text-foreground">{degreeName}</h1>
-            <p className="text-sm text-muted-foreground">
-              {university} • Class of {classYear}
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-lg font-semibold text-foreground leading-tight break-words">
+              {degreeName}
+            </h1>
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm text-muted-foreground leading-tight">
+              <span className="min-w-0 break-words">{university}</span>
+              <span className="hidden sm:inline">•</span>
+              <span className="text-[11px] sm:text-sm text-muted-foreground">Class of {classYear}</span>
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
+        <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:justify-end">
           <div className="flex items-center gap-2">
             <ConfirmDialog
               trigger={
@@ -57,9 +61,9 @@ export const PlannerHeader = ({
                   <RotateCcw className="h-4 w-4 mr-1.5" />
                   Reset
                 </Button>
-              }
+            }
               title="Reset your schedule?"
-              description="Are you sure you want to reset? This will clear planned classes from your schedule. Your class library will be unaffected."
+              description="Are you sure you want to reset? This will clear planned classes and restore missing years or terms. Your class library will be unaffected."
               confirmLabel="Reset schedule"
               cancelLabel="Keep schedule"
               confirmVariant="destructive"
