@@ -6,9 +6,11 @@ export type PlannerSnapshot = PlannerState;
 
 const db = getFirestore(app);
 const plannerDoc = (uid: string) => doc(db, "users", uid, "plannerV2", "current");
+const sanitizeSnapshot = (snapshot: PlannerSnapshot): PlannerSnapshot =>
+  JSON.parse(JSON.stringify(snapshot));
 
 export const savePlannerSnapshot = async (uid: string, snapshot: PlannerSnapshot) => {
-  await setDoc(plannerDoc(uid), { snapshot, updatedAt: serverTimestamp() });
+  await setDoc(plannerDoc(uid), { snapshot: sanitizeSnapshot(snapshot), updatedAt: serverTimestamp() });
 };
 
 export const loadPlannerSnapshot = async (uid: string): Promise<PlannerSnapshot | null> => {
