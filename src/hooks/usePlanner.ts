@@ -490,9 +490,21 @@ const createDefaultConfig = (): PlannerConfig => {
 const sanitizeSnapshotForPlanner = (snapshot: PlannerState): PlannerState => {
   const config = snapshot.config ?? createDefaultConfig();
   const termSystem = config.termSystem;
+  const normalizedRequirements =
+    snapshot.distributiveRequirements?.map(normalizeDistributiveRequirement) ?? [];
+  const normalizedDistributives = normalizeDistributives([
+    ...(snapshot.distributives ?? []),
+    ...normalizedRequirements.map((req) => req.name),
+  ]);
+  const normalizedPlans = snapshot.plans?.map(normalizePlan) ?? [];
+  const normalizedPalette = normalizePalette(snapshot.colorPalette ?? []);
   return {
     ...snapshot,
     courseCatalog: (snapshot.courseCatalog ?? []).map((course) => normalizeCourse(course, termSystem)),
+    distributiveRequirements: normalizedRequirements,
+    distributives: normalizedDistributives,
+    plans: normalizedPlans,
+    colorPalette: normalizedPalette,
     years: sanitizeYears(snapshot.years, config),
   };
 };
