@@ -1,4 +1,4 @@
-import { doc, getDoc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore";
 import app from "@/firebaseClient";
 import { PlannerState } from "@/types/planner";
 
@@ -36,4 +36,8 @@ export const loadPlannerSnapshot = async (uid: string): Promise<PlannerSnapshot 
   const data = snap.data();
   if (!data || !("snapshot" in data)) return null;
   return data.snapshot as PlannerSnapshot;
+};
+
+export const deletePlannerSnapshot = async (uid: string) => {
+  await deleteDoc(plannerDoc(uid));
 };

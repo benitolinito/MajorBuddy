@@ -84,17 +84,20 @@ export const PlannerHeader = ({
           onClick={onOpenSettings}
           aria-label="Open planner settings"
         >
-          <Settings className="h-4 w-4" />
+          <Wrench className="h-4 w-4" />
         </Button>
       )}
     </div>
   );
+  const hasUniversity = Boolean(university?.trim());
   const planMeta = (
     <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm text-muted-foreground leading-tight">
-      <span className="min-w-0 break-words">{degreeName}</span>
-      <span className="hidden sm:inline">•</span>
-      <span className="min-w-0 break-words">{university}</span>
-      <span className="hidden sm:inline">•</span>
+      {hasUniversity ? (
+        <>
+          <span className="min-w-0 break-words">{university}</span>
+          <span className="hidden sm:inline">•</span>
+        </>
+      ) : null}
       <span className="text-[11px] sm:text-sm text-muted-foreground">Class of {classYear}</span>
     </p>
   );
@@ -203,9 +206,9 @@ export const PlannerHeader = ({
                 variant="outline"
                 size="icon"
                 onClick={onOpenProfile}
-                aria-label="Open planner tools"
+                aria-label="Open profile"
               >
-                <Wrench className="h-4 w-4" />
+                <Settings className="h-4 w-4" />
               </Button>
             )}
           </div>

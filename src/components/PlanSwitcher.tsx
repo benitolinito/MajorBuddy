@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, Copy, Settings, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, Sparkles, Trash2, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -78,7 +78,7 @@ export const PlanSwitcher = ({
     'inline-flex items-center gap-2 truncate',
     compact && !isTitleVariant ? 'max-w-[200px] justify-between' : 'w-full justify-between',
     isTitleVariant
-      ? 'h-11 rounded-none border-0 bg-transparent px-4 py-2 text-base font-semibold text-foreground shadow-none hover:bg-transparent focus-visible:ring-0 sm:text-lg'
+      ? 'h-11 rounded-none border-0 bg-transparent px-4 py-2 text-base font-semibold text-foreground shadow-none hover:bg-transparent hover:text-foreground focus-visible:ring-0 focus-visible:text-foreground data-[state=open]:text-foreground sm:text-lg'
       : 'h-9'
   );
 
@@ -208,7 +208,7 @@ export const PlanSwitcher = ({
                 onOpenSettings();
               }}
             >
-              <Settings className="h-4 w-4" aria-hidden />
+              <Wrench className="h-4 w-4" aria-hidden />
             </Button>
           )}
         </div>

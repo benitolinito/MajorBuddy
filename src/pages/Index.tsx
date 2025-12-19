@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps, type CSSProperties, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CourseCatalog } from '@/components/CourseCatalog';
 import { PlannerHeader } from '@/components/PlannerHeader';
@@ -31,6 +31,10 @@ type PlannerStats = {
 };
 
 type PlannerHeaderSharedProps = Omit<ComponentProps<typeof PlannerHeader>, 'isMobile' | 'sticky'>;
+
+const SIDE_PANEL_TRANSITION: CSSProperties = {
+  transition: 'flex-basis 200ms ease, width 200ms ease, min-width 200ms ease',
+};
 
 const Index = () => {
   const navigate = useNavigate();
@@ -998,6 +1002,7 @@ const DesktopPlannerLayout = ({
         collapsedSize={1.5}
         onCollapse={() => setCatalogCollapsed(true)}
         onExpand={() => setCatalogCollapsed(false)}
+        style={SIDE_PANEL_TRANSITION}
       >
         {catalogCollapsed ? (
           <CollapsedRail side="left" ariaLabel="Expand class library" onExpand={() => catalogPanelRef.current?.expand()} />
@@ -1073,6 +1078,7 @@ const DesktopPlannerLayout = ({
               collapsedSize={2}
               onCollapse={() => setRequirementsCollapsed(true)}
               onExpand={() => setRequirementsCollapsed(false)}
+              style={SIDE_PANEL_TRANSITION}
             >
               {requirementsCollapsed ? (
                 <CollapsedRail side="right" ariaLabel="Expand requirements" onExpand={() => requirementsPanelRef.current?.expand()} />
