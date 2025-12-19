@@ -9,11 +9,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { TagColorPicker } from '@/components/TagColorPicker';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { getTagAccentClass, getTagAccentStyle, getTagColorClasses, getTagColorStyle } from '@/lib/tagColors';
 import { getTagAccentClass, getTagAccentStyle, getTagColorClasses, getTagColorStyle } from '@/lib/tagColors';
 
 interface CourseCatalogProps {
@@ -27,8 +25,6 @@ interface CourseCatalogProps {
   onRemoveCourse: (courseId: string) => void;
   onCollapsePanel?: () => void;
   termSystem: TermSystem;
-  colorPalette: string[];
-  onAddPaletteColor: (hex: string) => string | void;
   isMobile?: boolean;
   onQuickAddCourse?: (course: Course) => void;
   addCourseTrigger?: number;
@@ -149,8 +145,6 @@ export const CourseCatalog = ({
   onRemoveCourse,
   onCollapsePanel,
   termSystem,
-  colorPalette,
-  onAddPaletteColor,
   isMobile = false,
   onQuickAddCourse,
   addCourseTrigger,
@@ -321,6 +315,11 @@ export const CourseCatalog = ({
       }
       return prev;
     });
+  };
+
+  const selectAllOfferedTerms = () => {
+    const allTerms = Array.from(new Set(termOptions));
+    setFormState((prev) => ({ ...prev, offeredTerms: allTerms }));
   };
 
   const togglePlan = (planId: string) => {
@@ -542,11 +541,22 @@ export const CourseCatalog = ({
       </div>
 
       <div className="space-y-2">
-        <div className="space-y-1">
-          <Label>Typical terms offered</Label>
-          <p className="text-[11px] text-muted-foreground">
-            Pick every term this class usually runs in your {termSystem === 'quarter' ? 'quarter' : 'semester'} system.
-          </p>
+        <div className="flex items-start justify-between gap-2">
+          <div className="space-y-1">
+            <Label>Typical terms offered</Label>
+            <p className="text-[11px] text-muted-foreground">
+              Pick every term this class usually runs in your {termSystem === 'quarter' ? 'quarter' : 'semester'} system.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8"
+            onClick={selectAllOfferedTerms}
+          >
+            Select all
+          </Button>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {termOptions.map((term) => {
@@ -723,6 +733,17 @@ export const CourseCatalog = ({
         title="Availability"
         description="Pick every term this class typically runs so you can plan faster."
       >
+        <div className="flex justify-end pb-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={selectAllOfferedTerms}
+          >
+            Select all
+          </Button>
+        </div>
         <div className="grid grid-cols-2 gap-2">
           {termOptions.map((term) => {
             const selected = offeredTerms.includes(term);

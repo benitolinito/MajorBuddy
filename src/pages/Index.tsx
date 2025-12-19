@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ComponentProps, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type CSSProperties, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CourseCatalog } from '@/components/CourseCatalog';
 import { PlannerHeader } from '@/components/PlannerHeader';
@@ -6,7 +6,7 @@ import { YearSection } from '@/components/YearSection';
 import { RequirementsSidebar } from '@/components/RequirementsSidebar';
 import { usePlanner, clearPlannerStorage } from '@/hooks/usePlanner';
 import { useCloudPlanner } from '@/hooks/useCloudPlanner';
-import { Course, CourseDropOptions, PlannerConfig, PlannerState, PlanInput, PlannerPlan, NewCourseInput, TermSystem } from '@/types/planner';
+import { Course, CourseDropOptions, PlannerConfig, PlannerState, PlanInput, PlannerPlan, NewCourseInput, TermName, TermSystem } from '@/types/planner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlannerSetupDialog } from '@/components/PlannerSetupDialog';
 import { ExportScheduleDialog } from '@/components/ExportScheduleDialog';
@@ -114,6 +114,17 @@ const Index = () => {
     targetTermId: string;
     targetIndex?: number;
   } | null>(null);
+  const [offeredTermPrompt, setOfferedTermPrompt] = useState<{
+    course: Course;
+    targetYearId: string;
+    targetTermId: string;
+    targetIndex?: number;
+    source?: CourseDropOptions['source'];
+    targetTermName: TermName;
+    targetTermYear: number;
+    targetYearName: string;
+    offeredTerms: TermName[];
+  } | null>(null);
   const [courseActionPrompt, setCourseActionPrompt] = useState<{
     course: Course;
     yearId: string;
@@ -157,9 +168,18 @@ const Index = () => {
     });
     return map;
   }, [state.distributiveRequirements]);
-  const courseActionCourseLabel = courseActionPrompt
-    ? ([courseActionPrompt.course.code, courseActionPrompt.course.name].filter(Boolean).join(' ').trim() || 'this class')
-    : 'this class';
+  const formatCourseLabel = (course?: Course | null) =>
+    ([course?.code, course?.name].filter(Boolean).join(' ').trim() || 'this class');
+  const courseActionCourseLabel = formatCourseLabel(courseActionPrompt?.course);
+  const findTermMeta = useCallback(
+    (yearId: string, termId: string) => {
+      const year = state.years.find((item) => item.id === yearId);
+      const term = year?.terms.find((item) => item.id === termId);
+      if (!year || !term) return null;
+      return { termName: term.name, termYear: term.year, yearName: year.name };
+    },
+    [state.years],
+  );
   const disableCourseActionConfirm =
     !courseActionTarget ||
     (courseActionMode === 'move' &&
@@ -262,39 +282,86 @@ const Index = () => {
     setDraggedCourse(course);
   };
 
+  const executeCourseDrop = useCallback(
+    (payload: { yearId: string; termId: string; course: Course; options?: CourseDropOptions }) => {
+      const { yearId, termId, course, options } = payload;
+      const source = options?.source;
+      if (source?.courseId && source?.yearId && source?.termId) {
+        moveCourseBetweenTerms({
+          sourceYearId: source.yearId,
+          sourceTermId: source.termId,
+          courseId: source.courseId,
+          targetYearId: yearId,
+          targetTermId: termId,
+          targetIndex: options?.targetIndex,
+        });
+        setDraggedCourse(null);
+        return;
+      }
+
+      const placement = getCoursePlacement(course);
+      if (placement) {
+        setDuplicatePrompt({
+          course,
+          placement,
+          targetYearId: yearId,
+          targetTermId: termId,
+          targetIndex: options?.targetIndex,
+        });
+      } else {
+        addCourseToTerm(yearId, termId, course, options?.targetIndex);
+      }
+      setDraggedCourse(null);
+    },
+    [addCourseToTerm, getCoursePlacement, moveCourseBetweenTerms, setDuplicatePrompt, setDraggedCourse],
+  );
+
   const handleDropCourse = (
     yearId: string,
     termId: string,
     course: Course,
     options?: CourseDropOptions,
   ) => {
-    const source = options?.source;
-    if (source?.courseId && source?.yearId && source?.termId) {
-      moveCourseBetweenTerms({
-        sourceYearId: source.yearId,
-        sourceTermId: source.termId,
-        courseId: source.courseId,
+    const targetMeta = findTermMeta(yearId, termId);
+    const offeredTerms = course.offeredTerms ?? [];
+    const hasTaggedTerms = offeredTerms.length > 0;
+    const matchesOfferedTerm = !hasTaggedTerms || !targetMeta ? true : offeredTerms.includes(targetMeta.termName);
+
+    if (hasTaggedTerms && targetMeta && !matchesOfferedTerm) {
+      setOfferedTermPrompt({
+        course,
         targetYearId: yearId,
         targetTermId: termId,
         targetIndex: options?.targetIndex,
+        source: options?.source,
+        targetTermName: targetMeta.termName,
+        targetTermYear: targetMeta.termYear,
+        targetYearName: targetMeta.yearName,
+        offeredTerms,
       });
       setDraggedCourse(null);
       return;
     }
 
-    const placement = getCoursePlacement(course);
-    if (placement) {
-      setDuplicatePrompt({
-        course,
-        placement,
-        targetYearId: yearId,
-        targetTermId: termId,
-        targetIndex: options?.targetIndex,
-      });
-    } else {
-      addCourseToTerm(yearId, termId, course, options?.targetIndex);
-    }
-    setDraggedCourse(null);
+    executeCourseDrop({ yearId, termId, course, options });
+  };
+
+  const handleConfirmOfferedTerm = () => {
+    if (!offeredTermPrompt) return;
+    executeCourseDrop({
+      yearId: offeredTermPrompt.targetYearId,
+      termId: offeredTermPrompt.targetTermId,
+      course: offeredTermPrompt.course,
+      options: {
+        targetIndex: offeredTermPrompt.targetIndex,
+        source: offeredTermPrompt.source,
+      },
+    });
+    setOfferedTermPrompt(null);
+  };
+
+  const handleCancelOfferedTerm = () => {
+    setOfferedTermPrompt(null);
   };
 
   const handleRequestCourseAction = (payload: { course: Course; yearId: string; termId: string }) => {
@@ -447,6 +514,26 @@ const Index = () => {
             linkAccess: payload.linkAccess,
           });
         }}
+      />
+      <ConfirmDialog
+        open={Boolean(offeredTermPrompt)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setOfferedTermPrompt(null);
+          }
+        }}
+        title="Schedule outside typical term?"
+        description={offeredTermPrompt ? (
+          <>
+            <span className="font-medium text-foreground">{formatCourseLabel(offeredTermPrompt.course)}</span>{' '}
+            is usually offered in {offeredTermPrompt.offeredTerms.join(', ')}. Add it to {offeredTermPrompt.targetTermName}{' '}
+            {offeredTermPrompt.targetTermYear} ({offeredTermPrompt.targetYearName}) anyway?
+          </>
+        ) : undefined}
+        confirmLabel="Add anyway"
+        cancelLabel="Cancel"
+        onConfirm={handleConfirmOfferedTerm}
+        onCancel={handleCancelOfferedTerm}
       />
       <ConfirmDialog
         open={Boolean(duplicatePrompt)}

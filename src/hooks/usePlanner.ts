@@ -160,12 +160,8 @@ const normalizePlan = (value: unknown): PlannerPlan => {
   const requiredCredits =
     plan.requiredCredits === undefined ? defaultCredits : normalizeOptionalNumber(plan.requiredCredits, null);
   return {
-    return {
-      totalCredits,
-      planProgress: Object.fromEntries(planProgressMap),
-      distributiveProgress: Object.fromEntries(distributiveProgressMap),
-    };
-  }, [state.years, state.plans, state.courseCatalog, state.distributiveRequirements]);
+    id: isNonEmptyString(plan.id) ? plan.id : generateId(),
+    name,
     type,
     requiredCredits,
     classesNeeded: normalizeOptionalNumber(plan.classesNeeded, null),
