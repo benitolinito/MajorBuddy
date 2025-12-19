@@ -18,6 +18,7 @@ interface CourseCatalogProps {
   courses: Course[];
   distributives: string[];
   distributiveColorMap?: Record<string, string | null>;
+  onCreateDistributive?: (label: string) => string;
   plans: PlannerPlan[];
   onDragStart: (course: Course) => void;
   onCreateCourse: (course: NewCourseInput) => void;
@@ -103,6 +104,7 @@ type CourseFormState = {
   description: string;
   credits: number;
   distributives: string[];
+  newDistributive: string;
   planIds: string[];
   offeredTerms: TermName[];
 };
@@ -130,6 +132,7 @@ const createEmptyCourseForm = (): CourseFormState => ({
   description: '',
   credits: 3,
   distributives: [],
+  newDistributive: '',
   planIds: [],
   offeredTerms: [],
 });
@@ -138,6 +141,7 @@ export const CourseCatalog = ({
   courses,
   distributives,
   distributiveColorMap,
+  onCreateDistributive,
   plans,
   onDragStart,
   onCreateCourse,
@@ -166,6 +170,7 @@ export const CourseCatalog = ({
     description,
     credits,
     distributives: selectedDistributives,
+    newDistributive,
     planIds: selectedPlans,
     offeredTerms,
   } = formState;
@@ -292,6 +297,27 @@ export const CourseCatalog = ({
     setPlanFilter(null);
   };
 
+  const handleAddDistributive = () => {
+    const label = newDistributive.trim();
+    if (!label) return;
+
+    const createdLabel = onCreateDistributive ? onCreateDistributive(label) : label;
+    if (!createdLabel) {
+      setFormState((prev) => ({ ...prev, newDistributive: '' }));
+      return;
+    }
+
+    setFormState((prev) => {
+      const normalized = createdLabel.trim();
+      const alreadySelected = prev.distributives.includes(normalized);
+      return {
+        ...prev,
+        distributives: alreadySelected ? prev.distributives : [...prev.distributives, normalized],
+        newDistributive: '',
+      };
+    });
+  };
+
   const toggleDistributive = (label: string) => {
     setFormState((prev) => {
       const isSelected = prev.distributives.includes(label);
@@ -360,6 +386,7 @@ export const CourseCatalog = ({
       description: course.description ?? '',
       credits: course.credits,
       distributives: course.distributives,
+      newDistributive: '',
       planIds: course.planIds,
       offeredTerms: course.offeredTerms ?? [],
     });
@@ -405,19 +432,7 @@ export const CourseCatalog = ({
     if (!open) resetForm();
   };
 
-  const activeDistributiveColor =
-    activeDistributiveForColor && selectedDistributives.includes(activeDistributiveForColor)
-      ? selectedDistributiveColors[activeDistributiveForColor] ?? null
-      : null;
-
-  const handleActiveColorSelect = (colorId: string | null) => {
-    if (!activeDistributiveForColor) return;
-    if (colorId) {
-      updateDistributiveColor(activeDistributiveForColor, colorId);
-    } else {
-      removeDistributiveColor(activeDistributiveForColor);
-    }
-  };
+  const selectedDistributiveColors = distributiveColorMap ?? {};
 
   const isEditing = Boolean(editingCourse);
   const mobileQuickAdd = isMobile && Boolean(onQuickAddCourse);

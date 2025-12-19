@@ -6,7 +6,7 @@ import { YearSection } from '@/components/YearSection';
 import { RequirementsSidebar } from '@/components/RequirementsSidebar';
 import { usePlanner, clearPlannerStorage } from '@/hooks/usePlanner';
 import { useCloudPlanner } from '@/hooks/useCloudPlanner';
-import { Course, CourseDropOptions, PlannerConfig, PlannerState, PlanInput, PlannerPlan, NewCourseInput, TermName, TermSystem } from '@/types/planner';
+import { Course, CourseDropOptions, DistributiveRequirement, PlannerConfig, PlannerState, PlanInput, PlannerPlan, NewCourseInput, TermName, TermSystem } from '@/types/planner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlannerSetupDialog } from '@/components/PlannerSetupDialog';
 import { ExportScheduleDialog } from '@/components/ExportScheduleDialog';
@@ -672,6 +672,9 @@ const Index = () => {
           onAddPlan={addPlan}
           onUpdatePlan={updatePlan}
           onRemovePlan={removePlan}
+          addDistributiveRequirement={addDistributiveRequirement}
+          updateDistributiveRequirement={updateDistributiveRequirement}
+          removeDistributiveRequirement={removeDistributiveRequirement}
           onAddYear={addYear}
           addCourseToCatalog={addCourseToCatalog}
           updateCourseInCatalog={updateCourseInCatalog}
@@ -688,6 +691,7 @@ const Index = () => {
           headerProps={plannerHeaderProps}
           state={state}
           stats={stats}
+          distributiveColors={distributiveColorMap}
           termSystem={termSystem}
           canRemoveYear={canRemoveYear}
           showDeleteControls={showDeleteControls}
@@ -701,6 +705,9 @@ const Index = () => {
           onAddPlan={addPlan}
           onUpdatePlan={updatePlan}
           onRemovePlan={removePlan}
+          addDistributiveRequirement={addDistributiveRequirement}
+          updateDistributiveRequirement={updateDistributiveRequirement}
+          removeDistributiveRequirement={removeDistributiveRequirement}
           onAddYear={addYear}
           addCourseToCatalog={addCourseToCatalog}
           updateCourseInCatalog={updateCourseInCatalog}
@@ -844,6 +851,9 @@ type MobilePlannerLayoutProps = {
   onAddPlan: (plan: PlanInput) => PlannerPlan | null;
   onUpdatePlan: (planId: string, plan: PlanInput) => void;
   onRemovePlan: (planId: string) => void;
+  addDistributiveRequirement: (input: { name: string; classesNeeded?: number | null; color?: string | null }) => DistributiveRequirement | null;
+  updateDistributiveRequirement: (id: string, updates: { classesNeeded?: number | null; color?: string | null }) => void;
+  removeDistributiveRequirement: (id: string) => void;
   onAddYear: () => void;
   addCourseToCatalog: (course: NewCourseInput) => Course;
   updateCourseInCatalog: (courseId: string, course: NewCourseInput) => void;
@@ -872,6 +882,9 @@ const MobilePlannerLayout = ({
   onAddPlan,
   onUpdatePlan,
   onRemovePlan,
+  addDistributiveRequirement,
+  updateDistributiveRequirement,
+  removeDistributiveRequirement,
   onAddYear,
   addCourseToCatalog,
   updateCourseInCatalog,
@@ -1061,6 +1074,7 @@ type DesktopPlannerLayoutProps = {
   headerProps: PlannerHeaderSharedProps;
   state: PlannerState;
   stats: PlannerStats;
+  distributiveColors: Record<string, string | null>;
   termSystem: TermSystem;
   canRemoveYear: boolean;
   showDeleteControls: boolean;
@@ -1074,6 +1088,9 @@ type DesktopPlannerLayoutProps = {
   onAddPlan: (plan: PlanInput) => PlannerPlan | null;
   onUpdatePlan: (planId: string, plan: PlanInput) => void;
   onRemovePlan: (planId: string) => void;
+  addDistributiveRequirement: (input: { name: string; classesNeeded?: number | null; color?: string | null }) => DistributiveRequirement | null;
+  updateDistributiveRequirement: (id: string, updates: { classesNeeded?: number | null; color?: string | null }) => void;
+  removeDistributiveRequirement: (id: string) => void;
   onAddYear: () => void;
   addCourseToCatalog: (course: NewCourseInput) => Course;
   updateCourseInCatalog: (courseId: string, course: NewCourseInput) => void;
@@ -1087,6 +1104,7 @@ const DesktopPlannerLayout = ({
   headerProps,
   state,
   stats,
+  distributiveColors,
   termSystem,
   canRemoveYear,
   showDeleteControls,
@@ -1100,6 +1118,9 @@ const DesktopPlannerLayout = ({
   onAddPlan,
   onUpdatePlan,
   onRemovePlan,
+  addDistributiveRequirement,
+  updateDistributiveRequirement,
+  removeDistributiveRequirement,
   onAddYear,
   addCourseToCatalog,
   updateCourseInCatalog,
@@ -1172,7 +1193,7 @@ const DesktopPlannerLayout = ({
                       year={year}
                       getTermCredits={(termId) => getTermCredits(year.id, termId)}
                       plans={state.plans}
-                      distributiveColors={distributiveColorMap}
+                      distributiveColors={distributiveColors}
                       onRemoveCourse={(termId, courseId) => onRemoveCourse(year.id, termId, courseId)}
                       onDropCourse={(yearId, termId, course, options) => onDropCourse(yearId, termId, course, options)}
                       onAddTerm={() => onAddTerm(year.id)}
