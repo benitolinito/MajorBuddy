@@ -77,9 +77,6 @@ export const PlannerHeader = ({
                 <p className="text-xs text-muted-foreground">
                   {university} • Class of {classYear}
                 </p>
-                {planVariantLabel && (
-                  <p className="text-[11px] text-muted-foreground">Plan profile: {planVariantLabel}</p>
-                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -140,7 +137,7 @@ export const PlannerHeader = ({
             <p className="text-sm text-muted-foreground">
               {university} • Class of {classYear}
             </p>
-            {planVariantLabel && (
+            {planVariantLabel && !isMobile && (
               <p className="text-xs text-muted-foreground">Plan profile: {planVariantLabel}</p>
             )}
           </div>
