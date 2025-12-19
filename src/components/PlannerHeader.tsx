@@ -112,7 +112,7 @@ export const PlannerHeader = ({
       <header className={headerClass}>
         <div className="flex flex-col gap-2">
           <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-primary text-primary-foreground">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/70 bg-muted/60 text-primary">
               <GraduationCap className="h-5 w-5" />
             </div>
             <div className={planTitleContainerClass}>

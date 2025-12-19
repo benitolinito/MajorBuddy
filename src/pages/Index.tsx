@@ -12,7 +12,7 @@ import { PlannerSetupDialog } from '@/components/PlannerSetupDialog';
 import { ExportScheduleDialog } from '@/components/ExportScheduleDialog';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
-import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks, Download, Settings, PenLine } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks, Download, PenLine, Wrench } from 'lucide-react';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { cn } from '@/lib/utils';
 import { AuthDialog } from '@/components/AuthDialog';
@@ -583,20 +583,23 @@ const MobilePlanOverview = ({
   onOpenExport,
   onOpenSettings,
 }: MobilePlanOverviewProps) => (
-  <div className="rounded-3xl bg-gradient-to-br from-primary via-primary/90 to-primary/75 px-5 py-4 text-primary-foreground shadow-[0_35px_65px_-30px_rgba(79,70,229,0.9)]">
+  <div className="rounded-2xl border border-border/80 bg-card/90 p-4 shadow-[0_28px_45px_-30px_rgba(15,23,42,0.55)]">
     <div className="flex items-start justify-between gap-3">
-      <div>
-        <p className="text-[11px] uppercase tracking-[0.2em] text-primary-foreground/70">Planner</p>
-        <p className="text-2xl font-semibold leading-snug">{title}</p>
-        <p className="text-sm text-primary-foreground/90">{subtitle}</p>
-        <p className="text-xs text-primary-foreground/75">{meta}</p>
+      <div className="space-y-1">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Plan overview</p>
+        <p className="text-xl font-semibold leading-snug">{title}</p>
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
+        <div className="flex flex-wrap gap-2 pt-2 text-[11px] text-muted-foreground">
+          <span className="rounded-full bg-muted/70 px-2.5 py-1 font-semibold text-foreground">{meta}</span>
+          <span className="rounded-full border border-border px-2.5 py-1 font-medium">Stay on track</span>
+        </div>
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col items-end gap-2">
         <Button
           type="button"
           size="icon"
-          variant="secondary"
-          className="h-9 w-9 rounded-2xl bg-white/15 text-primary-foreground hover:bg-white/25"
+          variant="outline"
+          className="h-10 w-10 rounded-xl"
           onClick={onOpenExport}
           aria-label="Export schedule"
         >
@@ -606,27 +609,27 @@ const MobilePlanOverview = ({
           type="button"
           size="icon"
           variant="secondary"
-          className="h-9 w-9 rounded-2xl bg-white/15 text-primary-foreground hover:bg-white/25"
+          className="h-10 w-10 rounded-xl"
           onClick={onOpenSettings}
-          aria-label="Planner settings"
+          aria-label="Open configuration"
         >
-          <Settings className="h-4 w-4" />
+          <Wrench className="h-4 w-4" />
         </Button>
       </div>
     </div>
-    <div className="mt-4 grid grid-cols-2 gap-2 text-sm font-semibold">
+    <div className="mt-4 grid grid-cols-2 gap-2">
       <Button
         type="button"
-        className="h-11 rounded-2xl bg-white text-primary shadow-sm hover:bg-white"
+        className="h-11 rounded-xl"
         onClick={onStartNewClass}
       >
         <Plus className="mr-2 h-4 w-4" />
-        New class
+        Add class
       </Button>
       <Button
         type="button"
-        variant="secondary"
-        className="h-11 rounded-2xl border border-white/40 bg-white/15 text-primary-foreground hover:bg-white/25"
+        variant="outline"
+        className="h-11 rounded-xl border-dashed"
         onClick={onAddYear}
       >
         <Plus className="mr-2 h-4 w-4" />
@@ -645,6 +648,37 @@ const MOBILE_TABS: { id: MobilePane; label: string }[] = [
 const MobilePaneCard = ({ children }: { children: ReactNode }) => (
   <div className="rounded-3xl border border-border/60 bg-card/95 p-3 shadow-[0_30px_65px_-35px_rgba(15,23,42,0.8)]">
     {children}
+  </div>
+);
+
+type MobilePaneSwitchProps = {
+  activePane: MobilePane;
+  onSelectPane: (pane: MobilePane) => void;
+};
+
+const MobilePaneSwitch = ({ activePane, onSelectPane }: MobilePaneSwitchProps) => (
+  <div className="rounded-2xl border border-border/70 bg-card/80 p-2 shadow-sm">
+    <div className="grid grid-cols-3 gap-1.5">
+      {MOBILE_TABS.map((tab) => {
+        const Icon = tab.id === 'plan' ? PenLine : tab.id === 'library' ? BookOpen : ListChecks;
+        const isActive = activePane === tab.id;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onSelectPane(tab.id)}
+            className={cn(
+              'flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-semibold transition',
+              isActive ? 'bg-primary/10 text-foreground ring-1 ring-primary/30' : 'text-muted-foreground hover:text-foreground/80',
+            )}
+            aria-pressed={isActive}
+          >
+            <Icon className="h-4 w-4" aria-hidden />
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
   </div>
 );
 
@@ -686,10 +720,10 @@ const MobileDock = ({ activePane, onSelectPane, onAddClass, onOpenSettings }: Mo
           onClick={onOpenSettings}
           className="ml-3 flex flex-shrink-0 items-center gap-2 rounded-2xl border border-border/70 px-3 py-2 text-[11px] font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-muted/60 text-foreground">
-            <Settings className="h-4 w-4" aria-hidden />
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/60 text-foreground">
+            <Wrench className="h-4 w-4" aria-hidden />
           </span>
-          Settings
+          Configuration
         </button>
       </div>
       <button
@@ -855,7 +889,6 @@ const MobilePlannerLayout = ({
   const planMeta = `${state.years.length || 0} year${state.years.length === 1 ? '' : 's'} • ${totalTerms} term${totalTerms === 1 ? '' : 's'}`;
 
   const filteredYears = state.years.filter((year) => !activeYearId || year.id === activeYearId);
-  const activePaneLabel = MOBILE_TABS.find((tab) => tab.id === activePane)?.label ?? 'Plan';
 
   return (
     <>
@@ -872,12 +905,7 @@ const MobilePlannerLayout = ({
               onOpenExport={onOpenExport}
               onOpenSettings={onOpenSettings}
             />
-            <div className="rounded-2xl border border-border/70 bg-card/70 px-4 py-3 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-foreground">{activePaneLabel} view</p>
-                <span className="text-[11px] text-muted-foreground">Use the dock to switch</span>
-              </div>
-            </div>
+            <MobilePaneSwitch activePane={activePane} onSelectPane={setActivePane} />
             {activePane === 'plan' && (
               <MobileYearNavigator years={state.years} activeYearId={activeYearId} onSelectYear={setActiveYearId} />
             )}

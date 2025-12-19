@@ -173,7 +173,7 @@ export const ProfileDialog = ({
                       </div>
                       <ConfirmDialog
                         title="Delete planner data?"
-                        description="This removes schedules, saved courses, and requirements from this device and the cloud."
+                        description="This removes schedules, saved courses, and requirements from this device and/or the cloud if signed in."
                         confirmLabel={deletingData ? 'Deleting...' : 'Delete data'}
                         cancelLabel="Keep data"
                         confirmVariant="destructive"
