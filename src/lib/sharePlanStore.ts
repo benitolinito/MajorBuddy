@@ -1,9 +1,7 @@
 import { arrayUnion, doc, getFirestore, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import app from "@/firebaseClient";
-import { PlannerState } from "@/types/planner";
-
-export type ShareRole = "viewer" | "editor";
-export type ShareLinkAccess = ShareRole | "none";
+import { PlannerState, ShareLinkAccess, ShareRole } from "@/types/planner";
+export type { ShareLinkAccess, ShareRole } from "@/types/planner";
 
 type CreateShareRecordInput = {
   ownerId: string;
@@ -11,6 +9,7 @@ type CreateShareRecordInput = {
   snapshot: PlannerState;
   planProfileId?: string | null;
   linkAccess?: ShareLinkAccess;
+  shareId?: string | null;
 };
 
 type ShareInviteInput = {
@@ -39,20 +38,22 @@ export const buildShareUrl = (shareId: string) => {
   return `${origin.replace(/\/$/, "")}/share/${shareId}`;
 };
 
-export const createShareRecord = async ({ ownerId, planName, snapshot, planProfileId, linkAccess = "viewer" }: CreateShareRecordInput) => {
-  const shareId = generateShareId();
-  await setDoc(shareDoc(shareId), {
+export const upsertShareRecord = async ({ ownerId, planName, snapshot, planProfileId, linkAccess = "viewer", shareId }: CreateShareRecordInput) => {
+  const resolvedShareId = shareId?.trim() || generateShareId();
+  await setDoc(shareDoc(resolvedShareId), {
     ownerId,
     planProfileId: planProfileId ?? null,
     planName,
     linkAccess,
-    invites: [],
     snapshot: sanitizeSnapshot(snapshot),
+    ...(shareId ? {} : { invites: [] }),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
-  return shareId;
+  }, { merge: Boolean(shareId) });
+  return resolvedShareId;
 };
+
+export const createShareRecord = async (input: CreateShareRecordInput) => upsertShareRecord(input);
 
 export const updateShareLinkAccess = async (
   shareId: string,

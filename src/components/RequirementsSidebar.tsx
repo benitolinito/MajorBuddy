@@ -109,9 +109,12 @@ export const RequirementsSidebar = ({
   };
 
   const canSavePlan = Boolean(planName.trim()) && Boolean(normalizePositive(classesNeeded));
+  const containerClassName = isMobile
+    ? 'bg-card border border-border rounded-xl p-4 space-y-4'
+    : 'flex h-full flex-col space-y-4';
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 mb-6 space-y-4">
+    <div className={containerClassName}>
       <div className="flex items-start justify-between gap-2">
         <div>
           <h3 className="font-semibold text-foreground mb-1">Requirements</h3>

@@ -11,6 +11,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PlanSwitcher } from '@/components/PlanSwitcher';
 import { PlanProfile } from '@/types/planner';
+import { PresencePeer } from '@/hooks/useSharePresence';
 
 interface PlannerHeaderProps {
   degreeName: string;
@@ -33,6 +34,7 @@ interface PlannerHeaderProps {
   onSelectPlanProfile?: (planId: string) => void;
   onCreatePlanProfile?: (name: string, options?: { startBlank?: boolean }) => PlanProfile | void;
   onDeletePlanProfile?: (planId: string) => void;
+  presencePeers?: PresencePeer[];
 }
 
 export const PlannerHeader = ({
@@ -56,6 +58,7 @@ export const PlannerHeader = ({
   onSelectPlanProfile,
   onCreatePlanProfile,
   onDeletePlanProfile,
+  presencePeers,
 }: PlannerHeaderProps) => {
   const [planActionsOpen, setPlanActionsOpen] = useState(false);
   const showAuth = Boolean(onSignIn || onSignOut);
@@ -190,6 +193,24 @@ export const PlannerHeader = ({
     </Dialog>
   ) : null;
 
+  const onlinePeers = (presencePeers ?? []).filter(Boolean);
+  const showPresence = onlinePeers.length > 1;
+  const presenceIndicator = showPresence ? (
+    <div className="flex items-center gap-2 rounded-full border border-border bg-muted/60 px-2.5 py-1 shadow-sm">
+      <div className="flex -space-x-2">
+        {onlinePeers.slice(0, 3).map((peer) => (
+          <Avatar key={peer.id} className="h-7 w-7 border-2 border-background">
+            {peer.photoUrl ? <AvatarImage src={peer.photoUrl} alt={peer.label} /> : null}
+            <AvatarFallback className="bg-background text-muted-foreground">
+              <UserRound className="h-3.5 w-3.5" />
+            </AvatarFallback>
+          </Avatar>
+        ))}
+      </div>
+      <span className="text-xs font-semibold text-foreground">{onlinePeers.length} online</span>
+    </div>
+  ) : null;
+
   if (isMobile) {
     return (
       <>
@@ -216,6 +237,7 @@ export const PlannerHeader = ({
                     <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden />
                   </button>
                   <div>{planMeta}</div>
+                  {presenceIndicator}
                   {cloudStatus && (
                     <p className="text-[11px] text-muted-foreground/80">{cloudStatus}</p>
                   )}
@@ -262,6 +284,7 @@ export const PlannerHeader = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:justify-end">
+          {presenceIndicator}
           <div className="flex items-center gap-2">
             <Button
               size="sm"

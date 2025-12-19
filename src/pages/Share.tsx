@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { AlertCircle, ArrowLeft, ExternalLink, Loader2, Share2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, ExternalLink, Loader2, Share2, UserRound } from "lucide-react";
 import { doc, getDoc, getFirestore, Timestamp } from "firebase/firestore";
 import app from "@/firebaseClient";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { Separator } from "@/components/ui/separator";
 import { PlannerState, Term } from "@/types/planner";
 import { ShareLinkAccess } from "@/lib/sharePlanStore";
 import { storeSharedImport } from "@/lib/shareImport";
+import { useSharePresence } from "@/hooks/useSharePresence";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const db = getFirestore(app);
 const shareDoc = (shareId: string) => doc(db, "plannerShares", shareId);
@@ -53,6 +55,27 @@ const Share = () => {
   const { shareId } = useParams<{ shareId: string }>();
   const navigate = useNavigate();
   const [view, setView] = useState<ShareState>({ status: "loading" });
+  const activeShareId = view.status === "ready" ? view.payload.shareId : null;
+  const { peers: presencePeers } = useSharePresence({ shareId: activeShareId, userId: null, label: null, photoUrl: null });
+
+  const presenceIndicator = useMemo(() => {
+    if (!presencePeers || presencePeers.length <= 1) return null;
+    return (
+      <div className="flex items-center gap-2 rounded-full border border-border bg-muted/60 px-2.5 py-1 shadow-sm">
+        <div className="flex -space-x-2">
+          {presencePeers.slice(0, 3).map((peer) => (
+            <Avatar key={peer.id} className="h-7 w-7 border-2 border-background">
+              {peer.photoUrl ? <AvatarImage src={peer.photoUrl} alt={peer.label} /> : null}
+              <AvatarFallback className="bg-background text-muted-foreground">
+                <UserRound className="h-3.5 w-3.5" />
+              </AvatarFallback>
+            </Avatar>
+          ))}
+        </div>
+        <span className="text-xs font-semibold text-foreground">{presencePeers.length} viewing</span>
+      </div>
+    );
+  }, [presencePeers]);
 
   useEffect(() => {
     let active = true;
@@ -129,10 +152,11 @@ const Share = () => {
           {view.payload.updatedAtLabel ? (
             <Badge variant="outline">Updated {view.payload.updatedAtLabel}</Badge>
           ) : null}
+          {presenceIndicator}
         </div>
       </div>
     );
-  }, [view]);
+  }, [presenceIndicator, view]);
 
   const planPreview = useMemo(() => {
     if (view.status !== "ready") return null;

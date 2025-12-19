@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ShareLinkAccess, ShareRole, addShareInvite, buildShareUrl, createShareRecord, updateShareLinkAccess } from "@/lib/sharePlanStore";
+import { ShareLinkAccess, ShareRole, addShareInvite, buildShareUrl, updateShareLinkAccess, upsertShareRecord } from "@/lib/sharePlanStore";
 import { toast } from "@/components/ui/sonner";
 
 interface SharePlanDialogProps {
@@ -29,12 +29,15 @@ interface SharePlanDialogProps {
   snapshot: PlannerState;
   ownerId: string | null;
   activeProfileId?: string;
+  existingShareId?: string | null;
+  existingLinkAccess?: ShareLinkAccess;
+  onSharePersist?: (payload: { shareId: string; linkAccess: ShareLinkAccess }) => void;
 }
 
-export const SharePlanDialog = ({ open, onOpenChange, planName, snapshot, ownerId, activeProfileId }: SharePlanDialogProps) => {
+export const SharePlanDialog = ({ open, onOpenChange, planName, snapshot, ownerId, activeProfileId, existingShareId, existingLinkAccess, onSharePersist }: SharePlanDialogProps) => {
   const [shareId, setShareId] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string>("");
-  const [linkAccess, setLinkAccess] = useState<ShareLinkAccess>("viewer");
+  const [linkAccess, setLinkAccess] = useState<ShareLinkAccess>(existingLinkAccess ?? "viewer");
   const [linkBusy, setLinkBusy] = useState(false);
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -45,11 +48,13 @@ export const SharePlanDialog = ({ open, onOpenChange, planName, snapshot, ownerI
 
   useEffect(() => {
     if (!open) return;
-    setShareId(null);
-    setShareUrl("");
+    const normalizedShareId = existingShareId?.trim() || null;
+    setShareId(normalizedShareId);
+    setShareUrl(normalizedShareId ? buildShareUrl(normalizedShareId) : "");
+    setLinkAccess(existingLinkAccess ?? "viewer");
     setLinkBusy(false);
     setInviteBusy(false);
-  }, [open]);
+  }, [existingLinkAccess, existingShareId, open]);
 
   const permissionsCopy = useMemo(() => {
     if (linkAccess === "editor") {
@@ -69,13 +74,10 @@ export const SharePlanDialog = ({ open, onOpenChange, planName, snapshot, ownerI
       return null;
     }
 
-    if (shareId && shareUrl) {
-      return { shareId, shareUrl } as const;
-    }
-
     setLinkBusy(true);
     try {
-      const newShareId = await createShareRecord({
+      const newShareId = await upsertShareRecord({
+        shareId: shareId ?? existingShareId ?? null,
         ownerId,
         planName: normalizedPlanName,
         snapshot,
@@ -85,6 +87,7 @@ export const SharePlanDialog = ({ open, onOpenChange, planName, snapshot, ownerI
       const url = buildShareUrl(newShareId);
       setShareId(newShareId);
       setShareUrl(url);
+      onSharePersist?.({ shareId: newShareId, linkAccess });
       toast("Share link ready", {
         description: "Send this link to let others view or edit.",
       });
@@ -159,7 +162,8 @@ export const SharePlanDialog = ({ open, onOpenChange, planName, snapshot, ownerI
 
   const handleLinkAccessChange = async (value: ShareLinkAccess) => {
     setLinkAccess(value);
-    if (!shareId) return;
+    const activeShareId = shareId ?? existingShareId;
+    if (!activeShareId) return;
     setLinkBusy(true);
     const description = value === "editor"
       ? "Anyone with the link can edit"
@@ -167,8 +171,10 @@ export const SharePlanDialog = ({ open, onOpenChange, planName, snapshot, ownerI
         ? "Anyone with the link can view"
         : "Link requires an invite";
     try {
-      await updateShareLinkAccess(shareId, value, snapshot);
-      setShareUrl((prev) => prev || buildShareUrl(shareId));
+      await updateShareLinkAccess(activeShareId, value, snapshot);
+      setShareId(activeShareId);
+      setShareUrl((prev) => prev || buildShareUrl(activeShareId));
+      onSharePersist?.({ shareId: activeShareId, linkAccess: value });
       toast("Link access updated", {
         description,
       });
@@ -218,9 +224,9 @@ export const SharePlanDialog = ({ open, onOpenChange, planName, snapshot, ownerI
             </div>
 
             <div className="mt-4 space-y-3">
-              <Button type="button" size="sm" onClick={ensureShareLink} disabled={linkBusy || !ownerSignedIn}>
+                <Button type="button" size="sm" onClick={ensureShareLink} disabled={linkBusy || !ownerSignedIn}>
                 <Link2 className="mr-2 h-4 w-4" />
-                {shareUrl ? "Regenerate link" : "Create share link"}
+                  {shareUrl ? "Get share link" : "Create share link"}
               </Button>
               {shareUrl ? (
                 <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border bg-background p-3">

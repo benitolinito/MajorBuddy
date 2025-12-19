@@ -4,6 +4,9 @@ export type TermSystem = 'semester' | 'quarter';
 
 export type PlanType = 'major' | 'minor';
 
+export type ShareRole = 'viewer' | 'editor';
+export type ShareLinkAccess = ShareRole | 'none';
+
 export interface PlannerPlan {
   id: string;
   name: string;
@@ -83,6 +86,8 @@ export interface PlannerState {
 export type PlanProfile = {
   id: string;
   name: string;
+  shareId?: string | null;
+  shareLinkAccess?: ShareLinkAccess;
 };
 
 export type CourseDropSource = {

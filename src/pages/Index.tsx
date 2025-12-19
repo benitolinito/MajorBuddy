@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { AuthDialog } from '@/components/AuthDialog';
 import { ProfileDialog } from '@/components/ProfileDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useSharePresence } from '@/hooks/useSharePresence';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -51,6 +52,7 @@ const Index = () => {
     selectPlanProfile,
     renamePlanProfile,
     deletePlanProfile,
+    setPlanShareMeta,
     addCourseToTerm,
     removeCourse,
     removeTerm,
@@ -123,6 +125,14 @@ const Index = () => {
   const termSystem = state.config?.termSystem ?? 'semester';
   const activePlanProfile = planProfiles.find((profile) => profile.id === activePlanProfileId);
   const plannerTitle = state.degreeName || activePlanProfile?.name || DEFAULT_PLAN_NAME;
+  const activeShareId = activePlanProfile?.shareId ?? null;
+  const activeShareAccess = activePlanProfile?.shareLinkAccess;
+  const { peers: presencePeers } = useSharePresence({
+    shareId: activeShareId,
+    userId: user?.uid ?? null,
+    label: userLabel ?? null,
+    photoUrl: user?.photoURL ?? null,
+  });
   const quickAddOptions = useMemo(() => {
     const options: { value: string; label: string }[] = [];
     state.years.forEach((year) => {
@@ -233,6 +243,7 @@ const Index = () => {
     onSelectPlanProfile: selectPlanProfile,
     onCreatePlanProfile: createPlanProfile,
     onDeletePlanProfile: deletePlanProfile,
+    presencePeers,
   };
 
   const handleDragStart = (course: Course) => {
@@ -379,7 +390,14 @@ const Index = () => {
     toast('Shared plan loaded', {
       description: candidate.planName ? `Viewing "${candidate.planName}"` : 'Viewing shared plan.',
     });
-  }, [applySnapshot, location.state]);
+
+    if (candidate.shareId && activePlanProfileId) {
+      setPlanShareMeta(activePlanProfileId, {
+        shareId: candidate.shareId,
+        linkAccess: candidate.linkAccess,
+      });
+    }
+  }, [activePlanProfileId, applySnapshot, location.state, setPlanShareMeta]);
 
   return (
     <div
@@ -408,6 +426,15 @@ const Index = () => {
         snapshot={state}
         ownerId={user?.uid ?? null}
         activeProfileId={activePlanProfileId}
+        existingShareId={activeShareId}
+        existingLinkAccess={activeShareAccess}
+        onSharePersist={(payload) => {
+          if (!activePlanProfileId) return;
+          setPlanShareMeta(activePlanProfileId, {
+            shareId: payload.shareId,
+            linkAccess: payload.linkAccess,
+          });
+        }}
       />
       <ConfirmDialog
         open={Boolean(duplicatePrompt)}
@@ -1073,19 +1100,21 @@ const DesktopPlannerLayout = ({
               {requirementsCollapsed ? (
                 <CollapsedRail side="right" ariaLabel="Expand requirements" onExpand={() => requirementsPanelRef.current?.expand()} />
               ) : (
-                <aside className="h-full border-l border-border bg-card/30 p-6 overflow-y-auto">
-                  <RequirementsSidebar
-                    totalCredits={stats.totalCredits}
-                    maxCredits={state.requirements.totalCredits}
-                    plans={state.plans}
-                    planProgress={stats.planProgress}
-                    onAddPlan={onAddPlan}
-                    onUpdatePlan={onUpdatePlan}
-                    onRemovePlan={onRemovePlan}
-                    colorPalette={state.colorPalette}
-                    onAddPaletteColor={addColorToPalette}
-                    onCollapsePanel={() => requirementsPanelRef.current?.collapse()}
-                  />
+                <aside className="flex h-full flex-col border-l border-border bg-card">
+                  <div className="flex-1 overflow-y-auto p-6">
+                    <RequirementsSidebar
+                      totalCredits={stats.totalCredits}
+                      maxCredits={state.requirements.totalCredits}
+                      plans={state.plans}
+                      planProgress={stats.planProgress}
+                      onAddPlan={onAddPlan}
+                      onUpdatePlan={onUpdatePlan}
+                      onRemovePlan={onRemovePlan}
+                      colorPalette={state.colorPalette}
+                      onAddPaletteColor={addColorToPalette}
+                      onCollapsePanel={() => requirementsPanelRef.current?.collapse()}
+                    />
+                  </div>
                 </aside>
               )}
             </ResizablePanel>

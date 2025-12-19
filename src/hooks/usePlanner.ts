@@ -11,6 +11,7 @@ import {
   PlanType,
   NewCourseInput,
   PlanInput,
+  ShareLinkAccess,
 } from '@/types/planner';
 import { getDefaultColorId, normalizeColorHex } from '@/lib/tagColors';
 import { DEFAULT_PLAN_NAME, ensureUniquePlanName } from '@/lib/plannerProfiles';
@@ -23,6 +24,7 @@ const PLANS_STORAGE_KEY = 'plannerPlans';
 const YEARS_STORAGE_KEY = 'plannerAcademicYears';
 const PLAN_PROFILES_STORAGE_KEY = 'plannerPlanProfiles';
 const COLOR_PALETTE_STORAGE_KEY = 'plannerColorPalette';
+const PLAN_SHARE_STORAGE_KEY = 'plannerPlanShares';
 const DEFAULT_MAJOR_CREDITS = 48;
 const DEFAULT_MINOR_CREDITS = 24;
 const PLANNER_STORAGE_KEYS = [
@@ -33,6 +35,7 @@ const PLANNER_STORAGE_KEYS = [
   YEARS_STORAGE_KEY,
   PLAN_PROFILES_STORAGE_KEY,
   COLOR_PALETTE_STORAGE_KEY,
+  PLAN_SHARE_STORAGE_KEY,
 ];
 
 export const clearPlannerStorage = () => {
@@ -47,6 +50,35 @@ const persistJson = (key: string, value: unknown) => {
 
 const persistPalette = (palette: string[]) => {
   persistJson(COLOR_PALETTE_STORAGE_KEY, palette);
+};
+
+type PlanShareMeta = { shareId: string | null; linkAccess?: ShareLinkAccess };
+
+const normalizeShareMeta = (value: unknown): PlanShareMeta | null => {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as { shareId?: unknown; linkAccess?: unknown };
+  const shareId = typeof record.shareId === 'string' && record.shareId.trim().length ? record.shareId.trim() : null;
+  const linkAccess = record.linkAccess === 'viewer' || record.linkAccess === 'editor' || record.linkAccess === 'none'
+    ? (record.linkAccess as ShareLinkAccess)
+    : undefined;
+  if (!shareId && !linkAccess) return shareId === null ? { shareId: null } : null;
+  return { shareId, linkAccess };
+};
+
+const loadShareMetaMap = (): Record<string, PlanShareMeta> => {
+  const raw = loadJson<Record<string, unknown>>(PLAN_SHARE_STORAGE_KEY, {});
+  if (!raw || typeof raw !== 'object') return {};
+  return Object.entries(raw).reduce<Record<string, PlanShareMeta>>((acc, [key, value]) => {
+    const normalized = normalizeShareMeta(value);
+    if (normalized) {
+      acc[key] = normalized;
+    }
+    return acc;
+  }, {});
+};
+
+const persistShareMetaMap = (map: Record<string, PlanShareMeta>) => {
+  persistJson(PLAN_SHARE_STORAGE_KEY, map);
 };
 
 const isNonEmptyString = (value: unknown): value is string =>
@@ -573,6 +605,7 @@ const createPlannerState = (
 };
 
 const buildInitialPlanner = () => {
+  const storedShareMeta = loadShareMetaMap();
   const storedProfiles = loadStoredPlanProfiles();
   if (storedProfiles.profiles.length > 0) {
     const profileSnapshots = new Map<string, PlannerState>();
@@ -591,12 +624,26 @@ const buildInitialPlanner = () => {
         years: sanitizeYears(loadStoredYears(), createDefaultConfig()),
       });
 
+    const planProfilesWithShare = storedProfiles.profiles.map(({ id, name }) => ({
+      id,
+      name,
+      shareId: storedShareMeta[id]?.shareId ?? null,
+      shareLinkAccess: storedShareMeta[id]?.linkAccess,
+    }));
+
     return {
       state: clonePlannerState(fallbackState),
       hasConfig: Boolean(fallbackState.config),
-      planProfiles: storedProfiles.profiles.map(({ id, name }) => ({ id, name })),
+      planProfiles: planProfilesWithShare,
       activePlanProfileId: activeId || storedProfiles.profiles[0]?.id || '',
       profileSnapshots,
+      shareMeta: planProfilesWithShare.reduce<Record<string, PlanShareMeta>>((acc, profile) => {
+        acc[profile.id] = {
+          shareId: profile.shareId ?? null,
+          linkAccess: profile.shareLinkAccess,
+        };
+        return acc;
+      }, {}),
     };
   }
 
@@ -614,13 +661,15 @@ const buildInitialPlanner = () => {
   });
   const profileId = generateId();
   const profileName = initialState.degreeName || initialState.config?.planName || DEFAULT_PLAN_NAME;
+  const initialShareMeta = storedShareMeta[profileId] ?? { shareId: null };
 
   return {
     state: initialState,
     hasConfig: Boolean(initialConfig),
-    planProfiles: [{ id: profileId, name: profileName }],
+    planProfiles: [{ id: profileId, name: profileName, shareId: initialShareMeta.shareId ?? null, shareLinkAccess: initialShareMeta.linkAccess }],
     activePlanProfileId: profileId,
     profileSnapshots: new Map<string, PlannerState>([[profileId, initialState]]),
+    shareMeta: { [profileId]: initialShareMeta },
   };
 };
 
@@ -661,6 +710,7 @@ type PlanProfileManagerParams = {
   initialPlanProfiles: PlanProfile[];
   initialActiveId: string;
   initialSnapshots: Map<string, PlannerState>;
+  initialShareMeta: Record<string, PlanShareMeta>;
   state: PlannerState;
   setPlannerState: React.Dispatch<React.SetStateAction<PlannerState>>;
   setHasConfig: React.Dispatch<React.SetStateAction<boolean>>;
@@ -670,11 +720,38 @@ const usePlanProfilesManager = ({
   initialPlanProfiles,
   initialActiveId,
   initialSnapshots,
+  initialShareMeta,
   state,
   setPlannerState,
   setHasConfig,
 }: PlanProfileManagerParams) => {
-  const [planProfiles, setPlanProfiles] = useState<PlanProfile[]>(initialPlanProfiles);
+  const shareMetaInitial: Record<string, PlanShareMeta> = {};
+  initialPlanProfiles.forEach((profile) => {
+    const meta = initialShareMeta[profile.id];
+    if (meta) {
+      shareMetaInitial[profile.id] = { shareId: meta.shareId ?? null, linkAccess: meta.linkAccess };
+    } else if (profile.shareId || profile.shareLinkAccess) {
+      shareMetaInitial[profile.id] = {
+        shareId: profile.shareId ?? null,
+        linkAccess: profile.shareLinkAccess,
+      };
+    }
+  });
+  Object.entries(initialShareMeta).forEach(([id, meta]) => {
+    if (!shareMetaInitial[id]) {
+      shareMetaInitial[id] = { shareId: meta.shareId ?? null, linkAccess: meta.linkAccess };
+    }
+  });
+
+  const shareMetaRef = useRef<Record<string, PlanShareMeta>>(shareMetaInitial);
+
+  const [planProfiles, setPlanProfiles] = useState<PlanProfile[]>(() =>
+    initialPlanProfiles.map((profile) => ({
+      ...profile,
+      shareId: profile.shareId ?? shareMetaRef.current[profile.id]?.shareId ?? null,
+      shareLinkAccess: profile.shareLinkAccess ?? shareMetaRef.current[profile.id]?.linkAccess,
+    })),
+  );
   const [activePlanProfileId, setActivePlanProfileId] = useState<string>(initialActiveId);
   const profileSnapshotsRef = useRef<Map<string, PlannerState>>(initialSnapshots);
   const latestStateRef = useRef(state);
@@ -682,6 +759,10 @@ const usePlanProfilesManager = ({
   useEffect(() => {
     latestStateRef.current = state;
   }, [state]);
+
+  const persistShareMeta = useCallback(() => {
+    persistShareMetaMap(shareMetaRef.current);
+  }, []);
 
   const selectPlanProfile = useCallback(
     (profileId: string) => {
@@ -709,16 +790,18 @@ const usePlanProfilesManager = ({
         name || snapshot.degreeName || snapshot.config?.planName || DEFAULT_PLAN_NAME,
         planProfiles,
       );
-      const newProfile: PlanProfile = { id: generateId(), name: profileName };
+      const newProfile: PlanProfile = { id: generateId(), name: profileName, shareId: null };
 
       profileSnapshotsRef.current.set(newProfile.id, snapshot);
+      shareMetaRef.current[newProfile.id] = { shareId: null };
+      persistShareMeta();
       setPlanProfiles((prev) => [...prev, newProfile]);
       setActivePlanProfileId(newProfile.id);
       setPlannerState(snapshot);
       setHasConfig(Boolean(snapshot.config));
       return newProfile;
     },
-    [activePlanProfileId, planProfiles, setHasConfig, setPlannerState],
+    [activePlanProfileId, planProfiles, persistShareMeta, setHasConfig, setPlannerState],
   );
 
   const renamePlanProfile = useCallback((profileId: string, nextName: string) => {
@@ -731,6 +814,25 @@ const usePlanProfilesManager = ({
     });
   }, []);
 
+  const setPlanShareMeta = useCallback(
+    (profileId: string, meta: Partial<PlanShareMeta>) => {
+      if (!profileId) return;
+      const current = shareMetaRef.current[profileId] ?? { shareId: null };
+      const next: PlanShareMeta = {
+        shareId: meta.shareId === undefined ? current.shareId ?? null : meta.shareId ?? null,
+        linkAccess: meta.linkAccess === undefined ? current.linkAccess : meta.linkAccess,
+      };
+      shareMetaRef.current = { ...shareMetaRef.current, [profileId]: next };
+      persistShareMeta();
+      setPlanProfiles((prev) =>
+        prev.map((profile) =>
+          profile.id === profileId ? { ...profile, shareId: next.shareId, shareLinkAccess: next.linkAccess } : profile,
+        ),
+      );
+    },
+    [persistShareMeta],
+  );
+
   const deletePlanProfile = useCallback(
     (profileId: string) => {
       setPlanProfiles((prev) => {
@@ -738,6 +840,10 @@ const usePlanProfilesManager = ({
         const remaining = prev.filter((profile) => profile.id !== profileId);
         if (remaining.length === prev.length) return prev;
         profileSnapshotsRef.current.delete(profileId);
+        const nextShareMeta = { ...shareMetaRef.current };
+        delete nextShareMeta[profileId];
+        shareMetaRef.current = nextShareMeta;
+        persistShareMeta();
 
         if (profileId === activePlanProfileId) {
           const nextProfile = remaining[0];
@@ -753,7 +859,7 @@ const usePlanProfilesManager = ({
         return remaining;
       });
     },
-    [activePlanProfileId, setHasConfig, setPlannerState],
+    [activePlanProfileId, persistShareMeta, setHasConfig, setPlannerState],
   );
 
   const getCoursePlacement = useCallback(
@@ -786,15 +892,18 @@ const usePlanProfilesManager = ({
       profileSnapshots: Map<string, PlannerState>;
       nextState: PlannerState;
       hasConfig: boolean;
+      shareMeta?: Record<string, PlanShareMeta>;
     }) => {
       profileSnapshotsRef.current = new Map(payload.profileSnapshots);
       latestStateRef.current = clonePlannerState(payload.nextState);
+      shareMetaRef.current = payload.shareMeta ?? {};
+      persistShareMeta();
       setPlanProfiles(payload.planProfiles);
       setActivePlanProfileId(payload.activePlanProfileId);
       setPlannerState(clonePlannerState(payload.nextState));
       setHasConfig(payload.hasConfig);
     },
-    [setHasConfig, setPlannerState],
+    [persistShareMeta, setHasConfig, setPlannerState],
   );
 
   return {
@@ -806,6 +915,7 @@ const usePlanProfilesManager = ({
     deletePlanProfile,
     getCoursePlacement,
     resetPlanProfiles,
+    setPlanShareMeta,
   };
 };
 
@@ -823,10 +933,12 @@ export const usePlanner = () => {
     deletePlanProfile,
     resetPlanProfiles,
     getCoursePlacement,
+    setPlanShareMeta,
   } = usePlanProfilesManager({
     initialPlanProfiles: initialLoad.planProfiles,
     initialActiveId: initialLoad.activePlanProfileId,
     initialSnapshots: initialLoad.profileSnapshots,
+    initialShareMeta: initialLoad.shareMeta ?? {},
     state,
     setPlannerState: setState,
     setHasConfig,
@@ -1390,6 +1502,7 @@ export const usePlanner = () => {
       profileSnapshots: fresh.profileSnapshots,
       nextState: fresh.state,
       hasConfig: Boolean(fresh.hasConfig),
+      shareMeta: fresh.shareMeta ?? {},
     });
   }, [resetPlanProfiles]);
 
@@ -1537,5 +1650,6 @@ export const usePlanner = () => {
     applySnapshot,
     configurePlanner,
     hasConfig,
+    setPlanShareMeta,
   };
 };

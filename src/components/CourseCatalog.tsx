@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowRight, BookOpen, ChevronsLeft, Pencil, Plus, Search, Tag, Trash } from 'lucide-react';
+import { ArrowRight, ArrowUpDown, BookOpen, ChevronsLeft, Filter, Pencil, Plus, Search, Tag, Trash, X } from 'lucide-react';
 import { Course, NewCourseInput, PlannerPlan, TermName, TermSystem } from '@/types/planner';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -12,6 +12,8 @@ import { getTagAccentClass, getTagAccentStyle, getTagColorClasses, getTagColorSt
 import { cn } from '@/lib/utils';
 import { TagColorPicker } from '@/components/TagColorPicker';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface CourseCatalogProps {
   courses: Course[];
@@ -111,6 +113,23 @@ type CourseFormState = {
   offeredTerms: TermName[];
 };
 
+type SortOption =
+  | 'order-added'
+  | 'distributive'
+  | 'credits'
+  | 'title-asc'
+  | 'title-desc'
+  | 'plan';
+
+const SORT_LABELS: Record<SortOption, string> = {
+  'order-added': 'Order added',
+  distributive: 'Distributive',
+  credits: 'Credit number',
+  'title-asc': 'Title (A-Z)',
+  'title-desc': 'Title (Z-A)',
+  plan: 'Major/Minor',
+};
+
 const createEmptyCourseForm = (): CourseFormState => ({
   code: '',
   title: '',
@@ -143,6 +162,11 @@ export const CourseCatalog = ({
   quickAddLabel = 'Add to term',
 }: CourseCatalogProps) => {
   const [search, setSearch] = useState('');
+  const [sortOption, setSortOption] = useState<SortOption>('order-added');
+  const [termFilter, setTermFilter] = useState<TermName | null>(null);
+  const [distributiveFilter, setDistributiveFilter] = useState<string | null>(null);
+  const [planFilter, setPlanFilter] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formState, setFormState] = useState<CourseFormState>(() => createEmptyCourseForm());
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
@@ -163,16 +187,6 @@ export const CourseCatalog = ({
     setFormState((prev) => ({ ...prev, [key]: value }));
   };
 
-  const planLookup = useMemo(() => new Map(plans.map((plan) => [plan.id, plan])), [plans]);
-
-  const filteredCourses = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return courses;
-    return courses.filter(
-      (c) => c.code.toLowerCase().includes(term) || c.name.toLowerCase().includes(term) || c.distributives.some((d) => d.toLowerCase().includes(term))
-    );
-  }, [courses, search]);
-
   const baseTermOptions = useMemo<TermName[]>(
     () => (termSystem === 'quarter' ? ['Fall', 'Winter', 'Spring', 'Summer'] : ['Fall', 'Spring', 'Summer']),
     [termSystem],
@@ -182,6 +196,115 @@ export const CourseCatalog = ({
     const extras = offeredTerms.filter((term) => !baseTermOptions.includes(term));
     return [...baseTermOptions, ...extras];
   }, [baseTermOptions, offeredTerms]);
+
+  const planLookup = useMemo(() => new Map(plans.map((plan) => [plan.id, plan])), [plans]);
+
+  const courseOrder = useMemo(() => new Map(courses.map((course, index) => [course.id, index])), [courses]);
+  const hasCourses = courses.length > 0;
+
+  const termFilterOptions = useMemo<TermName[]>(() => {
+    const seen = new Set<TermName>();
+    baseTermOptions.forEach((term) => seen.add(term));
+    courses.forEach((course) => {
+      (course.offeredTerms ?? []).forEach((term) => seen.add(term));
+    });
+    return Array.from(seen);
+  }, [baseTermOptions, courses]);
+
+  const visibleCourses = useMemo(() => {
+    const searchTerm = search.trim().toLowerCase();
+
+    const primaryPlanKey = (course: Course) => {
+      const sortedPlans = course.planIds
+        .map((id) => planLookup.get(id))
+        .filter((plan): plan is PlannerPlan => Boolean(plan))
+        .sort((a, b) => {
+          if (a.type !== b.type) return a.type === 'major' ? -1 : 1;
+          return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+        });
+      const plan = sortedPlans[0];
+      return plan ? `${plan.type}-${plan.name}` : '';
+    };
+
+    const fallbackOrder = (a: Course, b: Course) => (courseOrder.get(a.id) ?? 0) - (courseOrder.get(b.id) ?? 0);
+
+    const matchesSearch = (course: Course) => {
+      if (!searchTerm) return true;
+      return (
+        course.code.toLowerCase().includes(searchTerm) ||
+        course.name.toLowerCase().includes(searchTerm) ||
+        course.distributives.some((d) => d.toLowerCase().includes(searchTerm))
+      );
+    };
+
+    const matchesFilters = (course: Course) => {
+      if (termFilter && !(course.offeredTerms ?? []).includes(termFilter)) return false;
+      if (distributiveFilter && !course.distributives.includes(distributiveFilter)) return false;
+      if (planFilter && !course.planIds.includes(planFilter)) return false;
+      return true;
+    };
+
+    const sorted = courses
+      .filter(matchesSearch)
+      .filter(matchesFilters)
+      .sort((a, b) => {
+        switch (sortOption) {
+          case 'title-asc': {
+            const cmp = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+            return cmp !== 0 ? cmp : fallbackOrder(a, b);
+          }
+          case 'title-desc': {
+            const cmp = b.name.localeCompare(a.name, undefined, { sensitivity: 'base' });
+            return cmp !== 0 ? cmp : fallbackOrder(a, b);
+          }
+          case 'credits': {
+            const diff = b.credits - a.credits;
+            return diff !== 0 ? diff : fallbackOrder(a, b);
+          }
+          case 'distributive': {
+            const aKey = (a.distributives[0] ?? '').toLowerCase();
+            const bKey = (b.distributives[0] ?? '').toLowerCase();
+            const cmp = aKey.localeCompare(bKey, undefined, { sensitivity: 'base' });
+            return cmp !== 0 ? cmp : fallbackOrder(a, b);
+          }
+          case 'plan': {
+            const aKey = primaryPlanKey(a).toLowerCase();
+            const bKey = primaryPlanKey(b).toLowerCase();
+            const cmp = aKey.localeCompare(bKey, undefined, { sensitivity: 'base' });
+            return cmp !== 0 ? cmp : fallbackOrder(a, b);
+          }
+          case 'order-added':
+          default:
+            return fallbackOrder(a, b);
+        }
+      });
+
+    return sorted;
+  }, [courses, search, termFilter, distributiveFilter, planFilter, sortOption, courseOrder, planLookup]);
+
+  const activeFilters = useMemo(() => {
+    const filters: { key: 'term' | 'distributive' | 'plan'; label: string }[] = [];
+    if (termFilter) {
+      filters.push({ key: 'term', label: `Offered in ${termFilter}` });
+    }
+    if (distributiveFilter) {
+      filters.push({ key: 'distributive', label: `Distributive: ${distributiveFilter}` });
+    }
+    if (planFilter) {
+      const plan = planLookup.get(planFilter);
+      const typeLabel = plan?.type === 'minor' ? 'Minor' : 'Major';
+      filters.push({ key: 'plan', label: `${typeLabel}: ${plan?.name ?? 'Plan'}` });
+    }
+    return filters;
+  }, [distributiveFilter, planFilter, planLookup, termFilter]);
+
+  const hasActiveFilters = activeFilters.length > 0;
+
+  const clearFilters = () => {
+    setTermFilter(null);
+    setDistributiveFilter(null);
+    setPlanFilter(null);
+  };
 
   useEffect(() => {
     if (selectedDistributives.length === 0) {
@@ -817,16 +940,154 @@ export const CourseCatalog = ({
             className="pl-9 bg-secondary border-0"
           />
         </div>
+
+        {hasCourses && (
+          <div className="flex flex-wrap items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <ArrowUpDown className="h-4 w-4" />
+                  {SORT_LABELS[sortOption]}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuLabel>Sort classes</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup value={sortOption} onValueChange={(value) => setSortOption(value as SortOption)}>
+                  <DropdownMenuRadioItem value="order-added">Order added</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="title-asc">Title (A-Z)</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="title-desc">Title (Z-A)</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="credits">Credit number</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="distributive">Distributive</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="plan">Major/Minor</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={hasActiveFilters ? 'default' : 'outline'}
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Filter className="h-4 w-4" />
+                  Filters{hasActiveFilters ? ` (${activeFilters.length})` : ''}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-80 space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-foreground">Filter class library</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    onClick={clearFilters}
+                    disabled={!hasActiveFilters}
+                  >
+                    Clear
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Term offered</p>
+                  <div className="flex flex-wrap gap-2">
+                    <TogglePill label="Any term" active={!termFilter} onClick={() => setTermFilter(null)} />
+                    {termFilterOptions.map((term) => (
+                      <TogglePill
+                        key={term}
+                        label={term}
+                        active={termFilter === term}
+                        onClick={() => setTermFilter(termFilter === term ? null : term)}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Distributive</p>
+                  <div className="flex flex-wrap gap-2">
+                    {distributives.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Add a distributive to filter.</p>
+                    ) : (
+                      distributives.map((dist) => (
+                        <TogglePill
+                          key={dist}
+                          label={dist}
+                          active={distributiveFilter === dist}
+                          onClick={() => setDistributiveFilter(distributiveFilter === dist ? null : dist)}
+                        />
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Major / Minor</p>
+                  <div className="flex flex-wrap gap-2">
+                    {plans.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Add a plan to filter.</p>
+                    ) : (
+                      plans.map((plan) => (
+                        <TogglePill
+                          key={plan.id}
+                          label={`${plan.type === 'major' ? 'Major' : 'Minor'} • ${plan.name}`}
+                          active={planFilter === plan.id}
+                          tone={plan.type === 'major' ? 'major' : 'minor'}
+                          colorClassName={getTagColorClasses(plan.name, plan.color)}
+                          colorAccentClass={getTagAccentClass(plan.name, plan.color)}
+                          colorStyle={getTagColorStyle(plan.name, plan.color)}
+                          colorAccentStyle={getTagAccentStyle(plan.name, plan.color)}
+                          onClick={() => setPlanFilter(planFilter === plan.id ? null : plan.id)}
+                        />
+                      ))
+                    )}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {hasActiveFilters && (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                {activeFilters.map((filter) => (
+                  <Badge key={`${filter.key}-${filter.label}`} variant="secondary" className="flex items-center gap-1">
+                    {filter.label}
+                    <button
+                      type="button"
+                      className="ml-1 rounded-full p-0.5 text-muted-foreground transition hover:text-foreground"
+                      aria-label={`Remove ${filter.label} filter`}
+                      onClick={() => {
+                        if (filter.key === 'term') setTermFilter(null);
+                        if (filter.key === 'distributive') setDistributiveFilter(null);
+                        if (filter.key === 'plan') setPlanFilter(null);
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={clearFilters}
+                >
+                  Clear all
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-2">
-          {filteredCourses.length === 0 && (
+          {visibleCourses.length === 0 && (
             <div className="border border-dashed border-border rounded-lg p-3 text-xs text-muted-foreground">
-              No classes yet. Add your first class to start planning.
+              {hasCourses ? 'No classes match these filters yet.' : 'No classes yet. Add your first class to start planning.'}
             </div>
           )}
-          {filteredCourses.map((course) => {
+          {visibleCourses.map((course) => {
             const coursePlans = course.planIds
               .map((id) => planLookup.get(id))
               .filter((plan): plan is PlannerPlan => Boolean(plan));
