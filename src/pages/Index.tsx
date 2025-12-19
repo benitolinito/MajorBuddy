@@ -12,7 +12,7 @@ import { PlannerSetupDialog } from '@/components/PlannerSetupDialog';
 import { ExportScheduleDialog } from '@/components/ExportScheduleDialog';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
-import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks, Download, PenLine, Wrench } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks, PenLine, Wrench, Share2, FileDown } from 'lucide-react';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { cn } from '@/lib/utils';
 import { AuthDialog } from '@/components/AuthDialog';
@@ -24,6 +24,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/components/ui/sonner';
 import { DEFAULT_PLAN_NAME } from '@/lib/plannerProfiles';
+import { buildScheduleRows, buildCsvContent, createScheduleFileName, triggerCsvDownload } from '@/lib/scheduleExport';
 
 type PlannerStats = {
   totalCredits: number;
@@ -566,74 +567,35 @@ type MobilePane = 'plan' | 'library' | 'requirements';
 
 type MobilePlanOverviewProps = {
   title: string;
-  subtitle: string;
-  meta: string;
-  onStartNewClass: () => void;
-  onAddYear: () => void;
+  subtitle?: string;
   onOpenExport: () => void;
-  onOpenSettings: () => void;
+  onDownloadCsv: () => void;
 };
 
-const MobilePlanOverview = ({
-  title,
-  subtitle,
-  meta,
-  onStartNewClass,
-  onAddYear,
-  onOpenExport,
-  onOpenSettings,
-}: MobilePlanOverviewProps) => (
+const MobilePlanOverview = ({ title, subtitle, onOpenExport, onDownloadCsv }: MobilePlanOverviewProps) => (
   <div className="rounded-2xl border border-border/80 bg-card/90 p-4 shadow-[0_28px_45px_-30px_rgba(15,23,42,0.55)]">
-    <div className="flex items-start justify-between gap-3">
-      <div className="space-y-1">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Plan overview</p>
-        <p className="text-xl font-semibold leading-snug">{title}</p>
-        <p className="text-sm text-muted-foreground">{subtitle}</p>
-        <div className="flex flex-wrap gap-2 pt-2 text-[11px] text-muted-foreground">
-          <span className="rounded-full bg-muted/70 px-2.5 py-1 font-semibold text-foreground">{meta}</span>
-          <span className="rounded-full border border-border px-2.5 py-1 font-medium">Stay on track</span>
-        </div>
-      </div>
-      <div className="flex flex-col items-end gap-2">
-        <Button
-          type="button"
-          size="icon"
-          variant="outline"
-          className="h-10 w-10 rounded-xl"
-          onClick={onOpenExport}
-          aria-label="Export schedule"
-        >
-          <Download className="h-4 w-4" />
-        </Button>
-        <Button
-          type="button"
-          size="icon"
-          variant="secondary"
-          className="h-10 w-10 rounded-xl"
-          onClick={onOpenSettings}
-          aria-label="Open configuration"
-        >
-          <Wrench className="h-4 w-4" />
-        </Button>
-      </div>
+    <div className="space-y-1">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Quick exports</p>
+      <p className="text-xl font-semibold leading-snug">{title}</p>
+      {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
     </div>
     <div className="mt-4 grid grid-cols-2 gap-2">
       <Button
         type="button"
         className="h-11 rounded-xl"
-        onClick={onStartNewClass}
+        onClick={onOpenExport}
       >
-        <Plus className="mr-2 h-4 w-4" />
-        Add class
+        <Share2 className="mr-2 h-4 w-4" />
+        Export options
       </Button>
       <Button
         type="button"
         variant="outline"
-        className="h-11 rounded-xl border-dashed"
-        onClick={onAddYear}
+        className="h-11 rounded-xl"
+        onClick={onDownloadCsv}
       >
-        <Plus className="mr-2 h-4 w-4" />
-        Add year
+        <FileDown className="mr-2 h-4 w-4" />
+        Download CSV
       </Button>
     </div>
   </div>
@@ -682,60 +644,33 @@ const MobilePaneSwitch = ({ activePane, onSelectPane }: MobilePaneSwitchProps) =
   </div>
 );
 
-type MobileDockProps = {
-  activePane: MobilePane;
-  onSelectPane: (pane: MobilePane) => void;
-  onAddClass: () => void;
-  onOpenSettings: () => void;
-};
+const MobileConfigurationButton = ({ onOpenSettings }: { onOpenSettings: () => void }) => (
+  <button
+    type="button"
+    onClick={onOpenSettings}
+    className="flex w-full items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3 text-left shadow-sm transition hover:border-primary/40"
+  >
+    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted/70 text-foreground">
+      <Wrench className="h-5 w-5" aria-hidden />
+    </span>
+    <span className="flex flex-1 flex-col">
+      <span className="text-sm font-semibold text-foreground">Configuration</span>
+      <span className="text-xs text-muted-foreground">Adjust plan defaults, terms, and catalog.</span>
+    </span>
+    <ChevronsRight className="h-4 w-4 text-muted-foreground" aria-hidden />
+  </button>
+);
 
-const MobileDock = ({ activePane, onSelectPane, onAddClass, onOpenSettings }: MobileDockProps) => (
-  <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4">
-    <div className="pointer-events-auto relative w-full max-w-[420px]">
-      <div className="flex items-center justify-between rounded-3xl border border-border/70 bg-card/95 px-4 py-3 shadow-[0_25px_55px_-20px_rgba(15,23,42,0.85)] backdrop-blur">
-        <div className="flex flex-1 items-center justify-around gap-1">
-          {MOBILE_TABS.map((tab) => {
-            const Icon = tab.id === 'plan' ? PenLine : tab.id === 'library' ? BookOpen : ListChecks;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => onSelectPane(tab.id)}
-                className={cn(
-                  'flex items-center gap-1.5 rounded-2xl px-3 py-2 text-[11px] font-semibold transition',
-                  activePane === tab.id
-                    ? 'bg-primary/10 text-foreground'
-                    : 'text-muted-foreground hover:text-foreground/80',
-                )}
-                aria-pressed={activePane === tab.id}
-              >
-                <Icon className="h-4 w-4" aria-hidden />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-        <button
-          type="button"
-          onClick={onOpenSettings}
-          className="ml-3 flex flex-shrink-0 items-center gap-2 rounded-2xl border border-border/70 px-3 py-2 text-[11px] font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
-        >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/60 text-foreground">
-            <Wrench className="h-4 w-4" aria-hidden />
-          </span>
-          Configuration
-        </button>
-      </div>
-      <button
-        type="button"
-        onClick={onAddClass}
-        className="absolute left-1/2 top-0 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_20px_45px_rgba(79,70,229,0.55)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30"
-        aria-label="New class"
-      >
-        <Plus className="h-6 w-6" />
-      </button>
-    </div>
-  </div>
+const MobileAddCourseFab = ({ onAddClass }: { onAddClass: () => void }) => (
+  <button
+    type="button"
+    onClick={onAddClass}
+    className="fixed bottom-6 right-4 z-40 flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-[0_24px_45px_-20px_rgba(79,70,229,0.65)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30"
+    aria-label="Add class"
+  >
+    <Plus className="h-4 w-4" />
+    Add class
+  </button>
 );
 
 type MobileYearNavigatorProps = {
@@ -884,27 +819,32 @@ const MobilePlannerLayout = ({
     onDropCourse(libraryTarget.yearId, libraryTarget.termId, course);
   };
 
-  const totalTerms = state.years.reduce((count, year) => count + year.terms.length, 0);
   const planSubtitle = stats.totalCredits > 0 ? `${stats.totalCredits} credits planned` : 'No credits planned yet';
-  const planMeta = `${state.years.length || 0} year${state.years.length === 1 ? '' : 's'} • ${totalTerms} term${totalTerms === 1 ? '' : 's'}`;
-
+  const scheduleRows = useMemo(() => buildScheduleRows(state.years, state.plans), [state.years, state.plans]);
+  const csvContent = useMemo(() => buildCsvContent(scheduleRows), [scheduleRows]);
+  const csvFileName = useMemo(
+    () => createScheduleFileName(headerProps.degreeName, state.university || 'plan'),
+    [headerProps.degreeName, state.university],
+  );
   const filteredYears = state.years.filter((year) => !activeYearId || year.id === activeYearId);
+  const handleDownloadCsv = () => {
+    triggerCsvDownload(csvContent, csvFileName);
+    toast('CSV exported', { description: 'Check your downloads for the schedule export.' });
+  };
 
   return (
     <>
-      <div className="relative min-h-screen pb-36">
+      <div className="relative min-h-screen pb-28">
         <div className="sticky top-0 z-40 border-b border-border/70 bg-background/95 backdrop-blur">
           <PlannerHeader {...headerProps} sticky={false} isMobile />
           <div className="space-y-4 px-4 pb-4 pt-3">
             <MobilePlanOverview
               title={headerProps.degreeName || 'Planner'}
               subtitle={planSubtitle}
-              meta={planMeta}
-              onStartNewClass={handleStartAddClass}
-              onAddYear={onAddYear}
               onOpenExport={onOpenExport}
-              onOpenSettings={onOpenSettings}
+              onDownloadCsv={handleDownloadCsv}
             />
+            <MobileConfigurationButton onOpenSettings={onOpenSettings} />
             <MobilePaneSwitch activePane={activePane} onSelectPane={setActivePane} />
             {activePane === 'plan' && (
               <MobileYearNavigator years={state.years} activeYearId={activeYearId} onSelectYear={setActiveYearId} />
@@ -941,6 +881,15 @@ const MobilePlannerLayout = ({
                   </MobilePaneCard>
                 ))
               )}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-dashed"
+                onClick={onAddYear}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add academic year
+              </Button>
             </div>
           )}
 
@@ -983,6 +932,8 @@ const MobilePlannerLayout = ({
         </div>
       </div>
 
+      <MobileAddCourseFab onAddClass={handleStartAddClass} />
+
       <Sheet open={quickAddOpen} onOpenChange={handleQuickAddChange}>
         <SheetContent side="bottom" className="h-[85vh] overflow-y-auto px-4">
           <SheetHeader className="pb-2 text-left">
@@ -1008,13 +959,6 @@ const MobilePlannerLayout = ({
           />
         </SheetContent>
       </Sheet>
-
-      <MobileDock
-        activePane={activePane}
-        onSelectPane={(pane) => setActivePane(pane)}
-        onAddClass={handleStartAddClass}
-        onOpenSettings={onOpenSettings}
-      />
     </>
   );
 };

@@ -5,6 +5,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
+import {
+  buildScheduleRows,
+  buildMarkdownTable,
+  buildCsvContent,
+  createScheduleFileName,
+  triggerCsvDownload,
+} from "@/lib/scheduleExport";
 
 type ExportScheduleDialogProps = {
   open: boolean;
@@ -15,34 +22,6 @@ type ExportScheduleDialogProps = {
   university: string;
 };
 
-type ScheduleRow = {
-  academicYear: string;
-  termLabel: string;
-  courseCode: string;
-  courseName: string;
-  credits: number | "";
-  plans: string;
-  distributives: string;
-};
-
-const escapeCsvValue = (value: string | number | "") => {
-  const normalized = `${value ?? ""}`;
-  if (normalized === "") return "";
-  const escaped = normalized.replace(/"/g, '""');
-  return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped;
-};
-
-const formatCourseCell = (row: ScheduleRow) => {
-  if (row.courseCode === "—") return row.courseName;
-  return `\`${row.courseCode}\` ${row.courseName}`;
-};
-
-const createFileName = (degreeName: string, university: string) => {
-  const base = `${degreeName || "schedule"}-${university || "plan"}`;
-  const safe = base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  return safe || "schedule-plan";
-};
-
 export const ExportScheduleDialog = ({
   open,
   onOpenChange,
@@ -51,94 +30,13 @@ export const ExportScheduleDialog = ({
   degreeName,
   university,
 }: ExportScheduleDialogProps) => {
-  const scheduleRows = useMemo(() => {
-    const planLookup = new Map(plans.map((plan) => [plan.id, plan.name]));
-    const rows: ScheduleRow[] = [];
-
-    years.forEach((year) => {
-      year.terms.forEach((term) => {
-        if (term.courses.length === 0) {
-          rows.push({
-            academicYear: year.name,
-            termLabel: `${term.name} ${term.year}`,
-            courseCode: "—",
-            courseName: "No courses planned",
-            credits: "",
-            plans: "",
-            distributives: "",
-          });
-          return;
-        }
-
-        term.courses.forEach((course) => {
-          rows.push({
-            academicYear: year.name,
-            termLabel: `${term.name} ${term.year}`,
-            courseCode: course.code,
-            courseName: course.name,
-            credits: course.credits,
-            plans: course.planIds.map((id) => planLookup.get(id) ?? "Unlabeled").join(", "),
-            distributives: course.distributives.join(", "),
-          });
-        });
-      });
-    });
-
-    return rows;
-  }, [years, plans]);
-
-  const markdownTable = useMemo(() => {
-    const header = [
-      "| Year | Term | Course | Credits | Plans | Distributives |",
-      "| --- | --- | --- | --- | --- | --- |",
-    ].join("\n");
-
-    const rows = scheduleRows.length
-      ? scheduleRows
-          .map((row) => {
-            const course = formatCourseCell(row);
-            const credits = row.credits === "" ? "—" : row.credits;
-            const plansCell = row.plans || "—";
-            const distributives = row.distributives || "—";
-            return `| ${row.academicYear} | ${row.termLabel} | ${course} | ${credits} | ${plansCell} | ${distributives} |`;
-          })
-          .join("\n")
-      : "| — | — | — | — | — | — |";
-
-    return `${header}\n${rows}`;
-  }, [scheduleRows]);
-
-  const csvContent = useMemo(() => {
-    const header = "Academic Year,Term,Course Code,Course Name,Credits,Plans,Distributives";
-    const body = scheduleRows
-      .map((row) =>
-        [
-          escapeCsvValue(row.academicYear),
-          escapeCsvValue(row.termLabel),
-          escapeCsvValue(row.courseCode),
-          escapeCsvValue(row.courseName),
-          escapeCsvValue(row.credits),
-          escapeCsvValue(row.plans),
-          escapeCsvValue(row.distributives),
-        ].join(","),
-      )
-      .join("\n");
-
-    return body ? `${header}\n${body}` : `${header}\n`;
-  }, [scheduleRows]);
-
-  const fileName = useMemo(() => createFileName(degreeName, university), [degreeName, university]);
+  const scheduleRows = useMemo(() => buildScheduleRows(years, plans), [years, plans]);
+  const markdownTable = useMemo(() => buildMarkdownTable(scheduleRows), [scheduleRows]);
+  const csvContent = useMemo(() => buildCsvContent(scheduleRows), [scheduleRows]);
+  const fileName = useMemo(() => createScheduleFileName(degreeName, university), [degreeName, university]);
 
   const handleDownloadCsv = () => {
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${fileName}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    triggerCsvDownload(csvContent, fileName);
     toast({
       title: "CSV exported",
       description: "Check your downloads for the schedule export.",
