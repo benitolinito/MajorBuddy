@@ -66,6 +66,7 @@ const Index = () => {
     addPlan,
     updatePlan,
     removePlan,
+    resetPlannerState,
     applySnapshot,
     configurePlanner,
     hasConfig,
@@ -202,6 +203,7 @@ const Index = () => {
 
   const handleSignOut = async () => {
     await signOut();
+    resetPlannerState();
     navigate('/', { replace: true });
   };
 

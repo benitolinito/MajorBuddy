@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { Database, Palette, User } from 'lucide-react';
+import { Database, Info, Palette, User } from 'lucide-react';
 
 type ProfileDialogProps = {
   open: boolean;
@@ -76,6 +76,10 @@ export const ProfileDialog = ({
               <TabsTrigger value="data" className="w-full justify-start gap-2">
                 <Database className="h-4 w-4" />
                 Data
+              </TabsTrigger>
+              <TabsTrigger value="about" className="w-full justify-start gap-2">
+                <Info className="h-4 w-4" />
+                About
               </TabsTrigger>
             </TabsList>
           </div>
@@ -237,6 +241,23 @@ export const ProfileDialog = ({
                         }
                       />
                     </div>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="about" className="mt-0">
+              <div className="space-y-4">
+                <div className="rounded-xl border border-border bg-muted/30 p-4">
+                  <p className="text-sm font-semibold text-foreground">Policies</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Review how we handle terms and privacy.</p>
+                  <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                    <Button asChild variant="outline" className="justify-start sm:justify-center">
+                      <a href="/terms">Terms of Service</a>
+                    </Button>
+                    <Button asChild variant="outline" className="justify-start sm:justify-center">
+                      <a href="/privacy">Privacy Policy</a>
+                    </Button>
                   </div>
                 </div>
               </div>

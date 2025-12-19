@@ -10,7 +10,6 @@ import {
   PlannerPlan,
   PlanType,
   NewCourseInput,
-  PlanProfile,
   PlanInput,
 } from '@/types/planner';
 import { getDefaultColorId, normalizeColorHex } from '@/lib/tagColors';
@@ -780,6 +779,24 @@ const usePlanProfilesManager = ({
     [],
   );
 
+  const resetPlanProfiles = useCallback(
+    (payload: {
+      planProfiles: PlanProfile[];
+      activePlanProfileId: string;
+      profileSnapshots: Map<string, PlannerState>;
+      nextState: PlannerState;
+      hasConfig: boolean;
+    }) => {
+      profileSnapshotsRef.current = new Map(payload.profileSnapshots);
+      latestStateRef.current = clonePlannerState(payload.nextState);
+      setPlanProfiles(payload.planProfiles);
+      setActivePlanProfileId(payload.activePlanProfileId);
+      setPlannerState(clonePlannerState(payload.nextState));
+      setHasConfig(payload.hasConfig);
+    },
+    [setHasConfig, setPlannerState],
+  );
+
   return {
     planProfiles,
     activePlanProfileId,
@@ -788,6 +805,7 @@ const usePlanProfilesManager = ({
     renamePlanProfile,
     deletePlanProfile,
     getCoursePlacement,
+    resetPlanProfiles,
   };
 };
 
@@ -1362,6 +1380,18 @@ export const usePlanner = () => {
     });
   }, []);
 
+  const resetPlannerState = useCallback(() => {
+    clearPlannerStorage();
+    const fresh = buildInitialPlanner();
+    resetPlanProfiles({
+      planProfiles: fresh.planProfiles,
+      activePlanProfileId: fresh.activePlanProfileId,
+      profileSnapshots: fresh.profileSnapshots,
+      nextState: fresh.state,
+      hasConfig: Boolean(fresh.hasConfig),
+    });
+  }, [resetPlanProfiles]);
+
   const applySnapshot = useCallback((snapshot: PlannerState) => {
     const defaults = createDefaultConfig();
     const storedConfig = loadStoredConfig();
@@ -1502,6 +1532,7 @@ export const usePlanner = () => {
     colorPalette: state.colorPalette,
     addColorToPalette,
     reset,
+    resetPlannerState,
     applySnapshot,
     configurePlanner,
     hasConfig,
