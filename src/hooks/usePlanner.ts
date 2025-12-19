@@ -821,6 +821,7 @@ export const usePlanner = () => {
     createPlanProfile,
     renamePlanProfile,
     deletePlanProfile,
+    resetPlanProfiles,
     getCoursePlacement,
   } = usePlanProfilesManager({
     initialPlanProfiles: initialLoad.planProfiles,

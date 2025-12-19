@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type CSSProperties, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { CourseCatalog } from '@/components/CourseCatalog';
 import { PlannerHeader } from '@/components/PlannerHeader';
 import { YearSection } from '@/components/YearSection';
@@ -13,7 +13,7 @@ import { ExportScheduleDialog } from '@/components/ExportScheduleDialog';
 import { SharePlanDialog } from '@/components/SharePlanDialog';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
-import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks, PenLine, Wrench, Download, Link2 } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks, PenLine } from 'lucide-react';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { cn } from '@/lib/utils';
 import { AuthDialog } from '@/components/AuthDialog';
@@ -25,6 +25,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/components/ui/sonner';
 import { DEFAULT_PLAN_NAME } from '@/lib/plannerProfiles';
+import { consumeSharedImport } from '@/lib/shareImport';
+import { ShareLinkAccess } from '@/lib/sharePlanStore';
 
 type PlannerStats = {
   totalCredits: number;
@@ -38,6 +40,7 @@ const SIDE_PANEL_TRANSITION: CSSProperties = {
 };
 
 const Index = () => {
+  const location = useLocation();
   const navigate = useNavigate();
   const {
     state,
@@ -112,6 +115,7 @@ const Index = () => {
   } | null>(null);
   const [courseActionTarget, setCourseActionTarget] = useState('');
   const [courseActionMode, setCourseActionMode] = useState<'move' | 'copy'>('move');
+  const shareImportApplied = useRef(false);
   const userLabel = user?.displayName || user?.email || undefined;
   const cloudBusy = cloudSaving || cloudLoading || authBusy;
   const canRemoveYear = state.years.length > 1;
@@ -347,6 +351,36 @@ const Index = () => {
     setDuplicatePrompt(null);
   };
 
+  useEffect(() => {
+    if (shareImportApplied.current) return;
+
+    const navState = (location.state as {
+      sharedSnapshot?: PlannerState;
+      sharePlanName?: string | null;
+      shareId?: string | null;
+      shareLinkAccess?: ShareLinkAccess;
+    } | null) ?? null;
+
+    const candidateFromState = navState?.sharedSnapshot
+      ? {
+          snapshot: navState.sharedSnapshot,
+          planName: navState.sharePlanName ?? null,
+          shareId: navState.shareId ?? null,
+          linkAccess: navState.shareLinkAccess,
+        }
+      : null;
+
+    const candidate = candidateFromState ?? consumeSharedImport();
+    if (!candidate) return;
+
+    applySnapshot(candidate.snapshot);
+    shareImportApplied.current = true;
+
+    toast('Shared plan loaded', {
+      description: candidate.planName ? `Viewing "${candidate.planName}"` : 'Viewing shared plan.',
+    });
+  }, [applySnapshot, location.state]);
+
   return (
     <div
       className="min-h-screen bg-background"
@@ -580,35 +614,6 @@ const CollapsedRail = ({ side, ariaLabel, onExpand }: CollapsedRailProps) => (
 
 type MobilePane = 'plan' | 'library' | 'requirements';
 
-type MobilePlanOverviewProps = {
-  onOpenExport: () => void;
-  onShareSchedule?: () => void;
-};
-
-const MobilePlanOverview = ({ onOpenExport, onShareSchedule }: MobilePlanOverviewProps) => (
-  <div className="rounded-2xl border border-border/80 bg-card/90 p-3 shadow-[0_28px_45px_-30px_rgba(15,23,42,0.55)]">
-    <div className="grid grid-cols-2 gap-2">
-      <Button
-        type="button"
-        className="h-11 rounded-xl"
-        onClick={onOpenExport}
-      >
-        <Download className="mr-2 h-4 w-4" />
-        Export schedule
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        className="h-11 rounded-xl"
-        onClick={onShareSchedule}
-      >
-        <Link2 className="mr-2 h-4 w-4" />
-        Share schedule
-      </Button>
-    </div>
-  </div>
-);
-
 const MOBILE_TABS: { id: MobilePane; label: string }[] = [
   { id: 'plan', label: 'Plan' },
   { id: 'library', label: 'Library' },
@@ -650,23 +655,6 @@ const MobilePaneSwitch = ({ activePane, onSelectPane }: MobilePaneSwitchProps) =
       })}
     </div>
   </div>
-);
-
-const MobileConfigurationButton = ({ onOpenSettings }: { onOpenSettings: () => void }) => (
-  <button
-    type="button"
-    onClick={onOpenSettings}
-    className="flex w-full items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3 text-left shadow-sm transition hover:border-primary/40"
-  >
-    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted/70 text-foreground">
-      <Wrench className="h-5 w-5" aria-hidden />
-    </span>
-    <span className="flex flex-1 flex-col">
-      <span className="text-sm font-semibold text-foreground">Configuration</span>
-      <span className="text-xs text-muted-foreground">Adjust plan defaults, terms, and catalog.</span>
-    </span>
-    <ChevronsRight className="h-4 w-4 text-muted-foreground" aria-hidden />
-  </button>
 );
 
 type MobileYearNavigatorProps = {
@@ -814,14 +802,9 @@ const MobilePlannerLayout = ({
   return (
     <>
       <div className="relative min-h-screen pb-28">
-        <div className="sticky top-0 z-40 border-b border-border/70 bg-background/95 backdrop-blur">
+        <div className="border-b border-border/70 bg-background/95">
           <PlannerHeader {...headerProps} sticky={false} isMobile />
           <div className="space-y-4 px-4 pb-4 pt-3">
-            <MobilePlanOverview
-              onOpenExport={onOpenExport}
-              onShareSchedule={onOpenShare}
-            />
-            <MobileConfigurationButton onOpenSettings={onOpenSettings} />
             <MobilePaneSwitch activePane={activePane} onSelectPane={setActivePane} />
             {activePane === 'plan' && (
               <MobileYearNavigator
