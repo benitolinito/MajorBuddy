@@ -659,6 +659,7 @@ const Index = () => {
         <MobilePlannerLayout
           headerProps={plannerHeaderProps}
           state={state}
+          distributiveColors={distributiveColorMap}
           termSystem={termSystem}
           stats={stats}
           canRemoveYear={canRemoveYear}
@@ -838,6 +839,7 @@ const MobileYearNavigator = ({ years, activeYearId, onSelectYear, onAddYear }: M
 type MobilePlannerLayoutProps = {
   headerProps: PlannerHeaderSharedProps;
   state: PlannerState;
+  distributiveColors: Record<string, string | null>;
   termSystem: TermSystem;
   stats: PlannerStats;
   canRemoveYear: boolean;
@@ -869,6 +871,7 @@ type MobilePlannerLayoutProps = {
 const MobilePlannerLayout = ({
   headerProps,
   state,
+  distributiveColors,
   termSystem,
   stats,
   canRemoveYear,
@@ -972,7 +975,7 @@ const MobilePlannerLayout = ({
                       year={year}
                       getTermCredits={(termId) => getTermCredits(year.id, termId)}
                       plans={state.plans}
-                      distributiveColors={distributiveColorMap}
+                      distributiveColors={distributiveColors}
                       onRemoveCourse={(termId, courseId) => onRemoveCourse(year.id, termId, courseId)}
                       onDropCourse={(yearId, termId, course, options) => onDropCourse(yearId, termId, course, options)}
                       onAddTerm={() => onAddTerm(year.id)}
