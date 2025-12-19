@@ -201,11 +201,6 @@ export const TermCard = ({
   }, [term.courses]);
   const maxSummaryChips = isStacked ? 3 : 4;
   const summaryChips = [
-    {
-      key: 'credits',
-      label: `${credits} credits`,
-      className: 'bg-card text-foreground border border-border/70',
-    },
     ...termPlans.map((plan) => ({
       key: `plan-${plan.id}`,
       label: `${plan.type === 'major' ? 'Major' : 'Minor'} • ${plan.name}`,

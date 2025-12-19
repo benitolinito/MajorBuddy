@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, Copy, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, Settings, Sparkles, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -25,6 +26,10 @@ type PlanSwitcherProps = {
   onCreatePlan: (name: string, options?: { startBlank?: boolean }) => PlanProfile | void;
   onDeletePlan: (planId: string) => void;
   compact?: boolean;
+  variant?: 'default' | 'title';
+  className?: string;
+  fallbackLabel?: string;
+  onOpenSettings?: () => void;
 };
 
 export const PlanSwitcher = ({
@@ -34,12 +39,17 @@ export const PlanSwitcher = ({
   onCreatePlan,
   onDeletePlan,
   compact = false,
+  variant = 'default',
+  className,
+  fallbackLabel,
+  onOpenSettings,
 }: PlanSwitcherProps) => {
   const activePlan = useMemo(() => plans.find((plan) => plan.id === activePlanId), [plans, activePlanId]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [planName, setPlanName] = useState('');
   const [startBlank, setStartBlank] = useState(false);
-  const planLabel = activePlan?.name ?? 'Select a plan';
+  const planLabel = activePlan?.name?.trim() ? activePlan.name : fallbackLabel ?? 'Select a plan';
+  const isTitleVariant = variant === 'title';
 
   const defaultNewPlanName = useMemo(() => {
     if (activePlan?.name) return buildDuplicatePlanName(activePlan.name, plans);
@@ -64,19 +74,30 @@ export const PlanSwitcher = ({
     onDeletePlan(activePlanId);
   };
 
+  const triggerClasses = cn(
+    'inline-flex items-center gap-2 truncate',
+    compact && !isTitleVariant ? 'max-w-[200px] justify-between' : 'w-full justify-between',
+    isTitleVariant
+      ? 'h-11 rounded-none border-0 bg-transparent px-4 py-2 text-base font-semibold text-foreground shadow-none hover:bg-transparent focus-visible:ring-0 sm:text-lg'
+      : 'h-9'
+  );
+
+  const dropdownAlign = compact && !isTitleVariant ? 'end' : 'start';
+  const dropdownOffset = isTitleVariant ? 4 : 8;
+
   const dropdown = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="outline"
+          variant={isTitleVariant ? 'ghost' : 'outline'}
           size="sm"
-          className={compact ? 'max-w-[200px] justify-between' : 'w-full justify-between'}
+          className={triggerClasses}
         >
           <span className="min-w-0 flex-1 truncate text-left">{planLabel}</span>
           <ChevronDown className="h-4 w-4" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-72" align={compact ? 'end' : 'start'} sideOffset={8}>
+      <DropdownMenuContent className="w-72" align={dropdownAlign} sideOffset={dropdownOffset}>
         <DropdownMenuLabel>Saved plans</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup value={activePlanId} onValueChange={onSelectPlan}>
@@ -166,17 +187,47 @@ export const PlanSwitcher = ({
       </Dialog>
   );
 
+  if (isTitleVariant) {
+    return (
+      <>
+        <div
+          className={cn(
+            'inline-flex w-full max-w-full items-stretch overflow-hidden rounded-xl border border-border bg-card/80 shadow-sm',
+            className,
+          )}
+        >
+          <div className="flex-1 min-w-0">{dropdown}</div>
+          {onOpenSettings && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11 rounded-none border-l border-border/70 text-muted-foreground hover:bg-accent"
+              aria-label="Open planner settings"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenSettings();
+              }}
+            >
+              <Settings className="h-4 w-4" aria-hidden />
+            </Button>
+          )}
+        </div>
+        {dialog}
+      </>
+    );
+  }
+
   if (compact) {
     return (
       <>
-        <div className="flex items-center justify-end gap-2">{dropdown}</div>
+        <div className={cn('flex items-center justify-end gap-2', className)}>{dropdown}</div>
         {dialog}
       </>
     );
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card/80 p-3 shadow-sm">
+    <div className={cn('rounded-lg border border-border bg-card/80 p-3 shadow-sm', className)}>
       <div className="space-y-1.5">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">My Plans</p>
         {dropdown}
