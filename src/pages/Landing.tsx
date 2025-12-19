@@ -109,6 +109,7 @@ const Landing = () => {
   const [showAuth, setShowAuth] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     return () => {
@@ -309,6 +310,26 @@ const Landing = () => {
             <MarketingWorkflow />
           </>
         )}
+
+        <footer className="border-t border-border/60 bg-background/80">
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-10 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">MajorBuddy</p>
+              <p className="mt-2 text-base text-foreground">Built for advisors and students.</p>
+            </div>
+            <nav aria-label="Legal" className="flex flex-wrap items-center gap-4 text-sm font-medium text-foreground">
+              <a className="transition-colors hover:text-primary" href="/terms">
+                Terms
+              </a>
+              <span aria-hidden="true" className="text-muted-foreground/60">
+                •
+              </span>
+              <a className="transition-colors hover:text-primary" href="/privacy">
+                Privacy
+              </a>
+            </nav>
+          </div>
+        </footer>
 
       </main>
     </>

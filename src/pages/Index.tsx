@@ -200,7 +200,7 @@ const Index = () => {
 
   const handleSignOut = async () => {
     await signOut();
-    window.location.reload();
+    navigate('/', { replace: true });
   };
 
   const deletingData = profileActionPending === 'delete-data';
