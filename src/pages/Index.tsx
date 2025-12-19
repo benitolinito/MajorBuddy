@@ -31,7 +31,7 @@ import { ShareLinkAccess } from '@/lib/sharePlanStore';
 
 type PlannerStats = {
   totalCredits: number;
-  planProgress: Record<string, { scheduled: number; total: number }>;
+  planProgress: Record<string, { scheduled: number; total: number; scheduledCredits: number }>;
 };
 
 type PlannerHeaderSharedProps = Omit<ComponentProps<typeof PlannerHeader>, 'isMobile' | 'sticky'>;

@@ -1426,9 +1426,9 @@ export const usePlanner = () => {
   }, []);
 
   const stats = useMemo(() => {
-    const planProgressMap = new Map<string, { scheduled: number; total: number }>();
+    const planProgressMap = new Map<string, { scheduled: number; total: number; scheduledCredits: number }>();
     state.plans.forEach((plan) => {
-      planProgressMap.set(plan.id, { scheduled: 0, total: 0 });
+      planProgressMap.set(plan.id, { scheduled: 0, total: 0, scheduledCredits: 0 });
     });
 
     state.courseCatalog.forEach((course) => {
@@ -1450,7 +1450,11 @@ export const usePlanner = () => {
           course.planIds.forEach((id) => {
             const entry = planProgressMap.get(id);
             if (!entry) return;
-            planProgressMap.set(id, { ...entry, scheduled: entry.scheduled + 1 });
+            planProgressMap.set(id, {
+              ...entry,
+              scheduled: entry.scheduled + 1,
+              scheduledCredits: entry.scheduledCredits + course.credits,
+            });
           });
         });
       });

@@ -2,7 +2,7 @@ import type { DragEvent } from 'react';
 import { X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Course, PlannerPlan } from '@/types/planner';
-import { getTagColorClasses } from '@/lib/tagColors';
+import { getTagColorClasses, getTagColorStyle } from '@/lib/tagColors';
 import { cn } from '@/lib/utils';
 
 interface CourseCardProps {

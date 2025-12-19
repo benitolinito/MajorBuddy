@@ -18,7 +18,7 @@ interface RequirementsProps {
   totalCredits: number;
   maxCredits: number;
   plans: PlannerPlan[];
-  planProgress: Record<string, { scheduled: number; total: number }>;
+  planProgress: Record<string, { scheduled: number; total: number; scheduledCredits: number }>;
   onAddPlan: (plan: PlanInput) => PlannerPlan | null;
   onUpdatePlan: (planId: string, plan: PlanInput) => void;
   onRemovePlan: (planId: string) => void;
@@ -173,8 +173,8 @@ export const RequirementsSidebar = ({
           </div>
         ) : (
           sortedPlans.map((plan) => {
-            const progress = planProgress[plan.id] ?? { scheduled: 0, total: 0 };
-            const { scheduled, total } = progress;
+            const progress = planProgress[plan.id] ?? { scheduled: 0, total: 0, scheduledCredits: 0 };
+            const { scheduled, total, scheduledCredits } = progress;
             const targetClasses =
               plan.classesNeeded && plan.classesNeeded > 0 ? plan.classesNeeded : total;
             const pct = targetClasses > 0 ? Math.min((scheduled / targetClasses) * 100, 100) : 0;
@@ -183,6 +183,10 @@ export const RequirementsSidebar = ({
             const accentClass = getTagAccentClass(plan.name, plan.color);
             const colorStyle = getTagColorStyle(plan.name, plan.color);
             const accentStyle = getTagAccentStyle(plan.name, plan.color);
+            const creditTarget = plan.requiredCredits && plan.requiredCredits > 0 ? plan.requiredCredits : null;
+            const creditPct = creditTarget
+              ? Math.min((scheduledCredits / creditTarget) * 100, 100)
+              : 0;
             return (
               <div
                 key={plan.id}
@@ -217,27 +221,11 @@ export const RequirementsSidebar = ({
                       </span>
                       <span className="text-base font-semibold text-foreground">{plan.name}</span>
                     </div>
-                    <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
-                      <span className="inline-flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" aria-hidden />
-                        Goal: {plan.classesNeeded ? `${plan.classesNeeded} classes` : 'Set a class goal'}
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" aria-hidden />
-                        Tagged: {total || 0}
-                      </span>
-                      {plan.requiredCredits ? (
-                        <span className="inline-flex items-center gap-1">
-                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" aria-hidden />
-                          Credits: {plan.requiredCredits}
-                        </span>
-                      ) : null}
-                    </div>
                   </div>
                 </div>
-                <div className="mt-4 space-y-1.5">
+                <div className="mt-4 space-y-3">
                   <div className="flex items-baseline justify-between">
-                    <span className="text-xs text-muted-foreground">Progress</span>
+                    <span className="text-xs text-muted-foreground">Class progress</span>
                     <span className="text-sm font-semibold text-foreground">
                       {scheduled}/{targetLabel}
                     </span>
@@ -252,6 +240,22 @@ export const RequirementsSidebar = ({
                     <p className="text-[11px] text-muted-foreground">Add a class goal to see progress here.</p>
                   ) : scheduled > 0 ? (
                     <p className="text-[11px] text-muted-foreground">{`${scheduled} tagged from your library.`}</p>
+                  ) : null}
+                  {creditTarget ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xs text-muted-foreground">Credit progress</span>
+                        <span className="text-sm font-semibold text-foreground">
+                          {scheduledCredits}/{creditTarget}
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-muted/80">
+                        <div
+                          className={`h-full rounded-full transition-all ${accentClass || 'bg-primary'}`}
+                          style={{ width: `${creditPct}%`, ...(accentStyle ?? {}), opacity: 0.9 }}
+                        />
+                      </div>
+                    </div>
                   ) : null}
                 </div>
               </div>

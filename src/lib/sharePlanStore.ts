@@ -46,8 +46,7 @@ export const upsertShareRecord = async ({ ownerId, planName, snapshot, planProfi
     planName,
     linkAccess,
     snapshot: sanitizeSnapshot(snapshot),
-    ...(shareId ? {} : { invites: [] }),
-    createdAt: serverTimestamp(),
+    ...(shareId ? {} : { invites: [], createdAt: serverTimestamp() }),
     updatedAt: serverTimestamp(),
   }, { merge: Boolean(shareId) });
   return resolvedShareId;
