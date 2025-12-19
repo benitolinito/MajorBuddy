@@ -23,7 +23,6 @@ interface PlannerHeaderProps {
   activePlanProfileId?: string;
   onSelectPlanProfile?: (planId: string) => void;
   onCreatePlanProfile?: (name: string, options?: { startBlank?: boolean }) => PlanProfile | void;
-  onRenamePlanProfile?: (planId: string, name: string) => void;
   onDeletePlanProfile?: (planId: string) => void;
 }
 
@@ -45,18 +44,13 @@ export const PlannerHeader = ({
   activePlanProfileId,
   onSelectPlanProfile,
   onCreatePlanProfile,
-  onRenamePlanProfile,
   onDeletePlanProfile,
 }: PlannerHeaderProps) => {
   const showAuth = Boolean(onSignIn || onSignOut);
   const signedIn = Boolean(userLabel);
   const authAction = signedIn ? onSignOut : onSignIn;
   const handlersReady =
-    planProfiles &&
-    onSelectPlanProfile &&
-    onCreatePlanProfile &&
-    onRenamePlanProfile &&
-    onDeletePlanProfile;
+    planProfiles && onSelectPlanProfile && onCreatePlanProfile && onDeletePlanProfile;
   const activePlanProfile =
     planProfiles && activePlanProfileId ? planProfiles.find((plan) => plan.id === activePlanProfileId) : null;
   const planVariantLabel =
@@ -95,7 +89,6 @@ export const PlannerHeader = ({
                   activePlanId={activePlanProfileId ?? planProfiles![0]?.id ?? ''}
                   onSelectPlan={onSelectPlanProfile!}
                   onCreatePlan={onCreatePlanProfile!}
-                  onRenamePlan={onRenamePlanProfile!}
                   onDeletePlan={onDeletePlanProfile!}
                   compact
                 />
@@ -162,7 +155,6 @@ export const PlannerHeader = ({
                   activePlanId={activePlanProfileId ?? planProfiles[0]?.id ?? ''}
                   onSelectPlan={onSelectPlanProfile}
                   onCreatePlan={onCreatePlanProfile}
-                  onRenamePlan={onRenamePlanProfile}
                   onDeletePlan={onDeletePlanProfile}
                   compact
                 />

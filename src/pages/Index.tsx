@@ -1,15 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { CourseCatalog } from '@/components/CourseCatalog';
 import { PlannerHeader } from '@/components/PlannerHeader';
 import { YearSection } from '@/components/YearSection';
 import { RequirementsSidebar } from '@/components/RequirementsSidebar';
 import { usePlanner } from '@/hooks/usePlanner';
 import { useCloudPlanner } from '@/hooks/useCloudPlanner';
-import { Course, CourseDropOptions } from '@/types/planner';
+import { Course, CourseDropOptions, PlannerConfig, PlannerState, PlanInput, PlannerPlan, NewCourseInput } from '@/types/planner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlannerSetupDialog } from '@/components/PlannerSetupDialog';
 import { ExportScheduleDialog } from '@/components/ExportScheduleDialog';
-import { PlannerConfig } from '@/types/planner';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
 import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks, Download, Settings } from 'lucide-react';
@@ -23,6 +22,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/components/ui/sonner';
 import { DEFAULT_PLAN_NAME } from '@/lib/plannerProfiles';
+
+type PlannerStats = {
+  totalCredits: number;
+  planProgress: Record<string, { scheduled: number; total: number }>;
+};
+
+type PlannerHeaderSharedProps = Omit<ComponentProps<typeof PlannerHeader>, 'isMobile' | 'sticky'>;
 
 const Index = () => {
   const {
@@ -71,18 +77,10 @@ const Index = () => {
     applySnapshot,
   });
 
-  const catalogPanelRef = useRef<ImperativePanelHandle>(null);
-  const requirementsPanelRef = useRef<ImperativePanelHandle>(null);
-
-  const [catalogCollapsed, setCatalogCollapsed] = useState(false);
-  const [requirementsCollapsed, setRequirementsCollapsed] = useState(false);
   const [, setDraggedCourse] = useState<Course | null>(null);
   const [showSetup, setShowSetup] = useState(!hasConfig);
   const [showExport, setShowExport] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [libraryOpen, setLibraryOpen] = useState(false);
-  const [requirementsOpen, setRequirementsOpen] = useState(false);
-  const [activeMobileYear, setActiveMobileYear] = useState(() => state.years[0]?.id ?? "");
   const [duplicatePrompt, setDuplicatePrompt] = useState<{
     course: Course;
     placement: { yearName: string; termName: string; termYear: number };
@@ -92,7 +90,6 @@ const Index = () => {
   } | null>(null);
   const [quickAddCourse, setQuickAddCourse] = useState<Course | null>(null);
   const [quickAddTarget, setQuickAddTarget] = useState('');
-  const [catalogAddTrigger, setCatalogAddTrigger] = useState(0);
   const [courseActionPrompt, setCourseActionPrompt] = useState<{
     course: Course;
     yearId: string;
@@ -129,6 +126,29 @@ const Index = () => {
     (courseActionMode === 'move' &&
       courseActionPrompt &&
       courseActionTarget === `${courseActionPrompt.yearId}:${courseActionPrompt.termId}`);
+
+  const handleOpenAuth = () => setShowAuth(true);
+  const handleOpenSettings = () => setShowSetup(true);
+  const handleOpenExport = () => setShowExport(true);
+
+  const plannerHeaderProps: PlannerHeaderSharedProps = {
+    degreeName: plannerTitle,
+    university: state.university,
+    classYear: state.classYear,
+    onReset: reset,
+    userLabel,
+    cloudStatus,
+    cloudBusy,
+    onSignIn: handleOpenAuth,
+    onSignOut: signOut,
+    onOpenSettings: handleOpenSettings,
+    onOpenExport: handleOpenExport,
+    planProfiles,
+    activePlanProfileId,
+    onSelectPlanProfile: selectPlanProfile,
+    onCreatePlanProfile: createPlanProfile,
+    onDeletePlanProfile: deletePlanProfile,
+  };
 
   const handleDragStart = (course: Course) => {
     setDraggedCourse(course);
@@ -190,11 +210,6 @@ const Index = () => {
     handleDropCourse(targetYearId, targetTermId, quickAddCourse);
     setQuickAddCourse(null);
     setQuickAddTarget('');
-  };
-
-  const handleStartAddClass = () => {
-    setLibraryOpen(true);
-    setCatalogAddTrigger(Date.now());
   };
 
   const handleRequestCourseAction = (payload: { course: Course; yearId: string; termId: string }) => {
@@ -443,243 +458,57 @@ const Index = () => {
               Add a year or term to choose a destination for {courseActionCourseLabel}.
             </p>
           )}
-        </DialogContent>
-      </Dialog>
+      </DialogContent>
+    </Dialog>
 
       {isMobile ? (
-        <>
-          <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-            <PlannerHeader
-              degreeName={plannerTitle}
-              university={state.university}
-              classYear={state.classYear}
-              onReset={reset}
-              userLabel={userLabel}
-              cloudStatus={cloudStatus}
-              cloudBusy={cloudBusy}
-              onSignIn={() => setShowAuth(true)}
-              onSignOut={signOut}
-              onOpenSettings={() => setShowSetup(true)}
-              onOpenExport={() => setShowExport(true)}
-              sticky={false}
-              isMobile
-              planProfiles={planProfiles}
-              activePlanProfileId={activePlanProfileId}
-              onSelectPlanProfile={selectPlanProfile}
-              onCreatePlanProfile={createPlanProfile}
-              onRenamePlanProfile={renamePlanProfile}
-              onDeletePlanProfile={deletePlanProfile}
-            />
-            <MobileYearNavigator
-              years={state.years}
-              activeYearId={activeMobileYear}
-              onSelectYear={(yearId) => setActiveMobileYear(yearId)}
-            />
-          </div>
-          <div className="space-y-4 px-4 py-4 pb-44">
-            <div className="space-y-6">
-              {state.years
-                .filter((year) => !activeMobileYear || year.id === activeMobileYear)
-                .map((year) => (
-                  <YearSection
-                    key={year.id}
-                    year={year}
-                    getTermCredits={(termId) => getTermCredits(year.id, termId)}
-                    plans={state.plans}
-                    onRemoveCourse={(termId, courseId) => removeCourse(year.id, termId, courseId)}
-                    onDropCourse={handleDropCourse}
-                    onAddTerm={() => addTerm(year.id)}
-                    onRemoveTerm={(termId) => removeTerm(year.id, termId)}
-                    onRemoveYear={() => removeYear(year.id)}
-                    canRemoveYear={canRemoveYear}
-                    onRequestCourseAction={handleRequestCourseAction}
-                  />
-                ))}
-            </div>
-          </div>
-
-          <Sheet open={libraryOpen} onOpenChange={setLibraryOpen}>
-            <SheetContent side="bottom" className="h-[90vh] overflow-y-auto px-2">
-              <SheetHeader className="pb-2 text-left">
-                <SheetTitle>Class Library</SheetTitle>
-                <SheetDescription>Browse and edit your saved courses.</SheetDescription>
-              </SheetHeader>
-              <div className="pb-6">
-                <CourseCatalog
-                  courses={state.courseCatalog}
-                  distributives={state.distributives}
-                  plans={state.plans}
-                  planProfiles={planProfiles}
-                  activePlanProfileId={activePlanProfileId}
-                  onDragStart={handleDragStart}
-                  onCreateCourse={addCourseToCatalog}
-                  onUpdateCourse={updateCourseInCatalog}
-                  onRemoveCourse={removeCourseFromCatalog}
-                  onCreateDistributive={addDistributive}
-                  onCreatePlanProfile={createPlanProfile}
-                  onSelectPlanProfile={selectPlanProfile}
-                  onRenamePlanProfile={renamePlanProfile}
-                  onDeletePlanProfile={deletePlanProfile}
-                  onCollapsePanel={() => setLibraryOpen(false)}
-                  isMobile
-                  onQuickAddCourse={handleQuickAddRequest}
-                  addCourseTrigger={catalogAddTrigger}
-                />
-              </div>
-            </SheetContent>
-          </Sheet>
-
-          <Sheet open={requirementsOpen} onOpenChange={setRequirementsOpen}>
-            <SheetContent side="bottom" className="h-[85vh] overflow-y-auto px-4">
-              <SheetHeader className="pb-2 text-left">
-                <SheetTitle>Requirements</SheetTitle>
-                <SheetDescription>Track majors, minors, and distributives.</SheetDescription>
-              </SheetHeader>
-              <RequirementsSidebar
-                totalCredits={stats.totalCredits}
-                maxCredits={state.requirements.totalCredits}
-                plans={state.plans}
-                planProgress={stats.planProgress}
-                onAddPlan={addPlan}
-                onUpdatePlan={updatePlan}
-                onRemovePlan={removePlan}
-                onCollapsePanel={() => setRequirementsOpen(false)}
-                isMobile
-              />
-            </SheetContent>
-          </Sheet>
-          <MobilePlannerToolbar
-            onOpenLibrary={() => setLibraryOpen(true)}
-            onOpenRequirements={() => setRequirementsOpen(true)}
-            onAddYear={addYear}
-            onAddClass={handleStartAddClass}
-            onOpenExport={() => setShowExport(true)}
-            onOpenSettings={() => setShowSetup(true)}
-          />
-        </>
+        <MobilePlannerLayout
+          headerProps={plannerHeaderProps}
+          state={state}
+          stats={stats}
+          canRemoveYear={canRemoveYear}
+          getTermCredits={getTermCredits}
+          onRemoveCourse={removeCourse}
+          onDropCourse={handleDropCourse}
+          onAddTerm={addTerm}
+          onRemoveTerm={removeTerm}
+          onRemoveYear={removeYear}
+          onRequestCourseAction={handleRequestCourseAction}
+          onQuickAddCourse={handleQuickAddRequest}
+          onAddPlan={addPlan}
+          onUpdatePlan={updatePlan}
+          onRemovePlan={removePlan}
+          onAddYear={addYear}
+          addCourseToCatalog={addCourseToCatalog}
+          updateCourseInCatalog={updateCourseInCatalog}
+          removeCourseFromCatalog={removeCourseFromCatalog}
+          addDistributive={addDistributive}
+          onDragStart={handleDragStart}
+          onOpenExport={handleOpenExport}
+          onOpenSettings={handleOpenSettings}
+        />
       ) : (
-      <ResizablePanelGroup direction="horizontal" className="h-screen w-full">
-        <ResizablePanel
-          ref={catalogPanelRef}
-          defaultSize={22}
-          minSize={18}
-          maxSize={35}
-          collapsible
-          collapsedSize={1.5}
-          onCollapse={() => setCatalogCollapsed(true)}
-          onExpand={() => setCatalogCollapsed(false)}
-        >
-          {catalogCollapsed ? (
-            <CollapsedRail side="left" ariaLabel="Expand class library" onExpand={() => catalogPanelRef.current?.expand()} />
-          ) : (
-            <CourseCatalog 
-              courses={state.courseCatalog} 
-              distributives={state.distributives}
-              plans={state.plans}
-              planProfiles={planProfiles}
-              activePlanProfileId={activePlanProfileId}
-              onDragStart={handleDragStart}
-              onCreateCourse={addCourseToCatalog}
-              onUpdateCourse={updateCourseInCatalog}
-              onRemoveCourse={removeCourseFromCatalog}
-              onCreateDistributive={addDistributive}
-              onCreatePlanProfile={createPlanProfile}
-              onSelectPlanProfile={selectPlanProfile}
-              onRenamePlanProfile={renamePlanProfile}
-              onDeletePlanProfile={deletePlanProfile}
-              onCollapsePanel={() => catalogPanelRef.current?.collapse()}
-              addCourseTrigger={catalogAddTrigger}
-            />
-          )}
-        </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={78} minSize={50}>
-          <div className="flex h-screen flex-col">
-            <PlannerHeader
-              degreeName={plannerTitle}
-              university={state.university}
-              classYear={state.classYear}
-              onReset={reset}
-              userLabel={userLabel}
-              cloudStatus={cloudStatus}
-              cloudBusy={cloudBusy}
-              onSignIn={() => setShowAuth(true)}
-              onSignOut={signOut}
-              onOpenSettings={() => setShowSetup(true)}
-              onOpenExport={() => setShowExport(true)}
-              planProfiles={planProfiles}
-              activePlanProfileId={activePlanProfileId}
-              onSelectPlanProfile={selectPlanProfile}
-              onCreatePlanProfile={createPlanProfile}
-              onRenamePlanProfile={renamePlanProfile}
-              onDeletePlanProfile={deletePlanProfile}
-            />
-            
-            <ResizablePanelGroup direction="horizontal" className="flex-1">
-              <ResizablePanel minSize={55}>
-                <ScrollArea className="h-full px-6 py-6">
-                  <div className="w-max min-w-full space-y-8 pr-6">
-                    {state.years.map((year) => (
-                      <YearSection
-                        key={year.id}
-                        year={year}
-                        getTermCredits={(termId) => getTermCredits(year.id, termId)}
-                        plans={state.plans}
-                        onRemoveCourse={(termId, courseId) => removeCourse(year.id, termId, courseId)}
-                        onDropCourse={handleDropCourse}
-                        onAddTerm={() => addTerm(year.id)}
-                        onRemoveTerm={(termId) => removeTerm(year.id, termId)}
-                        onRemoveYear={() => removeYear(year.id)}
-                        canRemoveYear={canRemoveYear}
-                      />
-                    ))}
-                    <div className="flex pt-2">
-                      <Button
-                        variant="outline"
-                        className="border-dashed"
-                        onClick={addYear}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add another academic year
-                      </Button>
-                    </div>
-                  </div>
-                </ScrollArea>
-              </ResizablePanel>
-              
-              <ResizableHandle withHandle />
-              
-              <ResizablePanel
-                ref={requirementsPanelRef}
-                defaultSize={24}
-                minSize={18}
-                maxSize={32}
-                collapsible
-                collapsedSize={1.5}
-                onCollapse={() => setRequirementsCollapsed(true)}
-                onExpand={() => setRequirementsCollapsed(false)}
-              >
-                {requirementsCollapsed ? (
-                  <CollapsedRail side="right" ariaLabel="Expand requirements" onExpand={() => requirementsPanelRef.current?.expand()} />
-                ) : (
-                  <aside className="h-full border-l border-border bg-card/30 p-6 overflow-y-auto">
-                    <RequirementsSidebar
-                      totalCredits={stats.totalCredits}
-                      maxCredits={state.requirements.totalCredits}
-                      plans={state.plans}
-                      planProgress={stats.planProgress}
-                      onAddPlan={addPlan}
-                      onUpdatePlan={updatePlan}
-                      onRemovePlan={removePlan}
-                      onCollapsePanel={() => requirementsPanelRef.current?.collapse()}
-                    />
-                  </aside>
-                )}
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        <DesktopPlannerLayout
+          headerProps={plannerHeaderProps}
+          state={state}
+          stats={stats}
+          canRemoveYear={canRemoveYear}
+          getTermCredits={getTermCredits}
+          onRemoveCourse={removeCourse}
+          onDropCourse={handleDropCourse}
+          onAddTerm={addTerm}
+          onRemoveTerm={removeTerm}
+          onRemoveYear={removeYear}
+          onAddPlan={addPlan}
+          onUpdatePlan={updatePlan}
+          onRemovePlan={removePlan}
+          onAddYear={addYear}
+          addCourseToCatalog={addCourseToCatalog}
+          updateCourseInCatalog={updateCourseInCatalog}
+          removeCourseFromCatalog={removeCourseFromCatalog}
+          addDistributive={addDistributive}
+          onDragStart={handleDragStart}
+        />
       )}
     </div>
   );
@@ -793,5 +622,298 @@ const MobileYearNavigator = ({ years, activeYearId, onSelectYear }: MobileYearNa
     </div>
   </div>
 );
+
+type MobilePlannerLayoutProps = {
+  headerProps: PlannerHeaderSharedProps;
+  state: PlannerState;
+  stats: PlannerStats;
+  canRemoveYear: boolean;
+  getTermCredits: (yearId: string, termId: string) => number;
+  onRemoveCourse: (yearId: string, termId: string, courseId: string) => void;
+  onDropCourse: (yearId: string, termId: string, course: Course, options?: CourseDropOptions) => void;
+  onAddTerm: (yearId: string) => void;
+  onRemoveTerm: (yearId: string, termId: string) => void;
+  onRemoveYear: (yearId: string) => void;
+  onRequestCourseAction: (payload: { course: Course; yearId: string; termId: string }) => void;
+  onQuickAddCourse: (course: Course) => void;
+  onAddPlan: (plan: PlanInput) => PlannerPlan | null;
+  onUpdatePlan: (planId: string, plan: PlanInput) => void;
+  onRemovePlan: (planId: string) => void;
+  onAddYear: () => void;
+  addCourseToCatalog: (course: NewCourseInput) => Course;
+  updateCourseInCatalog: (courseId: string, course: NewCourseInput) => void;
+  removeCourseFromCatalog: (courseId: string) => void;
+  addDistributive: (label: string) => string;
+  onDragStart: (course: Course) => void;
+  onOpenExport: () => void;
+  onOpenSettings: () => void;
+};
+
+const MobilePlannerLayout = ({
+  headerProps,
+  state,
+  stats,
+  canRemoveYear,
+  getTermCredits,
+  onRemoveCourse,
+  onDropCourse,
+  onAddTerm,
+  onRemoveTerm,
+  onRemoveYear,
+  onRequestCourseAction,
+  onQuickAddCourse,
+  onAddPlan,
+  onUpdatePlan,
+  onRemovePlan,
+  onAddYear,
+  addCourseToCatalog,
+  updateCourseInCatalog,
+  removeCourseFromCatalog,
+  addDistributive,
+  onDragStart,
+  onOpenExport,
+  onOpenSettings,
+}: MobilePlannerLayoutProps) => {
+  const [activeYearId, setActiveYearId] = useState(() => state.years[0]?.id ?? '');
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [requirementsOpen, setRequirementsOpen] = useState(false);
+  const [catalogAddTrigger, setCatalogAddTrigger] = useState(0);
+
+  const handleLibraryOpenChange = (open: boolean) => {
+    setLibraryOpen(open);
+    if (!open) {
+      setCatalogAddTrigger(0);
+    }
+  };
+
+  const handleStartAddClass = () => {
+    setLibraryOpen(true);
+    setCatalogAddTrigger(Date.now());
+  };
+
+  return (
+    <>
+      <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+        <PlannerHeader {...headerProps} sticky={false} isMobile />
+        <MobileYearNavigator years={state.years} activeYearId={activeYearId} onSelectYear={setActiveYearId} />
+      </div>
+      <div className="space-y-4 px-4 py-4 pb-44">
+        <div className="space-y-6">
+          {state.years
+            .filter((year) => !activeYearId || year.id === activeYearId)
+            .map((year) => (
+              <YearSection
+                key={year.id}
+                year={year}
+                getTermCredits={(termId) => getTermCredits(year.id, termId)}
+                plans={state.plans}
+                onRemoveCourse={(termId, courseId) => onRemoveCourse(year.id, termId, courseId)}
+                onDropCourse={(yearId, termId, course, options) => onDropCourse(yearId, termId, course, options)}
+                onAddTerm={() => onAddTerm(year.id)}
+                onRemoveTerm={(termId) => onRemoveTerm(year.id, termId)}
+                onRemoveYear={() => onRemoveYear(year.id)}
+                canRemoveYear={canRemoveYear}
+                onRequestCourseAction={onRequestCourseAction}
+              />
+            ))}
+        </div>
+      </div>
+
+      <Sheet open={libraryOpen} onOpenChange={handleLibraryOpenChange}>
+        <SheetContent side="bottom" className="h-[90vh] overflow-y-auto px-2">
+          <SheetHeader className="pb-2 text-left">
+            <SheetTitle>Class Library</SheetTitle>
+            <SheetDescription>Browse and edit your saved courses.</SheetDescription>
+          </SheetHeader>
+          <div className="pb-6">
+            <CourseCatalog
+              courses={state.courseCatalog}
+              distributives={state.distributives}
+              plans={state.plans}
+              onDragStart={onDragStart}
+              onCreateCourse={addCourseToCatalog}
+              onUpdateCourse={updateCourseInCatalog}
+              onRemoveCourse={removeCourseFromCatalog}
+              onCreateDistributive={addDistributive}
+              onCollapsePanel={() => handleLibraryOpenChange(false)}
+              isMobile
+              onQuickAddCourse={onQuickAddCourse}
+              addCourseTrigger={catalogAddTrigger}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={requirementsOpen} onOpenChange={setRequirementsOpen}>
+        <SheetContent side="bottom" className="h-[85vh] overflow-y-auto px-4">
+          <SheetHeader className="pb-2 text-left">
+            <SheetTitle>Requirements</SheetTitle>
+            <SheetDescription>Track majors, minors, and distributives.</SheetDescription>
+          </SheetHeader>
+          <RequirementsSidebar
+            totalCredits={stats.totalCredits}
+            maxCredits={state.requirements.totalCredits}
+            plans={state.plans}
+            planProgress={stats.planProgress}
+            onAddPlan={onAddPlan}
+            onUpdatePlan={onUpdatePlan}
+            onRemovePlan={onRemovePlan}
+            onCollapsePanel={() => setRequirementsOpen(false)}
+            isMobile
+          />
+        </SheetContent>
+      </Sheet>
+      <MobilePlannerToolbar
+        onOpenLibrary={() => setLibraryOpen(true)}
+        onOpenRequirements={() => setRequirementsOpen(true)}
+        onAddYear={onAddYear}
+        onAddClass={handleStartAddClass}
+        onOpenExport={onOpenExport}
+        onOpenSettings={onOpenSettings}
+      />
+    </>
+  );
+};
+
+type DesktopPlannerLayoutProps = {
+  headerProps: PlannerHeaderSharedProps;
+  state: PlannerState;
+  stats: PlannerStats;
+  canRemoveYear: boolean;
+  getTermCredits: (yearId: string, termId: string) => number;
+  onRemoveCourse: (yearId: string, termId: string, courseId: string) => void;
+  onDropCourse: (yearId: string, termId: string, course: Course, options?: CourseDropOptions) => void;
+  onAddTerm: (yearId: string) => void;
+  onRemoveTerm: (yearId: string, termId: string) => void;
+  onRemoveYear: (yearId: string) => void;
+  onAddPlan: (plan: PlanInput) => PlannerPlan | null;
+  onUpdatePlan: (planId: string, plan: PlanInput) => void;
+  onRemovePlan: (planId: string) => void;
+  onAddYear: () => void;
+  addCourseToCatalog: (course: NewCourseInput) => Course;
+  updateCourseInCatalog: (courseId: string, course: NewCourseInput) => void;
+  removeCourseFromCatalog: (courseId: string) => void;
+  addDistributive: (label: string) => string;
+  onDragStart: (course: Course) => void;
+};
+
+const DesktopPlannerLayout = ({
+  headerProps,
+  state,
+  stats,
+  canRemoveYear,
+  getTermCredits,
+  onRemoveCourse,
+  onDropCourse,
+  onAddTerm,
+  onRemoveTerm,
+  onRemoveYear,
+  onAddPlan,
+  onUpdatePlan,
+  onRemovePlan,
+  onAddYear,
+  addCourseToCatalog,
+  updateCourseInCatalog,
+  removeCourseFromCatalog,
+  addDistributive,
+  onDragStart,
+}: DesktopPlannerLayoutProps) => {
+  const catalogPanelRef = useRef<ImperativePanelHandle>(null);
+  const requirementsPanelRef = useRef<ImperativePanelHandle>(null);
+  const [catalogCollapsed, setCatalogCollapsed] = useState(false);
+  const [requirementsCollapsed, setRequirementsCollapsed] = useState(false);
+
+  return (
+    <ResizablePanelGroup direction="horizontal" className="h-screen w-full">
+      <ResizablePanel
+        ref={catalogPanelRef}
+        defaultSize={22}
+        minSize={18}
+        maxSize={35}
+        collapsible
+        collapsedSize={1.5}
+        onCollapse={() => setCatalogCollapsed(true)}
+        onExpand={() => setCatalogCollapsed(false)}
+      >
+        {catalogCollapsed ? (
+          <CollapsedRail side="left" ariaLabel="Expand class library" onExpand={() => catalogPanelRef.current?.expand()} />
+        ) : (
+          <CourseCatalog
+            courses={state.courseCatalog}
+            distributives={state.distributives}
+            plans={state.plans}
+            onDragStart={onDragStart}
+            onCreateCourse={addCourseToCatalog}
+            onUpdateCourse={updateCourseInCatalog}
+            onRemoveCourse={removeCourseFromCatalog}
+            onCreateDistributive={addDistributive}
+            onCollapsePanel={() => catalogPanelRef.current?.collapse()}
+          />
+        )}
+      </ResizablePanel>
+      <ResizableHandle withHandle />
+      <ResizablePanel defaultSize={78} minSize={50}>
+        <div className="flex h-screen flex-col">
+          <PlannerHeader {...headerProps} />
+          <ResizablePanelGroup direction="horizontal" className="flex-1">
+            <ResizablePanel minSize={55}>
+              <ScrollArea className="h-full px-6 py-6">
+                <div className="w-max min-w-full space-y-8 pr-6">
+                  {state.years.map((year) => (
+                    <YearSection
+                      key={year.id}
+                      year={year}
+                      getTermCredits={(termId) => getTermCredits(year.id, termId)}
+                      plans={state.plans}
+                      onRemoveCourse={(termId, courseId) => onRemoveCourse(year.id, termId, courseId)}
+                      onDropCourse={(yearId, termId, course, options) => onDropCourse(yearId, termId, course, options)}
+                      onAddTerm={() => onAddTerm(year.id)}
+                      onRemoveTerm={(termId) => onRemoveTerm(year.id, termId)}
+                      onRemoveYear={() => onRemoveYear(year.id)}
+                      canRemoveYear={canRemoveYear}
+                    />
+                  ))}
+                  <div className="flex pt-2">
+                    <Button variant="outline" className="border-dashed" onClick={onAddYear}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add another academic year
+                    </Button>
+                  </div>
+                </div>
+              </ScrollArea>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel
+              ref={requirementsPanelRef}
+              defaultSize={22}
+              minSize={18}
+              collapsible
+              collapsedSize={2}
+              onCollapse={() => setRequirementsCollapsed(true)}
+              onExpand={() => setRequirementsCollapsed(false)}
+            >
+              {requirementsCollapsed ? (
+                <CollapsedRail side="right" ariaLabel="Expand requirements" onExpand={() => requirementsPanelRef.current?.expand()} />
+              ) : (
+                <aside className="h-full border-l border-border bg-card/30 p-6 overflow-y-auto">
+                  <RequirementsSidebar
+                    totalCredits={stats.totalCredits}
+                    maxCredits={state.requirements.totalCredits}
+                    plans={state.plans}
+                    planProgress={stats.planProgress}
+                    onAddPlan={onAddPlan}
+                    onUpdatePlan={onUpdatePlan}
+                    onRemovePlan={onRemovePlan}
+                    onCollapsePanel={() => requirementsPanelRef.current?.collapse()}
+                  />
+                </aside>
+              )}
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
+      </ResizablePanel>
+    </ResizablePanelGroup>
+  );
+};
 
 export default Index;

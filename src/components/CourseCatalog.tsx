@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, BookOpen, ChevronsLeft, Pencil, Plus, Search, Tag, Trash } from 'lucide-react';
-import { Course, NewCourseInput, PlanProfile, PlannerPlan } from '@/types/planner';
+import { Course, NewCourseInput, PlannerPlan } from '@/types/planner';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -10,24 +10,17 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { getTagAccentClass, getTagColorClasses } from '@/lib/tagColors';
 import { cn } from '@/lib/utils';
-import { PlanSwitcher } from '@/components/PlanSwitcher';
 import { TagColorPicker } from '@/components/TagColorPicker';
 
 interface CourseCatalogProps {
   courses: Course[];
   distributives: string[];
   plans: PlannerPlan[];
-  planProfiles: PlanProfile[];
-  activePlanProfileId: string;
   onDragStart: (course: Course) => void;
   onCreateCourse: (course: NewCourseInput) => void;
   onUpdateCourse: (courseId: string, course: NewCourseInput) => void;
   onRemoveCourse: (courseId: string) => void;
   onCreateDistributive: (label: string) => string;
-  onCreatePlanProfile: (name: string, options?: { startBlank?: boolean }) => PlanProfile | void;
-  onSelectPlanProfile: (planId: string) => void;
-  onRenamePlanProfile: (planId: string, name: string) => void;
-  onDeletePlanProfile: (planId: string) => void;
   onCollapsePanel?: () => void;
   isMobile?: boolean;
   onQuickAddCourse?: (course: Course) => void;
@@ -97,17 +90,11 @@ export const CourseCatalog = ({
   courses,
   distributives,
   plans,
-  planProfiles,
-  activePlanProfileId,
   onDragStart,
   onCreateCourse,
   onUpdateCourse,
   onRemoveCourse,
   onCreateDistributive,
-  onCreatePlanProfile,
-  onSelectPlanProfile,
-  onRenamePlanProfile,
-  onDeletePlanProfile,
   onCollapsePanel,
   isMobile = false,
   onQuickAddCourse,
