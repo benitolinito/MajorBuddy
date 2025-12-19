@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { ArrowRight, BookOpen, ChevronsLeft, Pencil, Plus, Search, Tag, Trash } from 'lucide-react';
-import { Course, NewCourseInput, PlannerPlan } from '@/types/planner';
+import { Course, NewCourseInput, PlannerPlan, TermName, TermSystem } from '@/types/planner';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -24,6 +24,8 @@ interface CourseCatalogProps {
   onCreateDistributive: (label: string) => string;
   onCollapsePanel?: () => void;
   termSystem: TermSystem;
+  colorPalette: string[];
+  onAddPaletteColor: (hex: string) => string | void;
   isMobile?: boolean;
   onQuickAddCourse?: (course: Course) => void;
   addCourseTrigger?: number;
@@ -114,6 +116,8 @@ export const CourseCatalog = ({
   onCreateDistributive,
   onCollapsePanel,
   termSystem,
+  colorPalette,
+  onAddPaletteColor,
   isMobile = false,
   onQuickAddCourse,
   addCourseTrigger,

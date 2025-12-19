@@ -6,13 +6,13 @@ import { YearSection } from '@/components/YearSection';
 import { RequirementsSidebar } from '@/components/RequirementsSidebar';
 import { usePlanner, clearPlannerStorage } from '@/hooks/usePlanner';
 import { useCloudPlanner } from '@/hooks/useCloudPlanner';
-import { Course, CourseDropOptions, PlannerConfig, PlannerState, PlanInput, PlannerPlan, NewCourseInput } from '@/types/planner';
+import { Course, CourseDropOptions, PlannerConfig, PlannerState, PlanInput, PlannerPlan, NewCourseInput, TermSystem } from '@/types/planner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlannerSetupDialog } from '@/components/PlannerSetupDialog';
 import { ExportScheduleDialog } from '@/components/ExportScheduleDialog';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
-import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks, Download, Settings } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks, Download, Settings, PenLine } from 'lucide-react';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { cn } from '@/lib/utils';
 import { AuthDialog } from '@/components/AuthDialog';
@@ -95,6 +95,7 @@ const Index = () => {
   } | null>(null);
   const [quickAddCourse, setQuickAddCourse] = useState<Course | null>(null);
   const [quickAddTarget, setQuickAddTarget] = useState('');
+  const [preferredQuickAddTarget, setPreferredQuickAddTarget] = useState('');
   const [courseActionPrompt, setCourseActionPrompt] = useState<{
     course: Course;
     yearId: string;
@@ -136,6 +137,7 @@ const Index = () => {
   const handleOpenAuth = () => setShowAuth(true);
   const handleOpenSettings = () => setShowSetup(true);
   const handleOpenExport = () => setShowExport(true);
+  const toggleDeleteControls = () => setShowDeleteControls((prev) => !prev);
 
   const plannerHeaderProps: PlannerHeaderSharedProps = {
     degreeName: plannerTitle,
@@ -214,6 +216,7 @@ const Index = () => {
     const [targetYearId, targetTermId] = quickAddTarget.split(':');
     if (!targetYearId || !targetTermId) return;
     handleDropCourse(targetYearId, targetTermId, quickAddCourse);
+    setPreferredQuickAddTarget(quickAddTarget);
     setQuickAddCourse(null);
     setQuickAddTarget('');
   };
@@ -293,13 +296,6 @@ const Index = () => {
 
   const handleCancelDuplicate = () => {
     setDuplicatePrompt(null);
-  };
-
-  const handleRequestAddCourse = (yearId: string, termId: string) => {
-    const target = `${yearId}:${termId}`;
-    setPreferredQuickAddTarget(target);
-    setActiveMobileYear(yearId);
-    setLibraryOpen(true);
   };
 
   return (
@@ -478,6 +474,7 @@ const Index = () => {
         <MobilePlannerLayout
           headerProps={plannerHeaderProps}
           state={state}
+          termSystem={termSystem}
           stats={stats}
           canRemoveYear={canRemoveYear}
           getTermCredits={getTermCredits}
@@ -496,6 +493,7 @@ const Index = () => {
           updateCourseInCatalog={updateCourseInCatalog}
           removeCourseFromCatalog={removeCourseFromCatalog}
           addDistributive={addDistributive}
+          addColorToPalette={addColorToPalette}
           onDragStart={handleDragStart}
           onOpenExport={handleOpenExport}
           onOpenSettings={handleOpenSettings}
@@ -505,7 +503,10 @@ const Index = () => {
           headerProps={plannerHeaderProps}
           state={state}
           stats={stats}
+          termSystem={termSystem}
           canRemoveYear={canRemoveYear}
+          showDeleteControls={showDeleteControls}
+          onToggleDeleteControls={toggleDeleteControls}
           getTermCredits={getTermCredits}
           onRemoveCourse={removeCourse}
           onDropCourse={handleDropCourse}
@@ -520,6 +521,7 @@ const Index = () => {
           updateCourseInCatalog={updateCourseInCatalog}
           removeCourseFromCatalog={removeCourseFromCatalog}
           addDistributive={addDistributive}
+          addColorToPalette={addColorToPalette}
           onDragStart={handleDragStart}
         />
       )}
@@ -639,6 +641,7 @@ const MobileYearNavigator = ({ years, activeYearId, onSelectYear }: MobileYearNa
 type MobilePlannerLayoutProps = {
   headerProps: PlannerHeaderSharedProps;
   state: PlannerState;
+  termSystem: TermSystem;
   stats: PlannerStats;
   canRemoveYear: boolean;
   getTermCredits: (yearId: string, termId: string) => number;
@@ -657,6 +660,7 @@ type MobilePlannerLayoutProps = {
   updateCourseInCatalog: (courseId: string, course: NewCourseInput) => void;
   removeCourseFromCatalog: (courseId: string) => void;
   addDistributive: (label: string) => string;
+  addColorToPalette: (hex: string) => string;
   onDragStart: (course: Course) => void;
   onOpenExport: () => void;
   onOpenSettings: () => void;
@@ -665,6 +669,7 @@ type MobilePlannerLayoutProps = {
 const MobilePlannerLayout = ({
   headerProps,
   state,
+  termSystem,
   stats,
   canRemoveYear,
   getTermCredits,
@@ -683,6 +688,7 @@ const MobilePlannerLayout = ({
   updateCourseInCatalog,
   removeCourseFromCatalog,
   addDistributive,
+  addColorToPalette,
   onDragStart,
   onOpenExport,
   onOpenSettings,
@@ -726,6 +732,7 @@ const MobilePlannerLayout = ({
                 onRemoveTerm={(termId) => onRemoveTerm(year.id, termId)}
                 onRemoveYear={() => onRemoveYear(year.id)}
                 canRemoveYear={canRemoveYear}
+                termSystem={termSystem}
                 onRequestCourseAction={onRequestCourseAction}
               />
             ))}
@@ -743,8 +750,9 @@ const MobilePlannerLayout = ({
               courses={state.courseCatalog}
               distributives={state.distributives}
               plans={state.plans}
-                  colorPalette={state.colorPalette}
-                  onAddPaletteColor={addColorToPalette}
+              termSystem={termSystem}
+              colorPalette={state.colorPalette}
+              onAddPaletteColor={addColorToPalette}
               onDragStart={onDragStart}
               onCreateCourse={addCourseToCatalog}
               onUpdateCourse={updateCourseInCatalog}
@@ -773,8 +781,8 @@ const MobilePlannerLayout = ({
             onAddPlan={onAddPlan}
             onUpdatePlan={onUpdatePlan}
             onRemovePlan={onRemovePlan}
-                colorPalette={state.colorPalette}
-                onAddPaletteColor={addColorToPalette}
+            colorPalette={state.colorPalette}
+            onAddPaletteColor={addColorToPalette}
             onCollapsePanel={() => setRequirementsOpen(false)}
             isMobile
           />
@@ -796,7 +804,10 @@ type DesktopPlannerLayoutProps = {
   headerProps: PlannerHeaderSharedProps;
   state: PlannerState;
   stats: PlannerStats;
+  termSystem: TermSystem;
   canRemoveYear: boolean;
+  showDeleteControls: boolean;
+  onToggleDeleteControls: () => void;
   getTermCredits: (yearId: string, termId: string) => number;
   onRemoveCourse: (yearId: string, termId: string, courseId: string) => void;
   onDropCourse: (yearId: string, termId: string, course: Course, options?: CourseDropOptions) => void;
@@ -811,6 +822,7 @@ type DesktopPlannerLayoutProps = {
   updateCourseInCatalog: (courseId: string, course: NewCourseInput) => void;
   removeCourseFromCatalog: (courseId: string) => void;
   addDistributive: (label: string) => string;
+  addColorToPalette: (hex: string) => string;
   onDragStart: (course: Course) => void;
 };
 
@@ -818,7 +830,10 @@ const DesktopPlannerLayout = ({
   headerProps,
   state,
   stats,
+  termSystem,
   canRemoveYear,
+  showDeleteControls,
+  onToggleDeleteControls,
   getTermCredits,
   onRemoveCourse,
   onDropCourse,
@@ -833,6 +848,7 @@ const DesktopPlannerLayout = ({
   updateCourseInCatalog,
   removeCourseFromCatalog,
   addDistributive,
+  addColorToPalette,
   onDragStart,
 }: DesktopPlannerLayoutProps) => {
   const catalogPanelRef = useRef<ImperativePanelHandle>(null);
@@ -859,8 +875,9 @@ const DesktopPlannerLayout = ({
             courses={state.courseCatalog}
             distributives={state.distributives}
             plans={state.plans}
-              colorPalette={state.colorPalette}
-              onAddPaletteColor={addColorToPalette}
+            termSystem={termSystem}
+            colorPalette={state.colorPalette}
+            onAddPaletteColor={addColorToPalette}
             onDragStart={onDragStart}
             onCreateCourse={addCourseToCatalog}
             onUpdateCourse={updateCourseInCatalog}
@@ -884,7 +901,7 @@ const DesktopPlannerLayout = ({
                         size="sm"
                         className="gap-2"
                         aria-pressed={showDeleteControls}
-                        onClick={() => setShowDeleteControls((prev) => !prev)}
+                        onClick={onToggleDeleteControls}
                       >
                         <PenLine className="h-4 w-4" />
                         {showDeleteControls ? "Done editing" : "Quick edit"}
@@ -903,9 +920,8 @@ const DesktopPlannerLayout = ({
                       onRemoveTerm={(termId) => onRemoveTerm(year.id, termId)}
                       onRemoveYear={() => onRemoveYear(year.id)}
                       canRemoveYear={canRemoveYear}
-                        termSystem={termSystem}
-                        showDeleteControls={showDeleteControls}
-                        onRequestAddCourse={handleRequestAddCourse}
+                      termSystem={termSystem}
+                      showDeleteControls={showDeleteControls}
                     />
                   ))}
                   <div className="flex pt-2">
@@ -939,8 +955,8 @@ const DesktopPlannerLayout = ({
                     onAddPlan={onAddPlan}
                     onUpdatePlan={onUpdatePlan}
                     onRemovePlan={onRemovePlan}
-                      colorPalette={state.colorPalette}
-                      onAddPaletteColor={addColorToPalette}
+                    colorPalette={state.colorPalette}
+                    onAddPaletteColor={addColorToPalette}
                     onCollapsePanel={() => requirementsPanelRef.current?.collapse()}
                   />
                 </aside>

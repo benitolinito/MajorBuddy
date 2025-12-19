@@ -27,6 +27,7 @@ interface TermCardProps {
   onDropCourse: (course: Course, options?: CourseDropOptions) => void;
   onRemoveTerm?: () => void;
   isStacked?: boolean;
+  showDeleteControls?: boolean;
   onRequestCourseAction?: (course: Course) => void;
 }
 
@@ -39,6 +40,7 @@ export const TermCard = ({
   onDropCourse,
   onRemoveTerm,
   isStacked = false,
+  showDeleteControls = false,
   onRequestCourseAction,
 }: TermCardProps) => {
   const [isDragOver, setIsDragOver] = useState(false);

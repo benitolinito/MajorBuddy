@@ -10,12 +10,14 @@ interface YearSectionProps {
   year: AcademicYear;
   getTermCredits: (termId: string) => number;
   plans: PlannerPlan[];
+  termSystem: TermSystem;
   onRemoveCourse: (termId: string, courseId: string) => void;
   onDropCourse: (yearId: string, termId: string, course: Course, options?: CourseDropOptions) => void;
   onAddTerm: () => void;
   onRemoveTerm: (termId: string) => void;
   onRemoveYear: () => void;
   canRemoveYear: boolean;
+  showDeleteControls?: boolean;
   onRequestCourseAction?: (payload: { yearId: string; termId: string; course: Course }) => void;
 }
 
@@ -23,15 +25,18 @@ export const YearSection = ({
   year,
   getTermCredits,
   plans,
+  termSystem,
   onRemoveCourse,
   onDropCourse,
   onAddTerm,
   onRemoveTerm,
   onRemoveYear,
   canRemoveYear,
+  showDeleteControls = false,
   onRequestCourseAction,
 }: YearSectionProps) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
+  const deleteControlsVisible = showDeleteControls || isMobile;
   const maxTerms = termSystem === 'quarter' ? 4 : 3;
   const canAddTerm = year.terms.length < maxTerms;
 
@@ -53,7 +58,7 @@ export const YearSection = ({
                 className={cn(
                   'text-muted-foreground transition hover:opacity-100 hover:text-destructive hover:bg-destructive/10',
                   'focus-visible:opacity-100',
-                  showDeleteControls ? 'opacity-100' : 'opacity-0',
+                  deleteControlsVisible ? 'opacity-100' : 'opacity-0',
                 )}
               >
                 <Trash2 className="h-4 w-4 mr-1.5" />
@@ -82,6 +87,7 @@ export const YearSection = ({
             onDropCourse={(course, options) => onDropCourse(year.id, term.id, course, options)}
             onRemoveTerm={() => onRemoveTerm(term.id)}
             isStacked={isMobile}
+            showDeleteControls={deleteControlsVisible}
             onRequestCourseAction={
               onRequestCourseAction
                 ? (course) => onRequestCourseAction({ yearId: year.id, termId: term.id, course })
