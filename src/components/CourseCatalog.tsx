@@ -8,22 +8,23 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getTagAccentClass, getTagAccentStyle, getTagColorClasses, getTagColorStyle } from '@/lib/tagColors';
 import { cn } from '@/lib/utils';
 import { TagColorPicker } from '@/components/TagColorPicker';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { getTagAccentClass, getTagAccentStyle, getTagColorClasses, getTagColorStyle } from '@/lib/tagColors';
+import { getTagAccentClass, getTagAccentStyle, getTagColorClasses, getTagColorStyle } from '@/lib/tagColors';
 
 interface CourseCatalogProps {
   courses: Course[];
   distributives: string[];
+  distributiveColorMap?: Record<string, string | null>;
   plans: PlannerPlan[];
   onDragStart: (course: Course) => void;
   onCreateCourse: (course: NewCourseInput) => void;
   onUpdateCourse: (courseId: string, course: NewCourseInput) => void;
   onRemoveCourse: (courseId: string) => void;
-  onCreateDistributive: (label: string) => string;
   onCollapsePanel?: () => void;
   termSystem: TermSystem;
   colorPalette: string[];
@@ -106,9 +107,6 @@ type CourseFormState = {
   description: string;
   credits: number;
   distributives: string[];
-  distributiveColors: Record<string, string>;
-  activeDistributive: string | null;
-  newDistributive: string;
   planIds: string[];
   offeredTerms: TermName[];
 };
@@ -136,9 +134,6 @@ const createEmptyCourseForm = (): CourseFormState => ({
   description: '',
   credits: 3,
   distributives: [],
-  distributiveColors: {},
-  activeDistributive: null,
-  newDistributive: '',
   planIds: [],
   offeredTerms: [],
 });
@@ -146,12 +141,12 @@ const createEmptyCourseForm = (): CourseFormState => ({
 export const CourseCatalog = ({
   courses,
   distributives,
+  distributiveColorMap,
   plans,
   onDragStart,
   onCreateCourse,
   onUpdateCourse,
   onRemoveCourse,
-  onCreateDistributive,
   onCollapsePanel,
   termSystem,
   colorPalette,
@@ -177,9 +172,6 @@ export const CourseCatalog = ({
     description,
     credits,
     distributives: selectedDistributives,
-    distributiveColors: selectedDistributiveColors,
-    activeDistributive: activeDistributiveForColor,
-    newDistributive,
     planIds: selectedPlans,
     offeredTerms,
   } = formState;
@@ -306,60 +298,14 @@ export const CourseCatalog = ({
     setPlanFilter(null);
   };
 
-  useEffect(() => {
-    if (selectedDistributives.length === 0) {
-      if (activeDistributiveForColor !== null) {
-        updateFormField('activeDistributive', null);
-      }
-      return;
-    }
-    if (!activeDistributiveForColor || !selectedDistributives.includes(activeDistributiveForColor)) {
-      updateFormField('activeDistributive', selectedDistributives[0] ?? null);
-    }
-  }, [activeDistributiveForColor, selectedDistributives]);
-
-  const updateDistributiveColor = (label: string, colorId: string) => {
-    setFormState((prev) => ({
-      ...prev,
-      distributiveColors: { ...prev.distributiveColors, [label]: colorId },
-    }));
-  };
-
-  const removeDistributiveColor = (label: string) => {
-    setFormState((prev) => {
-      if (!(label in prev.distributiveColors)) return prev;
-      const nextColors = { ...prev.distributiveColors };
-      delete nextColors[label];
-      return { ...prev, distributiveColors: nextColors };
-    });
-  };
-
   const toggleDistributive = (label: string) => {
     setFormState((prev) => {
       const isSelected = prev.distributives.includes(label);
-      if (!isSelected) {
-        return {
-          ...prev,
-          distributives: [...prev.distributives, label],
-          activeDistributive: label,
-        };
-      }
-
-      if (prev.activeDistributive !== label) {
-        return {
-          ...prev,
-          activeDistributive: label,
-        };
-      }
-
-      const remaining = prev.distributives.filter((item) => item !== label);
-      const nextColors = { ...prev.distributiveColors };
-      delete nextColors[label];
       return {
         ...prev,
-        distributives: remaining,
-        distributiveColors: nextColors,
-        activeDistributive: remaining[0] ?? null,
+        distributives: isSelected
+          ? prev.distributives.filter((item) => item !== label)
+          : [...prev.distributives, label],
       };
     });
   };
@@ -384,18 +330,6 @@ export const CourseCatalog = ({
         ? prev.planIds.filter((id) => id !== planId)
         : [...prev.planIds, planId],
     }));
-  };
-
-  const handleAddDistributive = () => {
-    const created = onCreateDistributive(newDistributive);
-    if (created) {
-      setFormState((prev) => ({
-        ...prev,
-        distributives: Array.from(new Set([...prev.distributives, created])),
-        activeDistributive: created,
-      }));
-    }
-    updateFormField('newDistributive', '');
   };
 
   const resetForm = () => {
@@ -427,9 +361,6 @@ export const CourseCatalog = ({
       description: course.description ?? '',
       credits: course.credits,
       distributives: course.distributives,
-      distributiveColors: course.distributiveColors ?? {},
-      activeDistributive: course.distributives[0] ?? null,
-      newDistributive: '',
       planIds: course.planIds,
       offeredTerms: course.offeredTerms ?? [],
     });
@@ -452,21 +383,12 @@ export const CourseCatalog = ({
       normalizedOfferedTerms.includes(term),
     );
 
-    const sanitizedColors = selectedDistributives.reduce<Record<string, string>>((acc, label) => {
-      const colorId = selectedDistributiveColors[label];
-      if (colorId) {
-        acc[label] = colorId;
-      }
-      return acc;
-    }, {});
-
     const payload: NewCourseInput = {
       code: trimmedCode || 'NEW-000',
       name: trimmedTitle || 'Untitled class',
       description: description.trim() || undefined,
       credits: normalizedCredits,
       distributives: selectedDistributives,
-      distributiveColors: Object.keys(sanitizedColors).length ? sanitizedColors : undefined,
       planIds: activePlanIds,
       offeredTerms: orderedOfferedTerms,
     };
@@ -550,102 +472,44 @@ export const CourseCatalog = ({
               onChange={(e) => updateFormField('credits', Number(e.target.value))}
             />
           </div>
-          <div className="space-y-2">
-            <Label>Distributive colors</Label>
-            <TagColorPicker
-              value={activeDistributiveColor}
-              onSelect={handleActiveColorSelect}
-              disabled={!activeDistributiveForColor}
-              allowDeselect
-              size="compact"
-              className="gap-1.5"
-              customColors={colorPalette}
-              onAddCustomColor={(hex) => {
-                const added = onAddPaletteColor(hex);
-                handleActiveColorSelect(added || hex);
-              }}
-            />
-          </div>
         </div>
+
         <div className="space-y-2">
           <Label htmlFor="class-distributives">Distributives</Label>
-          <div className="flex items-center gap-2">
-            <Input
-              id="class-distributives"
-              placeholder="Add a distributive"
-              value={newDistributive}
-              onChange={(e) => updateFormField('newDistributive', e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleAddDistributive();
-                }
-              }}
-            />
-            <Button type="button" variant="secondary" onClick={handleAddDistributive}>
-              <Tag className="h-4 w-4 mr-1" />
-              Add
-            </Button>
-          </div>
+          <p className="text-[11px] text-muted-foreground">Tag to distributives from the Requirements panel.</p>
           <div className="flex flex-wrap gap-2 pt-1">
-            {distributives.map((dist) => (
-              <TogglePill
-                key={dist}
-                label={dist}
-                active={selectedDistributives.includes(dist)}
-                colorClassName={
-                  selectedDistributiveColors[dist]
-                    ? getTagColorClasses(dist, selectedDistributiveColors[dist])
-                    : undefined
-                }
-                colorAccentClass={
-                  selectedDistributiveColors[dist]
-                    ? getTagAccentClass(dist, selectedDistributiveColors[dist])
-                    : undefined
-                }
-                colorStyle={
-                  selectedDistributiveColors[dist]
-                    ? getTagColorStyle(dist, selectedDistributiveColors[dist])
-                    : undefined
-                }
-                colorAccentStyle={
-                  selectedDistributiveColors[dist]
-                    ? getTagAccentStyle(dist, selectedDistributiveColors[dist])
-                    : undefined
-                }
-                onClick={() => toggleDistributive(dist)}
-              />
-            ))}
-            {selectedDistributives
-              .filter((dist) => !distributives.includes(dist))
-              .map((dist) => (
+            {distributives.map((dist) => {
+              const colorId = distributiveColorMap?.[dist];
+              return (
                 <TogglePill
                   key={dist}
                   label={dist}
-                  active
-                  colorClassName={
-                    selectedDistributiveColors[dist]
-                      ? getTagColorClasses(dist, selectedDistributiveColors[dist])
-                      : undefined
-                  }
-                  colorAccentClass={
-                    selectedDistributiveColors[dist]
-                      ? getTagAccentClass(dist, selectedDistributiveColors[dist])
-                      : undefined
-                  }
-                  colorStyle={
-                    selectedDistributiveColors[dist]
-                      ? getTagColorStyle(dist, selectedDistributiveColors[dist])
-                      : undefined
-                  }
-                  colorAccentStyle={
-                    selectedDistributiveColors[dist]
-                      ? getTagAccentStyle(dist, selectedDistributiveColors[dist])
-                      : undefined
-                  }
+                  active={selectedDistributives.includes(dist)}
+                  colorClassName={getTagColorClasses(dist, colorId)}
+                  colorAccentClass={getTagAccentClass(dist, colorId)}
+                  colorStyle={getTagColorStyle(dist, colorId)}
+                  colorAccentStyle={getTagAccentStyle(dist, colorId)}
                   onClick={() => toggleDistributive(dist)}
                 />
-              ))}
+              );
+            })}
+            {selectedDistributives
+              .filter((dist) => !distributives.includes(dist))
+              .map((dist) => {
+                const colorId = distributiveColorMap?.[dist];
+                return (
+                  <TogglePill
+                    key={dist}
+                    label={dist}
+                    active
+                    colorClassName={getTagColorClasses(dist, colorId)}
+                    colorAccentClass={getTagAccentClass(dist, colorId)}
+                    colorStyle={getTagColorStyle(dist, colorId)}
+                    colorAccentStyle={getTagAccentStyle(dist, colorId)}
+                    onClick={() => toggleDistributive(dist)}
+                  />
+                );
+              })}
           </div>
         </div>
       </div>
@@ -827,26 +691,6 @@ export const CourseCatalog = ({
                 onClick={() => toggleDistributive(dist)}
               />
             ))}
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              <span>{activeDistributiveForColor ? `Color for ${activeDistributiveForColor}` : 'Select a tag to color'}</span>
-              <span>{activeDistributiveColor ?? '—'}</span>
-            </div>
-            <TagColorPicker
-              value={activeDistributiveColor}
-              onSelect={handleActiveColorSelect}
-              disabled={!activeDistributiveForColor}
-              allowDeselect
-              size="default"
-              layout="carousel"
-              showSelectionInfo
-              customColors={colorPalette}
-              onAddCustomColor={(hex) => {
-                const added = onAddPaletteColor(hex);
-                handleActiveColorSelect(added || hex);
-              }}
-            />
           </div>
         </div>
       </SectionCard>

@@ -23,6 +23,7 @@ interface TermCardProps {
   term: Term;
   credits: number;
   plans: PlannerPlan[];
+  distributiveColors?: Record<string, string | null>;
   onRemoveCourse: (courseId: string) => void;
   onDropCourse: (course: Course, options?: CourseDropOptions) => void;
   onRemoveTerm?: () => void;
@@ -37,6 +38,7 @@ export const TermCard = ({
   term,
   credits,
   plans,
+  distributiveColors,
   onRemoveCourse,
   onDropCourse,
   onRemoveTerm,
@@ -257,6 +259,7 @@ export const TermCard = ({
               <CourseCard
                 course={course}
                 plans={plans}
+                distributiveColors={distributiveColors}
                 onRemove={() => onRemoveCourse(course.id)}
                 draggable
                 onDragStart={handleCourseDragStart}

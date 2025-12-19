@@ -11,6 +11,7 @@ import {
   PlanType,
   NewCourseInput,
   PlanInput,
+  DistributiveRequirement,
   ShareLinkAccess,
 } from '@/types/planner';
 import { getDefaultColorId, normalizeColorHex } from '@/lib/tagColors';
@@ -20,6 +21,7 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 const CONFIG_STORAGE_KEY = 'plannerSetup';
 const COURSE_STORAGE_KEY = 'plannerCourseCatalog';
 const DISTRIBUTIVES_STORAGE_KEY = 'plannerDistributives';
+const DISTRIBUTIVE_REQUIREMENTS_STORAGE_KEY = 'plannerDistributiveRequirements';
 const PLANS_STORAGE_KEY = 'plannerPlans';
 const YEARS_STORAGE_KEY = 'plannerAcademicYears';
 const PLAN_PROFILES_STORAGE_KEY = 'plannerPlanProfiles';
@@ -31,6 +33,7 @@ const PLANNER_STORAGE_KEYS = [
   CONFIG_STORAGE_KEY,
   COURSE_STORAGE_KEY,
   DISTRIBUTIVES_STORAGE_KEY,
+  DISTRIBUTIVE_REQUIREMENTS_STORAGE_KEY,
   PLANS_STORAGE_KEY,
   YEARS_STORAGE_KEY,
   PLAN_PROFILES_STORAGE_KEY,
@@ -121,6 +124,27 @@ const normalizeDistributives = (value: unknown): string[] => {
   return Array.from(seen);
 };
 
+const normalizeDistributiveRequirement = (value: unknown): DistributiveRequirement => {
+  if (isNonEmptyString(value)) {
+    const name = value.trim();
+    return {
+      id: generateId(),
+      name,
+      classesNeeded: null,
+      color: getDefaultColorId(name),
+    };
+  }
+
+  const record = (value ?? {}) as Record<string, unknown>;
+  const name = isNonEmptyString(record.name) ? record.name.trim() : 'Untitled distributive';
+  return {
+    id: isNonEmptyString(record.id) ? record.id : generateId(),
+    name,
+    classesNeeded: normalizeOptionalNumber(record.classesNeeded, null),
+    color: isNonEmptyString(record.color) ? record.color.trim() : getDefaultColorId(name),
+  };
+};
+
 const normalizeOptionalNumber = (value: unknown, fallback: number | null = null) => {
   if (value === null || value === undefined || value === '') return fallback;
   const numeric = Number(value);
@@ -136,8 +160,12 @@ const normalizePlan = (value: unknown): PlannerPlan => {
   const requiredCredits =
     plan.requiredCredits === undefined ? defaultCredits : normalizeOptionalNumber(plan.requiredCredits, null);
   return {
-    id: isNonEmptyString(plan.id) ? plan.id : generateId(),
-    name,
+    return {
+      totalCredits,
+      planProgress: Object.fromEntries(planProgressMap),
+      distributiveProgress: Object.fromEntries(distributiveProgressMap),
+    };
+  }, [state.years, state.plans, state.courseCatalog, state.distributiveRequirements]);
     type,
     requiredCredits,
     classesNeeded: normalizeOptionalNumber(plan.classesNeeded, null),
@@ -195,6 +223,12 @@ const loadStoredCourses = (): Course[] => {
 };
 
 const loadStoredDistributives = (): string[] => normalizeDistributives(loadJson(DISTRIBUTIVES_STORAGE_KEY, []));
+
+const loadStoredDistributiveRequirements = (): DistributiveRequirement[] => {
+  const raw = loadJson<unknown>(DISTRIBUTIVE_REQUIREMENTS_STORAGE_KEY, []);
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeDistributiveRequirement);
+};
 
 const loadStoredPlans = (): PlannerPlan[] => {
   const raw = loadJson<unknown>(PLANS_STORAGE_KEY, []);
@@ -571,6 +605,7 @@ const createPlannerState = (
   options?: {
     courseCatalog?: Course[];
     distributives?: string[];
+    distributiveRequirements?: DistributiveRequirement[];
     plans?: PlannerPlan[];
     meta?: PlannerMeta;
     years?: AcademicYear[];
@@ -581,7 +616,13 @@ const createPlannerState = (
   const effectiveConfig = config ? { ...defaults, ...config } : defaults;
   const { startYear, totalCredits, termSystem, planName, university } = effectiveConfig;
   const courseCatalog = options?.courseCatalog?.map((course) => normalizeCourse(course, termSystem)) ?? [];
-  const distributives = normalizeDistributives(options?.distributives ?? []);
+  const distributiveRequirements =
+    options?.distributiveRequirements?.map(normalizeDistributiveRequirement) ??
+    loadStoredDistributiveRequirements();
+  const distributives = normalizeDistributives([
+    ...(options?.distributives ?? loadStoredDistributives()),
+    ...distributiveRequirements.map((req) => req.name),
+  ]);
   const plans = options?.plans?.map(normalizePlan) ?? [];
   const years = sanitizeYears(options?.years ?? loadStoredYears(), effectiveConfig);
   const colorPalette = normalizePalette(options?.colorPalette ?? loadStoredPalette());
@@ -598,6 +639,7 @@ const createPlannerState = (
     },
     courseCatalog,
     distributives,
+    distributiveRequirements,
     plans,
     colorPalette,
     config: effectiveConfig,
@@ -620,6 +662,7 @@ const buildInitialPlanner = () => {
       createPlannerState(loadStoredConfig(), {
         courseCatalog: loadStoredCourses(),
         distributives: loadStoredDistributives(),
+        distributiveRequirements: loadStoredDistributiveRequirements(),
         plans: loadStoredPlans(),
         years: sanitizeYears(loadStoredYears(), createDefaultConfig()),
       });
@@ -651,11 +694,13 @@ const buildInitialPlanner = () => {
   const initialYears = sanitizeYears(loadStoredYears(), initialConfig ?? createDefaultConfig());
   const initialCourses = loadStoredCourses();
   const initialDistributives = loadStoredDistributives();
+  const initialDistributiveRequirements = loadStoredDistributiveRequirements();
   const initialPlans = loadStoredPlans();
 
   const initialState = createPlannerState(initialConfig, {
     courseCatalog: initialCourses,
     distributives: initialDistributives,
+    distributiveRequirements: initialDistributiveRequirements,
     plans: initialPlans,
     years: initialYears,
   });
@@ -1109,6 +1154,105 @@ export const usePlanner = () => {
     return normalized;
   }, []);
 
+  const addDistributiveRequirement = useCallback(
+    (input: { name: string; classesNeeded?: number | null; color?: string | null }) => {
+      const normalizedName = input.name?.trim();
+      if (!normalizedName) return null;
+
+      const classesNeeded =
+        Number.isFinite(Number(input.classesNeeded)) && Number(input.classesNeeded) > 0
+          ? Math.max(0, Number(input.classesNeeded))
+          : null;
+
+      const inputColor =
+        typeof input.color === 'string' && input.color.trim() ? input.color.trim() : getDefaultColorId(normalizedName);
+      const resolvedColor = normalizeColorHex(inputColor) ?? inputColor;
+
+      let created: DistributiveRequirement | null = null;
+
+      setState((prev) => {
+        const existing = prev.distributiveRequirements.find(
+          (req) => req.name.toLowerCase() === normalizedName.toLowerCase(),
+        );
+        if (existing) {
+          created = existing;
+          return prev;
+        }
+
+        const nextRequirement: DistributiveRequirement = {
+          id: generateId(),
+          name: normalizedName,
+          classesNeeded,
+          color: resolvedColor,
+        };
+
+        const nextRequirements = [...prev.distributiveRequirements, nextRequirement];
+        const nextDistributives = normalizeDistributives([...prev.distributives, normalizedName]);
+
+        persistJson(DISTRIBUTIVE_REQUIREMENTS_STORAGE_KEY, nextRequirements);
+        persistJson(DISTRIBUTIVES_STORAGE_KEY, nextDistributives);
+
+        created = nextRequirement;
+        return {
+          ...prev,
+          distributiveRequirements: nextRequirements,
+          distributives: nextDistributives,
+        };
+      });
+
+      return created;
+    },
+    [],
+  );
+
+  const updateDistributiveRequirement = useCallback(
+    (id: string, updates: { classesNeeded?: number | null; color?: string | null }) => {
+      setState((prev) => {
+        let changed = false;
+
+        const nextRequirements = prev.distributiveRequirements.map((req) => {
+          if (req.id !== id) return req;
+
+          const nextClasses =
+            updates.classesNeeded === undefined
+              ? req.classesNeeded
+              : Number.isFinite(Number(updates.classesNeeded)) && Number(updates.classesNeeded) > 0
+                ? Math.max(0, Number(updates.classesNeeded))
+                : null;
+
+          const colorInput = updates.color === undefined ? req.color : updates.color;
+          const resolvedColor =
+            colorInput === null
+              ? null
+              : normalizeColorHex(colorInput ?? undefined) ??
+                (typeof colorInput === 'string' && colorInput.trim() ? colorInput.trim() : getDefaultColorId(req.name));
+
+          changed = true;
+          return {
+            ...req,
+            classesNeeded: nextClasses,
+            color: resolvedColor,
+          };
+        });
+
+        if (!changed) return prev;
+
+        persistJson(DISTRIBUTIVE_REQUIREMENTS_STORAGE_KEY, nextRequirements);
+        return { ...prev, distributiveRequirements: nextRequirements };
+      });
+    },
+    [],
+  );
+
+  const removeDistributiveRequirement = useCallback((id: string) => {
+    setState((prev) => {
+      const nextRequirements = prev.distributiveRequirements.filter((req) => req.id !== id);
+      if (nextRequirements.length === prev.distributiveRequirements.length) return prev;
+      persistJson(DISTRIBUTIVE_REQUIREMENTS_STORAGE_KEY, nextRequirements);
+      return { ...prev, distributiveRequirements: nextRequirements };
+    });
+  }, []);
+
   const addColorToPalette = useCallback((color: string) => {
     const normalized = normalizeColorHex(color);
     if (!normalized) return '';
@@ -1427,6 +1571,14 @@ export const usePlanner = () => {
 
   const stats = useMemo(() => {
     const planProgressMap = new Map<string, { scheduled: number; total: number; scheduledCredits: number }>();
+    const distributiveLookup = new Map<string, string>();
+    const distributiveProgressMap = new Map<string, { scheduled: number; total: number }>();
+
+    state.distributiveRequirements.forEach((req) => {
+      distributiveLookup.set(req.name.toLowerCase(), req.id);
+      distributiveProgressMap.set(req.id, { scheduled: 0, total: 0 });
+    });
+
     state.plans.forEach((plan) => {
       planProgressMap.set(plan.id, { scheduled: 0, total: 0, scheduledCredits: 0 });
     });
@@ -1438,6 +1590,14 @@ export const usePlanner = () => {
         if (entry) {
           planProgressMap.set(planId, { ...entry, total: entry.total + 1 });
         }
+      });
+
+      course.distributives.forEach((label) => {
+        const reqId = distributiveLookup.get(label.toLowerCase());
+        if (!reqId) return;
+        const entry = distributiveProgressMap.get(reqId);
+        if (!entry) return;
+        distributiveProgressMap.set(reqId, { ...entry, total: entry.total + 1 });
       });
     });
 
@@ -1456,12 +1616,27 @@ export const usePlanner = () => {
               scheduledCredits: entry.scheduledCredits + course.credits,
             });
           });
+
+          course.distributives.forEach((label) => {
+            const reqId = distributiveLookup.get(label.toLowerCase());
+            if (!reqId) return;
+            const entry = distributiveProgressMap.get(reqId);
+            if (!entry) return;
+            distributiveProgressMap.set(reqId, {
+              ...entry,
+              scheduled: entry.scheduled + 1,
+            });
+          });
         });
       });
     });
 
-    return { totalCredits, planProgress: Object.fromEntries(planProgressMap) };
-  }, [state.years, state.plans, state.courseCatalog]);
+    return {
+      totalCredits,
+      planProgress: Object.fromEntries(planProgressMap),
+      distributiveProgress: Object.fromEntries(distributiveProgressMap),
+    };
+  }, [state.years, state.plans, state.courseCatalog, state.distributiveRequirements]);
 
   const getTermCredits = useCallback((yearId: string, termId: string) => {
     const year = state.years.find((y) => y.id === yearId);
@@ -1478,6 +1653,7 @@ export const usePlanner = () => {
       const nextState = createPlannerState(config, {
         courseCatalog: prev.courseCatalog,
         distributives: prev.distributives,
+        distributiveRequirements: prev.distributiveRequirements,
         plans: prev.plans,
         years: restoredYears,
         colorPalette: prev.colorPalette,
@@ -1536,9 +1712,16 @@ export const usePlanner = () => {
     const normalizedCatalog = snapshot.courseCatalog?.length
       ? normalizeCatalogForSystem(snapshot.courseCatalog)
       : normalizeCatalogForSystem(loadStoredCourses());
+    const normalizedDistributiveRequirements = snapshot.distributiveRequirements?.length
+      ? snapshot.distributiveRequirements.map(normalizeDistributiveRequirement)
+      : loadStoredDistributiveRequirements();
     const normalizedDistributives = snapshot.distributives?.length
       ? normalizeDistributives(snapshot.distributives)
       : loadStoredDistributives();
+    const mergedDistributives = normalizeDistributives([
+      ...normalizedDistributives,
+      ...normalizedDistributiveRequirements.map((req) => req.name),
+    ]);
     const normalizedPlans = snapshot.plans?.length ? snapshot.plans.map(normalizePlan) : loadStoredPlans();
     const normalizedPalette =
       snapshot.colorPalette?.length ? normalizePalette(snapshot.colorPalette) : loadStoredPalette();
@@ -1549,7 +1732,8 @@ export const usePlanner = () => {
     }));
 
     persistJson(COURSE_STORAGE_KEY, sanitizedCatalog);
-    persistJson(DISTRIBUTIVES_STORAGE_KEY, normalizedDistributives);
+  persistJson(DISTRIBUTIVE_REQUIREMENTS_STORAGE_KEY, normalizedDistributiveRequirements);
+  persistJson(DISTRIBUTIVES_STORAGE_KEY, mergedDistributives);
     persistJson(PLANS_STORAGE_KEY, normalizedPlans);
     persistPalette(normalizedPalette);
 
@@ -1560,7 +1744,8 @@ export const usePlanner = () => {
       classYear: snapshot.classYear ?? normalizedConfig.startYear + 4,
       config: normalizedConfig,
       courseCatalog: sanitizedCatalog,
-      distributives: normalizedDistributives,
+      distributiveRequirements: normalizedDistributiveRequirements,
+      distributives: mergedDistributives,
       plans: normalizedPlans,
       colorPalette: normalizedPalette,
       years: snapshot.years.map((year, index) => {
@@ -1613,6 +1798,7 @@ export const usePlanner = () => {
         {
           courseCatalog: prev.courseCatalog,
           distributives: prev.distributives,
+          distributiveRequirements: prev.distributiveRequirements,
           plans: prev.plans,
           years,
           colorPalette: prev.colorPalette,
@@ -1637,6 +1823,9 @@ export const usePlanner = () => {
     renamePlanProfile,
     deletePlanProfile,
     addDistributive,
+    addDistributiveRequirement,
+    updateDistributiveRequirement,
+    removeDistributiveRequirement,
     addPlan,
     updatePlan,
     removePlan,

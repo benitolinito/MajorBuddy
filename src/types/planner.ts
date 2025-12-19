@@ -16,6 +16,13 @@ export interface PlannerPlan {
   color?: string | null;
 }
 
+export interface DistributiveRequirement {
+  id: string;
+  name: string;
+  classesNeeded: number | null;
+  color?: string | null;
+}
+
 export interface Course {
   id: string;
   sourceId?: string;
@@ -78,6 +85,7 @@ export interface PlannerState {
   requirements: DegreeRequirements;
   courseCatalog: Course[];
   distributives: string[];
+  distributiveRequirements: DistributiveRequirement[];
   plans: PlannerPlan[];
   colorPalette: string[];
   config?: PlannerConfig;

@@ -32,6 +32,7 @@ import { ShareLinkAccess } from '@/lib/sharePlanStore';
 type PlannerStats = {
   totalCredits: number;
   planProgress: Record<string, { scheduled: number; total: number; scheduledCredits: number }>;
+  distributiveProgress: Record<string, { scheduled: number; total: number }>;
 };
 
 type PlannerHeaderSharedProps = Omit<ComponentProps<typeof PlannerHeader>, 'isMobile' | 'sticky'>;
@@ -68,6 +69,9 @@ const Index = () => {
     updateCourseInCatalog,
     removeCourseFromCatalog,
     addDistributive,
+    addDistributiveRequirement,
+    updateDistributiveRequirement,
+    removeDistributiveRequirement,
     addPlan,
     updatePlan,
     removePlan,
@@ -145,6 +149,14 @@ const Index = () => {
     });
     return options;
   }, [state.years]);
+
+  const distributiveColorMap = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    state.distributiveRequirements.forEach((req) => {
+      map[req.name] = req.color ?? null;
+    });
+    return map;
+  }, [state.distributiveRequirements]);
   const courseActionCourseLabel = courseActionPrompt
     ? ([courseActionPrompt.course.code, courseActionPrompt.course.name].filter(Boolean).join(' ').trim() || 'this class')
     : 'this class';
@@ -860,6 +872,7 @@ const MobilePlannerLayout = ({
                       year={year}
                       getTermCredits={(termId) => getTermCredits(year.id, termId)}
                       plans={state.plans}
+                      distributiveColors={distributiveColorMap}
                       onRemoveCourse={(termId, courseId) => onRemoveCourse(year.id, termId, courseId)}
                       onDropCourse={(yearId, termId, course, options) => onDropCourse(yearId, termId, course, options)}
                       onAddTerm={() => onAddTerm(year.id)}
@@ -911,9 +924,14 @@ const MobilePlannerLayout = ({
                 maxCredits={state.requirements.totalCredits}
                 plans={state.plans}
                 planProgress={stats.planProgress}
+                distributiveRequirements={state.distributiveRequirements}
+                distributiveProgress={stats.distributiveProgress}
                 onAddPlan={onAddPlan}
                 onUpdatePlan={onUpdatePlan}
                 onRemovePlan={onRemovePlan}
+                onAddDistributive={addDistributiveRequirement}
+                onUpdateDistributive={updateDistributiveRequirement}
+                onRemoveDistributive={removeDistributiveRequirement}
                 colorPalette={state.colorPalette}
                 onAddPaletteColor={addColorToPalette}
                 isMobile
@@ -1067,6 +1085,7 @@ const DesktopPlannerLayout = ({
                       year={year}
                       getTermCredits={(termId) => getTermCredits(year.id, termId)}
                       plans={state.plans}
+                      distributiveColors={distributiveColorMap}
                       onRemoveCourse={(termId, courseId) => onRemoveCourse(year.id, termId, courseId)}
                       onDropCourse={(yearId, termId, course, options) => onDropCourse(yearId, termId, course, options)}
                       onAddTerm={() => onAddTerm(year.id)}
@@ -1107,9 +1126,14 @@ const DesktopPlannerLayout = ({
                       maxCredits={state.requirements.totalCredits}
                       plans={state.plans}
                       planProgress={stats.planProgress}
+                      distributiveRequirements={state.distributiveRequirements}
+                      distributiveProgress={stats.distributiveProgress}
                       onAddPlan={onAddPlan}
                       onUpdatePlan={onUpdatePlan}
                       onRemovePlan={onRemovePlan}
+                      onAddDistributive={addDistributiveRequirement}
+                      onUpdateDistributive={updateDistributiveRequirement}
+                      onRemoveDistributive={removeDistributiveRequirement}
                       colorPalette={state.colorPalette}
                       onAddPaletteColor={addColorToPalette}
                       onCollapsePanel={() => requirementsPanelRef.current?.collapse()}

@@ -10,6 +10,7 @@ interface YearSectionProps {
   year: AcademicYear;
   getTermCredits: (termId: string) => number;
   plans: PlannerPlan[];
+  distributiveColors?: Record<string, string | null>;
   termSystem: TermSystem;
   onRemoveCourse: (termId: string, courseId: string) => void;
   onDropCourse: (yearId: string, termId: string, course: Course, options?: CourseDropOptions) => void;
@@ -26,6 +27,7 @@ export const YearSection = ({
   year,
   getTermCredits,
   plans,
+  distributiveColors,
   termSystem,
   onRemoveCourse,
   onDropCourse,
@@ -85,6 +87,7 @@ export const YearSection = ({
             term={term}
             credits={getTermCredits(term.id)}
             plans={plans}
+            distributiveColors={distributiveColors}
             onRemoveCourse={(courseId) => onRemoveCourse(term.id, courseId)}
             onDropCourse={(course, options) => onDropCourse(year.id, term.id, course, options)}
             onRemoveTerm={() => onRemoveTerm(term.id)}

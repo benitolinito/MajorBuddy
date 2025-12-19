@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 interface CourseCardProps {
   course: Course;
   plans?: PlannerPlan[];
+  distributiveColors?: Record<string, string | null>;
   onRemove: () => void;
   draggable?: boolean;
   onDragStart?: (event: DragEvent, course: Course) => void;
@@ -17,6 +18,7 @@ interface CourseCardProps {
 export const CourseCard = ({
   course,
   plans = [],
+  distributiveColors,
   onRemove,
   draggable = false,
   onDragStart,
@@ -78,8 +80,8 @@ export const CourseCard = ({
           <Badge
             key={dist}
             variant="outline"
-            className={`text-[11px] font-medium ${getTagColorClasses(dist, course.distributiveColors?.[dist])}`}
-            style={getTagColorStyle(dist, course.distributiveColors?.[dist])}
+            className={`text-[11px] font-medium ${getTagColorClasses(dist, distributiveColors?.[dist] ?? course.distributiveColors?.[dist])}`}
+            style={getTagColorStyle(dist, distributiveColors?.[dist] ?? course.distributiveColors?.[dist])}
           >
             {dist}
           </Badge>

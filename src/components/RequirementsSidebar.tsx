@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { ChevronsRight, Pencil } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { PlanInput, PlannerPlan, PlanType } from '@/types/planner';
+import { DistributiveRequirement, PlanInput, PlannerPlan, PlanType } from '@/types/planner';
 import {
   getDefaultColorId,
   getTagAccentClass,
@@ -19,9 +19,14 @@ interface RequirementsProps {
   maxCredits: number;
   plans: PlannerPlan[];
   planProgress: Record<string, { scheduled: number; total: number; scheduledCredits: number }>;
+  distributiveRequirements: DistributiveRequirement[];
+  distributiveProgress: Record<string, { scheduled: number; total: number }>;
   onAddPlan: (plan: PlanInput) => PlannerPlan | null;
   onUpdatePlan: (planId: string, plan: PlanInput) => void;
   onRemovePlan: (planId: string) => void;
+  onAddDistributive: (input: { name: string; classesNeeded?: number | null; color?: string | null }) => DistributiveRequirement | null;
+  onUpdateDistributive: (id: string, updates: { classesNeeded?: number | null; color?: string | null }) => void;
+  onRemoveDistributive: (id: string) => void;
   colorPalette: string[];
   onAddPaletteColor: (hex: string) => string | void;
   onCollapsePanel?: () => void;
@@ -33,9 +38,14 @@ export const RequirementsSidebar = ({
   maxCredits,
   plans,
   planProgress,
+  distributiveRequirements,
+  distributiveProgress,
   onAddPlan,
   onUpdatePlan,
   onRemovePlan,
+  onAddDistributive,
+  onUpdateDistributive,
+  onRemoveDistributive,
   colorPalette,
   onAddPaletteColor,
   onCollapsePanel,
@@ -48,10 +58,20 @@ export const RequirementsSidebar = ({
   const [colorChoice, setColorChoice] = useState<string>(() => getDefaultColorId(''));
   const [showDialog, setShowDialog] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlannerPlan | null>(null);
+  const [distributiveName, setDistributiveName] = useState('');
+  const [distributiveClasses, setDistributiveClasses] = useState('');
+  const [distributiveColor, setDistributiveColor] = useState<string>(() => getDefaultColorId(''));
+  const [showDistributiveDialog, setShowDistributiveDialog] = useState(false);
+  const [editingDistributive, setEditingDistributive] = useState<DistributiveRequirement | null>(null);
 
   const sortedPlans = useMemo(
     () => [...plans].sort((a, b) => a.name.localeCompare(b.name)),
     [plans],
+  );
+
+  const sortedDistributives = useMemo(
+    () => [...distributiveRequirements].sort((a, b) => a.name.localeCompare(b.name)),
+    [distributiveRequirements],
   );
 
   const resetPlanForm = () => {
@@ -60,6 +80,12 @@ export const RequirementsSidebar = ({
     setClassesNeeded('');
     setPlanCredits('');
     setColorChoice(getDefaultColorId(''));
+  };
+
+  const resetDistributiveForm = () => {
+    setDistributiveName('');
+    setDistributiveClasses('');
+    setDistributiveColor(getDefaultColorId(''));
   };
 
   const normalizePositive = (value: string) => {
@@ -100,6 +126,33 @@ export const RequirementsSidebar = ({
     }
   };
 
+  const handleSaveDistributive = () => {
+    const classTarget = normalizePositive(distributiveClasses);
+    if (!distributiveName.trim()) return;
+    if (!classTarget) return;
+
+    if (editingDistributive) {
+      onUpdateDistributive(editingDistributive.id, {
+        classesNeeded: classTarget,
+        color: distributiveColor,
+      });
+      resetDistributiveForm();
+      setEditingDistributive(null);
+      setShowDistributiveDialog(false);
+      return;
+    }
+
+    const created = onAddDistributive({
+      name: distributiveName,
+      classesNeeded: classTarget,
+      color: distributiveColor,
+    });
+    if (created) {
+      resetDistributiveForm();
+      setShowDistributiveDialog(false);
+    }
+  };
+
   const handleDialogChange = (open: boolean) => {
     setShowDialog(open);
     if (!open) {
@@ -108,7 +161,16 @@ export const RequirementsSidebar = ({
     }
   };
 
+  const handleDistributiveDialogChange = (open: boolean) => {
+    setShowDistributiveDialog(open);
+    if (!open) {
+      resetDistributiveForm();
+      setEditingDistributive(null);
+    }
+  };
+
   const canSavePlan = Boolean(planName.trim()) && Boolean(normalizePositive(classesNeeded));
+  const canSaveDistributive = Boolean(distributiveName.trim()) && Boolean(normalizePositive(distributiveClasses));
   const containerClassName = isMobile
     ? 'bg-card border border-border rounded-xl p-4 space-y-4'
     : 'flex h-full flex-col space-y-4';
@@ -162,6 +224,19 @@ export const RequirementsSidebar = ({
           }}
         >
           Add major/minor
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={() => {
+            resetDistributiveForm();
+            setEditingDistributive(null);
+            setDistributiveName('');
+            setShowDistributiveDialog(true);
+          }}
+        >
+          Add distributive
         </Button>
       </div>
 
@@ -264,6 +339,82 @@ export const RequirementsSidebar = ({
         )}
       </div>
 
+      <div className="space-y-3">
+        <p className="text-xs font-medium text-muted-foreground">Distributives</p>
+        {sortedDistributives.length === 0 ? (
+          <div className="text-xs text-muted-foreground bg-muted/50 border border-dashed border-border rounded-lg p-3">
+            Add distributives to track class goals here.
+          </div>
+        ) : (
+          sortedDistributives.map((dist) => {
+            const progress = distributiveProgress[dist.id] ?? { scheduled: 0, total: 0 };
+            const targetClasses =
+              dist.classesNeeded && dist.classesNeeded > 0 ? dist.classesNeeded : progress.total;
+            const pct = targetClasses > 0 ? Math.min((progress.scheduled / targetClasses) * 100, 100) : 0;
+            const targetLabel = targetClasses || '—';
+            const colorClass = getTagColorClasses(dist.name, dist.color);
+            const accentClass = getTagAccentClass(dist.name, dist.color);
+            const colorStyle = getTagColorStyle(dist.name, dist.color);
+            const accentStyle = getTagAccentStyle(dist.name, dist.color);
+            return (
+              <div
+                key={dist.id}
+                className="group relative rounded-2xl border border-border/70 bg-card/95 p-4 pb-8 shadow-sm"
+              >
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-3 bottom-3 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-transparent focus-visible:bg-transparent"
+                  onClick={() => {
+                    setEditingDistributive(dist);
+                    setDistributiveName(dist.name);
+                    setDistributiveClasses(dist.classesNeeded?.toString() ?? '');
+                    setDistributiveColor(dist.color ?? getDefaultColorId(dist.name));
+                    setShowDistributiveDialog(true);
+                  }}
+                  aria-label={`Edit ${dist.name}`}
+                >
+                  <Pencil className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                </Button>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${colorClass}`}
+                        style={colorStyle}
+                      >
+                        Distributive
+                      </span>
+                      <span className="text-base font-semibold text-foreground">{dist.name}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs text-muted-foreground">Class progress</span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {progress.scheduled}/{targetLabel}
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-muted/80">
+                    <div
+                      className={`h-full rounded-full transition-all ${accentClass || 'bg-primary'}`}
+                      style={{ width: `${pct}%`, ...(accentStyle ?? {}) }}
+                    />
+                  </div>
+                  {targetClasses === 0 ? (
+                    <p className="text-[11px] text-muted-foreground">Add a class goal to see progress here.</p>
+                  ) : progress.scheduled > 0 ? (
+                    <p className="text-[11px] text-muted-foreground">{`${progress.scheduled} tagged from your library.`}</p>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
       <Dialog open={showDialog} onOpenChange={handleDialogChange}>
         <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -302,7 +453,7 @@ export const RequirementsSidebar = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="plan-name">Plan name</Label>
+              <Label htmlFor="plan-name">Title</Label>
               <Input
                 id="plan-name"
                 placeholder="e.g., Computer Science"
@@ -375,6 +526,93 @@ export const RequirementsSidebar = ({
                 </Button>
                 <Button type="submit" disabled={!canSavePlan}>
                   {editingPlan ? 'Save changes' : 'Save plan'}
+                </Button>
+              </div>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDistributiveDialog} onOpenChange={handleDistributiveDialogChange}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingDistributive ? `Edit ${editingDistributive.name}` : 'Add a distributive'}
+            </DialogTitle>
+            <DialogDescription>
+              Set a class goal and color for this distributive. You can tag classes from the library anytime.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleSaveDistributive();
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="distributive-name">Distributive name</Label>
+              <Input
+                id="distributive-name"
+                placeholder="e.g., Humanities"
+                value={distributiveName}
+                onChange={(e) => setDistributiveName(e.target.value)}
+                disabled={Boolean(editingDistributive)}
+                required
+              />
+              {editingDistributive ? (
+                <p className="text-[11px] text-muted-foreground">Names stay locked once created.</p>
+              ) : null}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="distributive-classes">Classes needed</Label>
+                <Input
+                  id="distributive-classes"
+                  type="number"
+                  min={1}
+                  value={distributiveClasses}
+                  onChange={(e) => setDistributiveClasses(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Color</Label>
+                <TagColorPicker
+                  value={distributiveColor}
+                  onSelect={(colorId) => colorId && setDistributiveColor(colorId)}
+                  customColors={colorPalette}
+                  onAddCustomColor={(hex) => {
+                    const added = onAddPaletteColor(hex);
+                    setDistributiveColor(added || hex);
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-between gap-2 pt-2">
+              {editingDistributive ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    onRemoveDistributive(editingDistributive.id);
+                    handleDistributiveDialogChange(false);
+                  }}
+                >
+                  Delete
+                </Button>
+              ) : (
+                <span />
+              )}
+              <div className="flex gap-2">
+                <Button type="button" variant="ghost" onClick={() => handleDistributiveDialogChange(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={!canSaveDistributive}>
+                  {editingDistributive ? 'Save changes' : 'Save distributive'}
                 </Button>
               </div>
             </div>
