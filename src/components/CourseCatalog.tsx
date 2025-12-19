@@ -496,13 +496,23 @@ export const CourseCatalog = ({
             );
           })}
         </div>
-        <div className="pt-4">
-          <Button variant="outline" size="sm" className="w-full border-dashed" onClick={startAddCourse}>
-            <Plus className="h-4 w-4 mr-1.5" />
-            {addCourseLabel}
-          </Button>
-        </div>
       </ScrollArea>
+      <div
+        className={cn(
+          'border-t border-border/70 p-4',
+          isMobile ? 'bg-background/80 backdrop-blur-sm' : 'bg-card',
+        )}
+      >
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full border-dashed"
+          onClick={startAddCourse}
+        >
+          <Plus className="h-4 w-4 mr-1.5" />
+          {addCourseLabel}
+        </Button>
+      </div>
 
       <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
         <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">

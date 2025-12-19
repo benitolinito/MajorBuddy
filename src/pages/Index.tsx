@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CourseCatalog } from '@/components/CourseCatalog';
 import { PlannerHeader } from '@/components/PlannerHeader';
@@ -499,51 +499,159 @@ const CollapsedRail = ({ side, ariaLabel, onExpand }: CollapsedRailProps) => (
   </button>
 );
 
-type MobileToolbarProps = {
-  onOpenLibrary: () => void;
-  onOpenRequirements: () => void;
+type MobilePane = 'plan' | 'library' | 'requirements';
+
+type MobilePlanOverviewProps = {
+  title: string;
+  subtitle: string;
+  meta: string;
+  onStartNewClass: () => void;
   onAddYear: () => void;
-  onAddClass: () => void;
   onOpenExport: () => void;
   onOpenSettings: () => void;
 };
 
-const MobilePlannerToolbar = ({
-  onOpenLibrary,
-  onOpenRequirements,
+const MobilePlanOverview = ({
+  title,
+  subtitle,
+  meta,
+  onStartNewClass,
   onAddYear,
-  onAddClass,
   onOpenExport,
   onOpenSettings,
-}: MobileToolbarProps) => (
-  <div className="fixed inset-x-0 bottom-0 border-t border-border bg-card/95 px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.2)] backdrop-blur">
-    <div className="grid grid-cols-3 gap-3 pb-2 text-xs font-medium">
-      <Button variant="outline" className="justify-center gap-1.5 py-2 text-xs" onClick={onOpenLibrary}>
-        <BookOpen className="h-3.5 w-3.5" />
-        Library
-      </Button>
-      <Button variant="outline" className="justify-center gap-1.5 py-2 text-xs" onClick={onOpenRequirements}>
-        <ListChecks className="h-3.5 w-3.5" />
-        Requirements
-      </Button>
-      <Button variant="outline" className="justify-center gap-1.5 py-2 text-xs" onClick={onAddClass}>
-        <Plus className="h-3.5 w-3.5" />
+}: MobilePlanOverviewProps) => (
+  <div className="rounded-3xl bg-gradient-to-br from-primary via-primary/90 to-primary/75 px-5 py-4 text-primary-foreground shadow-[0_35px_65px_-30px_rgba(79,70,229,0.9)]">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-primary-foreground/70">Planner</p>
+        <p className="text-2xl font-semibold leading-snug">{title}</p>
+        <p className="text-sm text-primary-foreground/90">{subtitle}</p>
+        <p className="text-xs text-primary-foreground/75">{meta}</p>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Button
+          type="button"
+          size="icon"
+          variant="secondary"
+          className="h-9 w-9 rounded-2xl bg-white/15 text-primary-foreground hover:bg-white/25"
+          onClick={onOpenExport}
+          aria-label="Export schedule"
+        >
+          <Download className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          size="icon"
+          variant="secondary"
+          className="h-9 w-9 rounded-2xl bg-white/15 text-primary-foreground hover:bg-white/25"
+          onClick={onOpenSettings}
+          aria-label="Planner settings"
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+    <div className="mt-4 grid grid-cols-2 gap-2 text-sm font-semibold">
+      <Button
+        type="button"
+        className="h-11 rounded-2xl bg-white text-primary shadow-sm hover:bg-white"
+        onClick={onStartNewClass}
+      >
+        <Plus className="mr-2 h-4 w-4" />
         New class
       </Button>
-    </div>
-    <div className="grid grid-cols-3 gap-3 text-xs font-medium">
-      <Button variant="default" className="justify-center gap-1.5 py-2 text-xs" onClick={onAddYear}>
-        <Plus className="h-3.5 w-3.5" />
+      <Button
+        type="button"
+        variant="secondary"
+        className="h-11 rounded-2xl border border-white/40 bg-white/15 text-primary-foreground hover:bg-white/25"
+        onClick={onAddYear}
+      >
+        <Plus className="mr-2 h-4 w-4" />
         Add year
       </Button>
-      <Button variant="outline" className="justify-center gap-1.5 py-2 text-xs" onClick={onOpenExport}>
-        <Download className="h-3.5 w-3.5" />
-        Export
-      </Button>
-      <Button variant="outline" className="justify-center gap-1.5 py-2 text-xs" onClick={onOpenSettings}>
-        <Settings className="h-3.5 w-3.5" />
-        Settings
-      </Button>
+    </div>
+  </div>
+);
+
+const MOBILE_TABS: { id: MobilePane; label: string }[] = [
+  { id: 'plan', label: 'Plan' },
+  { id: 'library', label: 'Library' },
+  { id: 'requirements', label: 'Goals' },
+];
+
+const MobilePrimaryNav = ({ active, onChange }: { active: MobilePane; onChange: (pane: MobilePane) => void }) => (
+  <div className="rounded-full bg-muted/60 p-1">
+    <div className="grid grid-cols-3 gap-1">
+      {MOBILE_TABS.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          onClick={() => onChange(tab.id)}
+          className={cn(
+            'rounded-full py-2 text-sm font-medium transition',
+            active === tab.id ? 'bg-background shadow text-foreground' : 'text-muted-foreground',
+          )}
+          aria-pressed={active === tab.id}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+const MobilePaneCard = ({ children }: { children: ReactNode }) => (
+  <div className="rounded-3xl border border-border/60 bg-card/95 p-3 shadow-[0_30px_65px_-35px_rgba(15,23,42,0.8)]">
+    {children}
+  </div>
+);
+
+type MobileDockProps = {
+  activePane: MobilePane;
+  onSelectPane: (pane: MobilePane) => void;
+  onAddClass: () => void;
+  onOpenSettings: () => void;
+};
+
+const MobileDock = ({ activePane, onSelectPane, onAddClass, onOpenSettings }: MobileDockProps) => (
+  <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4">
+    <div className="pointer-events-auto relative w-full max-w-[420px]">
+      <div className="flex items-center justify-between rounded-3xl border border-border/70 bg-card/95 px-4 py-3 shadow-[0_25px_55px_-20px_rgba(15,23,42,0.85)] backdrop-blur">
+        {MOBILE_TABS.map((tab) => {
+          const Icon = tab.id === 'plan' ? PenLine : tab.id === 'library' ? BookOpen : ListChecks;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onSelectPane(tab.id)}
+              className={cn(
+                'flex flex-col items-center gap-1 px-3 text-[11px] font-medium transition',
+                activePane === tab.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/80',
+              )}
+              aria-pressed={activePane === tab.id}
+            >
+              <Icon className="h-5 w-5" aria-hidden />
+              {tab.label}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          className="flex flex-col items-center gap-1 px-3 text-[11px] font-medium text-muted-foreground transition hover:text-foreground/80"
+        >
+          <Settings className="h-5 w-5" aria-hidden />
+          Settings
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={onAddClass}
+        className="absolute left-1/2 top-0 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_20px_45px_rgba(79,70,229,0.55)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30"
+        aria-label="New class"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
     </div>
   </div>
 );
@@ -638,11 +746,27 @@ const MobilePlannerLayout = ({
   onOpenSettings,
 }: MobilePlannerLayoutProps) => {
   const [activeYearId, setActiveYearId] = useState(() => state.years[0]?.id ?? '');
-  const [libraryOpen, setLibraryOpen] = useState(false);
-  const [libraryMode, setLibraryMode] = useState<'browse' | 'select'>('browse');
+  const [activePane, setActivePane] = useState<MobilePane>('plan');
   const [libraryTarget, setLibraryTarget] = useState<{ yearId: string; termId: string } | null>(null);
-  const [requirementsOpen, setRequirementsOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [catalogAddTrigger, setCatalogAddTrigger] = useState(0);
+  const pendingAddRef = useRef(false);
+
+  useEffect(() => {
+    if (activeYearId && state.years.some((year) => year.id === activeYearId)) {
+      return;
+    }
+    const nextId = state.years[0]?.id ?? '';
+    if (nextId !== activeYearId) {
+      setActiveYearId(nextId);
+    }
+  }, [state.years, activeYearId]);
+
+  useEffect(() => {
+    if (activePane !== 'library' || !pendingAddRef.current) return;
+    pendingAddRef.current = false;
+    setCatalogAddTrigger(Date.now());
+  }, [activePane]);
 
   const libraryTargetLabel = useMemo(() => {
     if (!libraryTarget) return null;
@@ -652,37 +776,25 @@ const MobilePlannerLayout = ({
     return `${year.name} • ${term.name} ${term.year}`;
   }, [libraryTarget, state.years]);
 
-  const libraryTitle = libraryMode === 'select' ? 'Add class' : 'Class Library';
-  const libraryDescription =
-    libraryMode === 'select'
-      ? `Select a class from your library to add to ${libraryTargetLabel ?? 'this term'}.`
-      : 'Browse and edit your saved courses.';
-
-  const handleLibraryOpenChange = (open: boolean) => {
-    setLibraryOpen(open);
-    if (!open) {
-      setCatalogAddTrigger(0);
-      setLibraryMode('browse');
-      setLibraryTarget(null);
-    }
-  };
-
-  const openLibraryBrowse = () => {
-    setLibraryMode('browse');
-    setLibraryTarget(null);
-    setLibraryOpen(true);
-  };
-
   const handleStartAddClass = () => {
-    openLibraryBrowse();
-    setCatalogAddTrigger(Date.now());
+    if (activePane === 'library') {
+      setCatalogAddTrigger(Date.now());
+      return;
+    }
+    pendingAddRef.current = true;
+    setActivePane('library');
   };
 
   const handleOpenTermPicker = (yearId: string, termId: string) => {
-    setLibraryMode('select');
     setLibraryTarget({ yearId, termId });
-    setCatalogAddTrigger(0);
-    setLibraryOpen(true);
+    setQuickAddOpen(true);
+  };
+
+  const handleQuickAddChange = (open: boolean) => {
+    setQuickAddOpen(open);
+    if (!open) {
+      setLibraryTarget(null);
+    }
   };
 
   const handleQuickAddCourse = (course: Course) => {
@@ -690,106 +802,135 @@ const MobilePlannerLayout = ({
     onDropCourse(libraryTarget.yearId, libraryTarget.termId, course);
   };
 
+  const totalTerms = state.years.reduce((count, year) => count + year.terms.length, 0);
+  const planSubtitle = stats.totalCredits > 0 ? `${stats.totalCredits} credits planned` : 'No credits planned yet';
+  const planMeta = `${state.years.length || 0} year${state.years.length === 1 ? '' : 's'} • ${totalTerms} term${totalTerms === 1 ? '' : 's'}`;
+
+  const filteredYears = state.years.filter((year) => !activeYearId || year.id === activeYearId);
+
   return (
     <>
-      <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-        <PlannerHeader {...headerProps} sticky={false} isMobile />
-        <MobileYearNavigator years={state.years} activeYearId={activeYearId} onSelectYear={setActiveYearId} />
-      </div>
-      <div className="space-y-4 px-4 py-4 pb-44">
-        <div className="space-y-6">
-          {state.years
-            .filter((year) => !activeYearId || year.id === activeYearId)
-            .map((year) => (
-              <YearSection
-                key={year.id}
-                year={year}
-                getTermCredits={(termId) => getTermCredits(year.id, termId)}
+      <div className="relative min-h-screen pb-36">
+        <div className="sticky top-0 z-40 border-b border-border/70 bg-background/95 backdrop-blur">
+          <PlannerHeader {...headerProps} sticky={false} isMobile />
+          <div className="space-y-4 px-4 pb-4 pt-3">
+            <MobilePlanOverview
+              title={headerProps.degreeName || 'Planner'}
+              subtitle={planSubtitle}
+              meta={planMeta}
+              onStartNewClass={handleStartAddClass}
+              onAddYear={onAddYear}
+              onOpenExport={onOpenExport}
+              onOpenSettings={onOpenSettings}
+            />
+            <MobilePrimaryNav active={activePane} onChange={(pane) => setActivePane(pane)} />
+            {activePane === 'plan' && (
+              <MobileYearNavigator years={state.years} activeYearId={activeYearId} onSelectYear={setActiveYearId} />
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-6 px-4 py-6">
+          {activePane === 'plan' && (
+            <div className="space-y-5">
+              {filteredYears.length === 0 ? (
+                <MobilePaneCard>
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    Add an academic year to start planning.
+                  </div>
+                </MobilePaneCard>
+              ) : (
+                filteredYears.map((year) => (
+                  <MobilePaneCard key={year.id}>
+                    <YearSection
+                      year={year}
+                      getTermCredits={(termId) => getTermCredits(year.id, termId)}
+                      plans={state.plans}
+                      onRemoveCourse={(termId, courseId) => onRemoveCourse(year.id, termId, courseId)}
+                      onDropCourse={(yearId, termId, course, options) => onDropCourse(yearId, termId, course, options)}
+                      onAddTerm={() => onAddTerm(year.id)}
+                      onRemoveTerm={(termId) => onRemoveTerm(year.id, termId)}
+                      onRemoveYear={() => onRemoveYear(year.id)}
+                      canRemoveYear={canRemoveYear}
+                      termSystem={termSystem}
+                      onRequestCourseAction={onRequestCourseAction}
+                      onAddCourseToTerm={(termId) => handleOpenTermPicker(year.id, termId)}
+                    />
+                  </MobilePaneCard>
+                ))
+              )}
+            </div>
+          )}
+
+          {activePane === 'library' && (
+            <MobilePaneCard>
+              <CourseCatalog
+                courses={state.courseCatalog}
+                distributives={state.distributives}
                 plans={state.plans}
-                onRemoveCourse={(termId, courseId) => onRemoveCourse(year.id, termId, courseId)}
-                onDropCourse={(yearId, termId, course, options) => onDropCourse(yearId, termId, course, options)}
-                onAddTerm={() => onAddTerm(year.id)}
-                onRemoveTerm={(termId) => onRemoveTerm(year.id, termId)}
-                onRemoveYear={() => onRemoveYear(year.id)}
-                canRemoveYear={canRemoveYear}
                 termSystem={termSystem}
-                onRequestCourseAction={onRequestCourseAction}
-                onAddCourseToTerm={(termId) => handleOpenTermPicker(year.id, termId)}
+                colorPalette={state.colorPalette}
+                onAddPaletteColor={addColorToPalette}
+                onDragStart={onDragStart}
+                onCreateCourse={addCourseToCatalog}
+                onUpdateCourse={updateCourseInCatalog}
+                onRemoveCourse={removeCourseFromCatalog}
+                onCreateDistributive={addDistributive}
+                isMobile
+                addCourseTrigger={catalogAddTrigger}
               />
-            ))}
+            </MobilePaneCard>
+          )}
+
+          {activePane === 'requirements' && (
+            <MobilePaneCard>
+              <RequirementsSidebar
+                totalCredits={stats.totalCredits}
+                maxCredits={state.requirements.totalCredits}
+                plans={state.plans}
+                planProgress={stats.planProgress}
+                onAddPlan={onAddPlan}
+                onUpdatePlan={onUpdatePlan}
+                onRemovePlan={onRemovePlan}
+                colorPalette={state.colorPalette}
+                onAddPaletteColor={addColorToPalette}
+                isMobile
+              />
+            </MobilePaneCard>
+          )}
         </div>
       </div>
 
-      <Sheet open={libraryOpen} onOpenChange={handleLibraryOpenChange}>
-        <SheetContent side="bottom" className="h-[90vh] overflow-y-auto px-2">
-          <SheetHeader className="pb-2 text-left">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <SheetTitle>{libraryTitle}</SheetTitle>
-                <SheetDescription>{libraryDescription}</SheetDescription>
-              </div>
-              {libraryMode === 'select' && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleLibraryOpenChange(false)}
-                >
-                  Done
-                </Button>
-              )}
-            </div>
-          </SheetHeader>
-          <div className="pb-6">
-            <CourseCatalog
-              courses={state.courseCatalog}
-              distributives={state.distributives}
-              plans={state.plans}
-              termSystem={termSystem}
-              colorPalette={state.colorPalette}
-              onAddPaletteColor={addColorToPalette}
-              onDragStart={onDragStart}
-              onCreateCourse={addCourseToCatalog}
-              onUpdateCourse={updateCourseInCatalog}
-              onRemoveCourse={removeCourseFromCatalog}
-              onCreateDistributive={addDistributive}
-              onCollapsePanel={() => handleLibraryOpenChange(false)}
-              isMobile
-              onQuickAddCourse={libraryMode === 'select' ? handleQuickAddCourse : undefined}
-              quickAddLabel="Add"
-              addCourseTrigger={catalogAddTrigger}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      <Sheet open={requirementsOpen} onOpenChange={setRequirementsOpen}>
+      <Sheet open={quickAddOpen} onOpenChange={handleQuickAddChange}>
         <SheetContent side="bottom" className="h-[85vh] overflow-y-auto px-4">
           <SheetHeader className="pb-2 text-left">
-            <SheetTitle>Requirements</SheetTitle>
-            <SheetDescription>Track majors, minors, and distributives.</SheetDescription>
+            <SheetTitle>Add to {libraryTargetLabel ?? 'a term'}</SheetTitle>
+            <SheetDescription>Select a class to drop into this term.</SheetDescription>
           </SheetHeader>
-          <RequirementsSidebar
-            totalCredits={stats.totalCredits}
-            maxCredits={state.requirements.totalCredits}
+          <CourseCatalog
+            courses={state.courseCatalog}
+            distributives={state.distributives}
             plans={state.plans}
-            planProgress={stats.planProgress}
-            onAddPlan={onAddPlan}
-            onUpdatePlan={onUpdatePlan}
-            onRemovePlan={onRemovePlan}
+            termSystem={termSystem}
             colorPalette={state.colorPalette}
             onAddPaletteColor={addColorToPalette}
-            onCollapsePanel={() => setRequirementsOpen(false)}
+            onDragStart={onDragStart}
+            onCreateCourse={addCourseToCatalog}
+            onUpdateCourse={updateCourseInCatalog}
+            onRemoveCourse={removeCourseFromCatalog}
+            onCreateDistributive={addDistributive}
+            onCollapsePanel={() => handleQuickAddChange(false)}
             isMobile
+            onQuickAddCourse={handleQuickAddCourse}
+            quickAddLabel="Add"
           />
         </SheetContent>
       </Sheet>
-      <MobilePlannerToolbar
-        onOpenLibrary={openLibraryBrowse}
-        onOpenRequirements={() => setRequirementsOpen(true)}
-        onAddYear={onAddYear}
+
+      <MobileDock
+        activePane={activePane}
+        onSelectPane={(pane) => setActivePane(pane)}
         onAddClass={handleStartAddClass}
-        onOpenExport={onOpenExport}
         onOpenSettings={onOpenSettings}
       />
     </>
