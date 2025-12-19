@@ -84,9 +84,9 @@ const MarketingFeatures = () => (
 );
 
 const MarketingWorkflow = () => (
-  <section className="bg-muted/30 py-16" id="workflow">
-    <div className="mx-auto flex max-w-5xl flex-col gap-8 px-6">
-      <header className="space-y-2 text-center">
+  <section className="py-16" id="workflow">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6">
+      <header className="space-y-2 text-left">
         <p className="text-xs uppercase tracking-[0.4rem] text-muted-foreground">How it works</p>
         <h2 className="text-3xl font-semibold text-foreground">Plan faster in three lightweight steps.</h2>
         <p className="text-base text-muted-foreground">
@@ -204,7 +204,7 @@ const Landing = () => {
       >
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -left-12 top-10 h-56 w-56 rounded-full bg-primary/25 blur-3xl" />
-          <div className="absolute right-0 bottom-10 h-64 w-64 rounded-full bg-amber-200/50 blur-3xl" />
+          <div className="absolute right-0 bottom-10 h-64 w-64 rounded-full bg-emerald-200/40 blur-3xl" />
         </div>
 
         <div className="relative mx-auto flex max-w-6xl flex-col gap-12 px-6 py-10 lg:flex-row lg:items-center lg:py-16">
@@ -253,7 +253,7 @@ const Landing = () => {
               </div>
               <div className="rounded-xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur">
                 <div className="flex items-start gap-3">
-                  <div className="rounded-lg bg-amber-100 p-2 text-amber-700">
+                  <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700">
                     <ShieldCheck className="h-4 w-4" />
                   </div>
                   <div>

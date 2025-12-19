@@ -2,6 +2,8 @@ import { GraduationCap, RotateCcw, Download, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { PlanSwitcher } from '@/components/PlanSwitcher';
+import { PlanProfile } from '@/types/planner';
 
 interface PlannerHeaderProps {
   degreeName: string;
@@ -17,6 +19,11 @@ interface PlannerHeaderProps {
   onOpenExport?: () => void;
   sticky?: boolean;
   isMobile?: boolean;
+  planProfiles?: PlanProfile[];
+  activePlanProfileId?: string;
+  onSelectPlanProfile?: (planId: string) => void;
+  onCreatePlanProfile?: (name: string, options?: { startBlank?: boolean }) => PlanProfile | void;
+  onDeletePlanProfile?: (planId: string) => void;
 }
 
 export const PlannerHeader = ({
@@ -33,13 +40,28 @@ export const PlannerHeader = ({
   onOpenExport,
   sticky = true,
   isMobile = false,
+  planProfiles,
+  activePlanProfileId,
+  onSelectPlanProfile,
+  onCreatePlanProfile,
+  onDeletePlanProfile,
 }: PlannerHeaderProps) => {
   const showAuth = Boolean(onSignIn || onSignOut);
   const signedIn = Boolean(userLabel);
   const authAction = signedIn ? onSignOut : onSignIn;
+  const handlersReady =
+    planProfiles && onSelectPlanProfile && onCreatePlanProfile && onDeletePlanProfile;
+  const activePlanProfile =
+    planProfiles && activePlanProfileId ? planProfiles.find((plan) => plan.id === activePlanProfileId) : null;
+  const planVariantLabel =
+    activePlanProfile && activePlanProfile.name && activePlanProfile.name !== degreeName
+      ? activePlanProfile.name
+      : null;
   const headerClass = `bg-card border-b border-border ${isMobile ? 'px-4 py-3' : 'px-6 py-4'} ${
     sticky ? 'sticky top-0 z-10' : 'relative z-10'
   }`;
+  const canShowPlanSwitcher = !isMobile && handlersReady;
+  const canShowPlanSwitcherMobile = isMobile && handlersReady;
 
   if (isMobile) {
     return (
@@ -57,7 +79,19 @@ export const PlannerHeader = ({
                 </p>
               </div>
             </div>
-            <ThemeToggle className="h-8 w-8" />
+            <div className="flex items-center gap-2">
+              {canShowPlanSwitcherMobile && (
+                <PlanSwitcher
+                  plans={planProfiles}
+                  activePlanId={activePlanProfileId ?? planProfiles![0]?.id ?? ''}
+                  onSelectPlan={onSelectPlanProfile!}
+                  onCreatePlan={onCreatePlanProfile!}
+                  onDeletePlan={onDeletePlanProfile!}
+                  compact
+                />
+              )}
+              <ThemeToggle className="h-8 w-8" />
+            </div>
           </div>
           <div className="flex gap-2">
             {showAuth && (
@@ -107,11 +141,26 @@ export const PlannerHeader = ({
               <span className="hidden sm:inline">•</span>
               <span className="text-[11px] sm:text-sm text-muted-foreground">Class of {classYear}</span>
             </p>
+            {planVariantLabel && !isMobile && (
+              <p className="text-xs text-muted-foreground">Plan profile: {planVariantLabel}</p>
+            )}
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:justify-end">
           <div className="flex items-center gap-2">
+            {canShowPlanSwitcher && (
+              <div className="hidden lg:block">
+                <PlanSwitcher
+                  plans={planProfiles}
+                  activePlanId={activePlanProfileId ?? planProfiles[0]?.id ?? ''}
+                  onSelectPlan={onSelectPlanProfile}
+                  onCreatePlan={onCreatePlanProfile}
+                  onDeletePlan={onDeletePlanProfile}
+                  compact
+                />
+              </div>
+            )}
             <ConfirmDialog
               trigger={
                 <Button variant="outline" size="sm">

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -10,12 +11,66 @@ import { UNIVERSITY_SUGGESTIONS } from '@/data/universities';
 const formatInitialValue = (value?: number | string | null) =>
   (value !== null && value !== undefined ? String(value) : "");
 
+const clampNumber = (value: number, min?: number, max?: number) => {
+  let nextValue = value;
+  if (typeof min === "number") {
+    nextValue = Math.max(min, nextValue);
+  }
+  if (typeof max === "number") {
+    nextValue = Math.min(max, nextValue);
+  }
+  return nextValue;
+};
+
+const stepNumericField = (
+  setter: Dispatch<SetStateAction<string>>,
+  delta: number,
+  fallback: number,
+  min?: number,
+  max?: number
+) => {
+  setter((previous) => {
+    const parsed = Number(previous);
+    const baseValue = Number.isFinite(parsed) ? parsed : fallback;
+    const stepped = clampNumber(baseValue + delta, min, max);
+    return String(stepped);
+  });
+};
+
 type PlannerSetupDialogProps = {
   open: boolean;
   onClose?: () => void;
   onSave: (config: PlannerConfig) => void;
   initialConfig?: PlannerConfig | null;
 };
+
+type StepperButtonsProps = {
+  onIncrement: () => void;
+  onDecrement: () => void;
+  increaseLabel: string;
+  decreaseLabel: string;
+};
+
+const StepperButtons = ({ onIncrement, onDecrement, increaseLabel, decreaseLabel }: StepperButtonsProps) => (
+  <div className="absolute inset-y-1 right-1 flex w-8 flex-col overflow-hidden rounded-md border border-border bg-muted/40 shadow-sm focus-within:ring-1 focus-within:ring-ring">
+    <button
+      type="button"
+      aria-label={increaseLabel}
+      className="flex flex-1 items-center justify-center text-muted-foreground transition hover:bg-background hover:text-foreground focus-visible:outline-none"
+      onClick={onIncrement}
+    >
+      <ChevronUp className="h-3 w-3" />
+    </button>
+    <button
+      type="button"
+      aria-label={decreaseLabel}
+      className="flex flex-1 items-center justify-center text-muted-foreground transition hover:bg-background hover:text-foreground focus-visible:outline-none"
+      onClick={onDecrement}
+    >
+      <ChevronDown className="h-3 w-3" />
+    </button>
+  </div>
+);
 
 export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: PlannerSetupDialogProps) => {
   const fallbackDefaults = useMemo(() => {
@@ -37,11 +92,45 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: Pla
   const [planName, setPlanName] = useState(() => initialConfig?.planName ?? "");
   const [university, setUniversity] = useState(() => initialConfig?.university ?? "");
   const [universityFocused, setUniversityFocused] = useState(false);
-  const [universityQuery, setUniversityQuery] = useState('');
   const filteredUniversities = useMemo(() => {
     const query = university.trim().toLowerCase();
-    if (!query) return UNIVERSITY_SUGGESTIONS.slice(0, 6);
-    return UNIVERSITY_SUGGESTIONS.filter((school) => school.toLowerCase().includes(query)).slice(0, 6);
+    if (!query) return [];
+    const prioritySchools = [
+      "Harvard University",
+      "Yale University",
+      "Princeton University",
+      "Columbia University in the City of New York",
+      "Cornell University",
+      "University of Pennsylvania",
+      "Brown University",
+      "Dartmouth College",
+      "Massachusetts Institute of Technology",
+      "Stanford University",
+      "University of California, Berkeley",
+      "University of California-Los Angeles",
+      "University of Michigan-Ann Arbor",
+      "University of Chicago",
+      "California Institute of Technology",
+      "University of Southern California",
+      "University of Texas at Austin",
+      "University of Washington-Seattle Campus",
+      "University of Florida",
+      "Georgia Institute of Technology-Main Campus",
+    ];
+    const priorityMap = new Map(prioritySchools.map((name, index) => [name.toLowerCase(), index]));
+    return UNIVERSITY_SUGGESTIONS.filter((school) => school.toLowerCase().includes(query))
+      .sort((a, b) => {
+        const aLower = a.toLowerCase();
+        const bLower = b.toLowerCase();
+        const aStarts = aLower.startsWith(query);
+        const bStarts = bLower.startsWith(query);
+        if (aStarts !== bStarts) return aStarts ? -1 : 1;
+        const aPriority = priorityMap.has(aLower) ? priorityMap.get(aLower) : Infinity;
+        const bPriority = priorityMap.has(bLower) ? priorityMap.get(bLower) : Infinity;
+        if (aPriority !== bPriority) return aPriority - bPriority;
+        return a.localeCompare(b);
+      })
+      .slice(0, 6);
   }, [university]);
 
   useEffect(() => {
@@ -147,14 +236,23 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: Pla
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="start-year">Starting academic year</Label>
-              <Input
-                id="start-year"
-                type="number"
-                min={2000}
-                max={3000}
-                value={startYear}
-                onChange={(e) => setStartYear(e.target.value)}
-              />
+              <div className="relative">
+                <Input
+                  id="start-year"
+                  type="number"
+                  min={2000}
+                  max={3000}
+                  value={startYear}
+                  onChange={(e) => setStartYear(e.target.value)}
+                  className="pr-12"
+                />
+                <StepperButtons
+                  increaseLabel="Increase start year"
+                  decreaseLabel="Decrease start year"
+                  onIncrement={() => stepNumericField(setStartYear, 1, fallbackDefaults.startYear, 2000, 3000)}
+                  onDecrement={() => stepNumericField(setStartYear, -1, fallbackDefaults.startYear, 2000, 3000)}
+                />
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -185,26 +283,44 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: Pla
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="classes-per-term">Classes per term</Label>
-              <Input
-                id="classes-per-term"
-                type="number"
-                min={1}
-                max={10}
-                value={classesPerTerm}
-                onChange={(e) => setClassesPerTerm(e.target.value)}
-              />
+              <div className="relative">
+                <Input
+                  id="classes-per-term"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={classesPerTerm}
+                  onChange={(e) => setClassesPerTerm(e.target.value)}
+                  className="pr-12"
+                />
+                <StepperButtons
+                  increaseLabel="Increase classes per term"
+                  decreaseLabel="Decrease classes per term"
+                  onIncrement={() => stepNumericField(setClassesPerTerm, 1, fallbackDefaults.classesPerTerm, 1, 10)}
+                  onDecrement={() => stepNumericField(setClassesPerTerm, -1, fallbackDefaults.classesPerTerm, 1, 10)}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="total-credits">Credits to graduate</Label>
-              <Input
-                id="total-credits"
-                type="number"
-                min={1}
-                max={400}
-                value={totalCredits}
-                onChange={(e) => setTotalCredits(e.target.value)}
-              />
+              <div className="relative">
+                <Input
+                  id="total-credits"
+                  type="number"
+                  min={1}
+                  max={400}
+                  value={totalCredits}
+                  onChange={(e) => setTotalCredits(e.target.value)}
+                  className="pr-12"
+                />
+                <StepperButtons
+                  increaseLabel="Increase credits to graduate"
+                  decreaseLabel="Decrease credits to graduate"
+                  onIncrement={() => stepNumericField(setTotalCredits, 1, fallbackDefaults.totalCredits, 1, 400)}
+                  onDecrement={() => stepNumericField(setTotalCredits, -1, fallbackDefaults.totalCredits, 1, 400)}
+                />
+              </div>
             </div>
           </div>
 

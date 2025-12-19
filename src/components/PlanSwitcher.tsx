@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, Copy, Pencil, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -18,15 +18,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { PlanProfile } from '@/types/planner';
 import { buildDuplicatePlanName, DEFAULT_PLAN_NAME, getSuggestedPlanName } from '@/lib/plannerProfiles';
 
-type PlanDialogMode = 'create' | 'rename';
-
 type PlanSwitcherProps = {
   plans: PlanProfile[];
   activePlanId: string;
   onSelectPlan: (planId: string) => void;
   onCreatePlan: (name: string, options?: { startBlank?: boolean }) => PlanProfile | void;
-  onRenamePlan: (planId: string, name: string) => void;
   onDeletePlan: (planId: string) => void;
+  compact?: boolean;
 };
 
 export const PlanSwitcher = ({
@@ -34,11 +32,10 @@ export const PlanSwitcher = ({
   activePlanId,
   onSelectPlan,
   onCreatePlan,
-  onRenamePlan,
   onDeletePlan,
+  compact = false,
 }: PlanSwitcherProps) => {
   const activePlan = useMemo(() => plans.find((plan) => plan.id === activePlanId), [plans, activePlanId]);
-  const [dialogMode, setDialogMode] = useState<PlanDialogMode>('create');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [planName, setPlanName] = useState('');
   const [startBlank, setStartBlank] = useState(false);
@@ -50,30 +47,14 @@ export const PlanSwitcher = ({
   }, [activePlan?.name, plans]);
 
   const openCreateDialog = (blank = false) => {
-    setDialogMode('create');
     setPlanName(blank ? '' : defaultNewPlanName);
     setStartBlank(blank);
     setDialogOpen(true);
   };
 
-  const openRenameDialog = () => {
-    setDialogMode('rename');
-    setPlanName(activePlan?.name ?? '');
-    setStartBlank(false);
-    setDialogOpen(true);
-  };
-
   const handleSubmitDialog = () => {
-    const normalizedName = planName.trim();
-    if (!normalizedName) {
-      return;
-    }
-
-    if (dialogMode === 'create') {
-      onCreatePlan(normalizedName, { startBlank });
-    } else if (activePlanId) {
-      onRenamePlan(activePlanId, normalizedName);
-    }
+    if (!planName.trim()) return;
+    onCreatePlan(planName, { startBlank });
     setDialogOpen(false);
   };
 
@@ -82,22 +63,15 @@ export const PlanSwitcher = ({
     onDeletePlan(activePlanId);
   };
 
-  return (
-    <div className="rounded-lg border border-border bg-card/80 p-3 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">My Plans</p>
-          <p className="text-sm font-semibold text-foreground">{activePlan?.name ?? 'Select a plan'}</p>
-          {/* <p className="text-[11px] text-muted-foreground">Save variations and swap quickly.</p> */}
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-1">
-              My Plans
-              <ChevronDown className="h-4 w-4" aria-hidden />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-72" align="start" sideOffset={8}>
+  const dropdown = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1">
+          My Plans
+          <ChevronDown className="h-4 w-4" aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-72" align={compact ? "end" : "start"} sideOffset={8}>
             <DropdownMenuLabel>Saved plans</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuRadioGroup value={activePlanId} onValueChange={onSelectPlan}>
@@ -127,15 +101,6 @@ export const PlanSwitcher = ({
               New blank plan
             </DropdownMenuItem>
             <DropdownMenuItem
-              onSelect={(event) => {
-                event.preventDefault();
-                openRenameDialog();
-              }}
-            >
-              <Pencil className="h-4 w-4 mr-2" aria-hidden />
-              Rename current plan
-            </DropdownMenuItem>
-            <DropdownMenuItem
               disabled={plans.length <= 1}
               className="text-destructive focus:text-destructive"
               onSelect={(event) => {
@@ -146,14 +111,15 @@ export const PlanSwitcher = ({
               <Trash2 className="h-4 w-4 mr-2" aria-hidden />
               Delete current plan
             </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
-      <Dialog
-        open={dialogOpen}
-        onOpenChange={(open) => {
-          setDialogOpen(open);
+  const dialog = (
+    <Dialog
+      open={dialogOpen}
+      onOpenChange={(open) => {
+        setDialogOpen(open);
           if (!open) {
             setStartBlank(false);
           }
@@ -161,12 +127,8 @@ export const PlanSwitcher = ({
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{dialogMode === 'create' ? 'Save as a new plan' : 'Rename this plan'}</DialogTitle>
-            <DialogDescription>
-              {dialogMode === 'create'
-                ? 'Capture this schedule as its own plan so you can branch out ideas.'
-                : 'Give this plan a clear name so you can spot it later.'}
-            </DialogDescription>
+            <DialogTitle>Save as a new plan</DialogTitle>
+            <DialogDescription>Capture this schedule as its own plan so you can branch out ideas.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
@@ -179,28 +141,46 @@ export const PlanSwitcher = ({
                 onChange={(event) => setPlanName(event.target.value)}
               />
             </div>
-            {dialogMode === 'create' && (
-              <label className="flex items-center gap-2 text-sm text-foreground">
-                <Checkbox
-                  checked={startBlank}
-                  onCheckedChange={(checked) => setStartBlank(Boolean(checked))}
-                  aria-label="Start from an empty schedule"
-                />
-                <span className="text-sm">Start from an empty schedule</span>
-              </label>
-            )}
+            <label className="flex items-center gap-2 text-sm text-foreground">
+              <Checkbox
+                checked={startBlank}
+                onCheckedChange={(checked) => setStartBlank(Boolean(checked))}
+                aria-label="Start from an empty schedule"
+              />
+              <span className="text-sm">Start from an empty schedule</span>
+            </label>
           </div>
 
           <div className="flex justify-end gap-2 pt-3">
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmitDialog} disabled={!planName.trim()}>
-              {dialogMode === 'create' ? 'Create plan' : 'Save name'}
-            </Button>
+            <Button onClick={handleSubmitDialog} disabled={!planName.trim()}>Create plan</Button>
           </div>
         </DialogContent>
       </Dialog>
+  );
+
+  if (compact) {
+    return (
+      <>
+        <div className="flex items-center justify-end gap-2">{dropdown}</div>
+        {dialog}
+      </>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-card/80 p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">My Plans</p>
+          <p className="text-sm font-semibold text-foreground">{activePlan?.name ?? 'Select a plan'}</p>
+          <p className="text-[11px] text-muted-foreground">Save variations and swap quickly.</p>
+        </div>
+        {dropdown}
+      </div>
+      {dialog}
     </div>
   );
 };

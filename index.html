@@ -33,6 +33,24 @@
     <meta name="twitter:image" content="https://majorbuddy.xyz/favicon-degree.svg?v=2" />
     <meta name="twitter:site" content="@majorbuddy" />
 
+    <script>
+      (function () {
+        try {
+          const storageKey = "majorbuddy-theme";
+          const stored = localStorage.getItem(storageKey);
+          const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          const theme = stored === "light" || stored === "dark" ? stored : prefersDark ? "dark" : "light";
+          if (theme === "dark") {
+            document.documentElement.classList.add("dark");
+          } else {
+            document.documentElement.classList.remove("dark");
+          }
+        } catch (error) {
+          // Ignore failures (e.g., localStorage unavailable) and fall back to default light theme.
+        }
+      })();
+    </script>
+
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -52,6 +70,23 @@
           "price": "0",
           "priceCurrency": "USD"
         }
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "MajorBuddy",
+        "url": "https://majorbuddy.xyz/",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://majorbuddy.xyz/favicon-degree.svg",
+          "width": 256,
+          "height": 256
+        },
+        "sameAs": [
+          "https://twitter.com/majorbuddy"
+        ]
       }
     </script>
   </head>

@@ -25,6 +25,7 @@ interface RequirementsProps {
   colorPalette: string[];
   onAddPaletteColor: (hex: string) => string | void;
   onCollapsePanel?: () => void;
+  isMobile?: boolean;
 }
 
 export const RequirementsSidebar = ({
@@ -38,6 +39,7 @@ export const RequirementsSidebar = ({
   colorPalette,
   onAddPaletteColor,
   onCollapsePanel,
+  isMobile = false,
 }: RequirementsProps) => {
   const [planName, setPlanName] = useState('');
   const [planType, setPlanType] = useState<PlanType>('major');
@@ -117,7 +119,7 @@ export const RequirementsSidebar = ({
             {/* Track overall credits and see progress for each major/minor. */}
           </p>
         </div>
-        {onCollapsePanel && (
+        {onCollapsePanel && !isMobile && (
           <Button
             variant="ghost"
             size="icon"
@@ -158,9 +160,6 @@ export const RequirementsSidebar = ({
         >
           Add major/minor
         </Button>
-        <p className="text-[11px] text-muted-foreground text-center">
-          {/* Capture class counts, credits, and colors for each plan. */}
-        </p>
       </div>
 
       <div className="space-y-3">
@@ -246,13 +245,11 @@ export const RequirementsSidebar = ({
                       style={{ width: `${pct}%`, ...(accentStyle ?? {}) }}
                     />
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    {targetClasses === 0
-                      ? 'Add a class goal to see progress here.'
-                      : total === 0
-                        ? 'No tagged classes yet. Add one from the library to begin tracking.'
-                        : `${scheduled} tagged from your library.`}
-                  </p>
+                  {targetClasses === 0 ? (
+                    <p className="text-[11px] text-muted-foreground">Add a class goal to see progress here.</p>
+                  ) : scheduled > 0 ? (
+                    <p className="text-[11px] text-muted-foreground">{`${scheduled} tagged from your library.`}</p>
+                  ) : null}
                 </div>
               </div>
             );

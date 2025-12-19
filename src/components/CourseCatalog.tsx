@@ -1,6 +1,6 @@
-import { CSSProperties, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, BookOpen, ChevronsLeft, Pencil, Plus, Search, Tag, Trash } from 'lucide-react';
-import { Course, NewCourseInput, PlanProfile, PlannerPlan, TermName, TermSystem } from '@/types/planner';
+import { Course, NewCourseInput, PlannerPlan } from '@/types/planner';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { getTagAccentClass, getTagAccentStyle, getTagColorClasses, getTagColorStyle } from '@/lib/tagColors';
 import { cn } from '@/lib/utils';
-import { PlanSwitcher } from '@/components/PlanSwitcher';
 import { TagColorPicker } from '@/components/TagColorPicker';
 import { Checkbox } from '@/components/ui/checkbox';
 
@@ -18,19 +17,11 @@ interface CourseCatalogProps {
   courses: Course[];
   distributives: string[];
   plans: PlannerPlan[];
-  colorPalette: string[];
-  onAddPaletteColor: (hex: string) => string | void;
-  planProfiles: PlanProfile[];
-  activePlanProfileId: string;
   onDragStart: (course: Course) => void;
   onCreateCourse: (course: NewCourseInput) => void;
   onUpdateCourse: (courseId: string, course: NewCourseInput) => void;
   onRemoveCourse: (courseId: string) => void;
   onCreateDistributive: (label: string) => string;
-  onCreatePlanProfile: (name: string, options?: { startBlank?: boolean }) => PlanProfile | void;
-  onSelectPlanProfile: (planId: string) => void;
-  onRenamePlanProfile: (planId: string, name: string) => void;
-  onDeletePlanProfile: (planId: string) => void;
   onCollapsePanel?: () => void;
   termSystem: TermSystem;
   isMobile?: boolean;
@@ -116,19 +107,11 @@ export const CourseCatalog = ({
   courses,
   distributives,
   plans,
-  colorPalette,
-  onAddPaletteColor,
-  planProfiles,
-  activePlanProfileId,
   onDragStart,
   onCreateCourse,
   onUpdateCourse,
   onRemoveCourse,
   onCreateDistributive,
-  onCreatePlanProfile,
-  onSelectPlanProfile,
-  onRenamePlanProfile,
-  onDeletePlanProfile,
   onCollapsePanel,
   termSystem,
   isMobile = false,
@@ -278,8 +261,12 @@ export const CourseCatalog = ({
     setDialogOpen(true);
   };
 
+  const lastAddTrigger = useRef<number | null>(null);
+
   useEffect(() => {
     if (!addCourseTrigger) return;
+    if (lastAddTrigger.current === addCourseTrigger) return;
+    lastAddTrigger.current = addCourseTrigger;
     setFormState(createEmptyCourseForm());
     setEditingCourse(null);
     setDialogOpen(true);
@@ -370,14 +357,6 @@ export const CourseCatalog = ({
   return (
     <aside className="bg-card border-r border-border flex flex-col h-screen sticky top-0 min-w-[260px] max-w-full">
       <div className="p-4 border-b border-border space-y-4">
-        <PlanSwitcher
-          plans={planProfiles}
-          activePlanId={activePlanProfileId}
-          onSelectPlan={onSelectPlanProfile}
-          onCreatePlan={onCreatePlanProfile}
-          onRenamePlan={onRenamePlanProfile}
-          onDeletePlan={onDeletePlanProfile}
-        />
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-muted-foreground" />
@@ -393,12 +372,13 @@ export const CourseCatalog = ({
               <Plus className="h-4 w-4 mr-1" />
               Add class
             </Button>
-            {onCollapsePanel && (
+            {onCollapsePanel && !isMobile && (
               <Button
                 size="icon"
                 variant="ghost"
                 className="h-8 w-8"
                 onClick={onCollapsePanel}
+                aria-label="Collapse class library"
               >
                 <ChevronsLeft className="h-4 w-4" />
               </Button>
