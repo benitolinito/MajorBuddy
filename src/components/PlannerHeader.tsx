@@ -17,6 +17,7 @@ interface PlannerHeaderProps {
   onSignOut?: () => void;
   onOpenSettings?: () => void;
   onOpenExport?: () => void;
+  onOpenProfile?: () => void;
   sticky?: boolean;
   isMobile?: boolean;
   planProfiles?: PlanProfile[];
@@ -38,6 +39,7 @@ export const PlannerHeader = ({
   onSignOut,
   onOpenSettings,
   onOpenExport,
+  onOpenProfile,
   sticky = true,
   isMobile = false,
   planProfiles,
@@ -49,6 +51,7 @@ export const PlannerHeader = ({
   const showAuth = Boolean(onSignIn || onSignOut);
   const signedIn = Boolean(userLabel);
   const authAction = signedIn ? onSignOut : onSignIn;
+  const canOpenProfile = signedIn && Boolean(onOpenProfile);
   const handlersReady =
     planProfiles && onSelectPlanProfile && onCreatePlanProfile && onDeletePlanProfile;
   const activePlanProfile =
@@ -192,9 +195,20 @@ export const PlannerHeader = ({
           {showAuth && (
             <div className="flex items-center gap-2">
               <div className="hidden lg:flex flex-col items-end">
-                <span className="text-xs font-medium text-foreground">
-                  {signedIn ? userLabel : "Sign in to sync"}
-                </span>
+                {canOpenProfile ? (
+                  <button
+                    type="button"
+                    onClick={onOpenProfile}
+                    className="text-xs font-medium text-foreground transition hover:text-primary"
+                    aria-haspopup="dialog"
+                  >
+                    {userLabel}
+                  </button>
+                ) : (
+                  <span className="text-xs font-medium text-foreground">
+                    {signedIn ? userLabel : "Sign in to sync"}
+                  </span>
+                )}
                 {cloudStatus && (
                   <span className="text-[11px] text-muted-foreground">{cloudStatus}</span>
                 )}

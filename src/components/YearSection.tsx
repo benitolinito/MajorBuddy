@@ -19,6 +19,7 @@ interface YearSectionProps {
   canRemoveYear: boolean;
   showDeleteControls?: boolean;
   onRequestCourseAction?: (payload: { yearId: string; termId: string; course: Course }) => void;
+  onAddCourseToTerm?: (termId: string) => void;
 }
 
 export const YearSection = ({
@@ -34,6 +35,7 @@ export const YearSection = ({
   canRemoveYear,
   showDeleteControls = false,
   onRequestCourseAction,
+  onAddCourseToTerm,
 }: YearSectionProps) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const deleteControlsVisible = showDeleteControls || isMobile;
@@ -93,6 +95,7 @@ export const YearSection = ({
                 ? (course) => onRequestCourseAction({ yearId: year.id, termId: term.id, course })
                 : undefined
             }
+            onAddCourse={onAddCourseToTerm ? () => onAddCourseToTerm(term.id) : undefined}
           />
         ))}
         

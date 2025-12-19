@@ -29,6 +29,7 @@ interface TermCardProps {
   isStacked?: boolean;
   showDeleteControls?: boolean;
   onRequestCourseAction?: (course: Course) => void;
+  onAddCourse?: () => void;
 }
 
 export const TermCard = ({
@@ -42,6 +43,7 @@ export const TermCard = ({
   isStacked = false,
   showDeleteControls = false,
   onRequestCourseAction,
+  onAddCourse,
 }: TermCardProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [indicatorIndex, setIndicatorIndex] = useState<number | null>(null);
@@ -219,7 +221,7 @@ export const TermCard = ({
   const remainingSummary = summaryChips.length - visibleSummaryChips.length;
   const emptyTitle = isStacked ? 'No classes scheduled' : 'Drag courses here';
   const emptyDescription = isStacked
-    ? 'Tap "Add to term" in the Class Library to place a class.'
+    ? 'Tap "Add class" below to pick from your library.'
     : 'Drop classes into this term to schedule them.';
 
   const containerClassName = cn(
@@ -288,7 +290,7 @@ export const TermCard = ({
           )}
         </div>
       )}
-      
+
       <div ref={listRef} className={cn('space-y-2', isStacked ? 'min-h-[100px]' : 'min-h-[120px]')}>
         {isEmpty ? (
           <div
@@ -329,6 +331,17 @@ export const TermCard = ({
         )}
         {showIndicatorAt(term.courses.length) && renderDropIndicator(term.courses.length)}
       </div>
+      {onAddCourse && isStacked && (
+        <Button
+          type="button"
+          variant="secondary"
+          className="mt-3 w-full justify-center gap-2"
+          onClick={onAddCourse}
+        >
+          <Plus className="h-4 w-4" />
+          Add class
+        </Button>
+      )}
     </div>
   );
 };

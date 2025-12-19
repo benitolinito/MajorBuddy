@@ -16,6 +16,7 @@ import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks, Download, Sett
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { cn } from '@/lib/utils';
 import { AuthDialog } from '@/components/AuthDialog';
+import { ProfileDialog } from '@/components/ProfileDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -85,6 +86,7 @@ const Index = () => {
   const [showSetup, setShowSetup] = useState(!hasConfig);
   const [showExport, setShowExport] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [showDeleteControls, setShowDeleteControls] = useState(false);
   const [duplicatePrompt, setDuplicatePrompt] = useState<{
     course: Course;
@@ -93,9 +95,6 @@ const Index = () => {
     targetTermId: string;
     targetIndex?: number;
   } | null>(null);
-  const [quickAddCourse, setQuickAddCourse] = useState<Course | null>(null);
-  const [quickAddTarget, setQuickAddTarget] = useState('');
-  const [preferredQuickAddTarget, setPreferredQuickAddTarget] = useState('');
   const [courseActionPrompt, setCourseActionPrompt] = useState<{
     course: Course;
     yearId: string;
@@ -122,9 +121,6 @@ const Index = () => {
     });
     return options;
   }, [state.years]);
-  const quickAddCourseLabel = quickAddCourse
-    ? ([quickAddCourse.code, quickAddCourse.name].filter(Boolean).join(' ').trim() || 'this class')
-    : 'this class';
   const courseActionCourseLabel = courseActionPrompt
     ? ([courseActionPrompt.course.code, courseActionPrompt.course.name].filter(Boolean).join(' ').trim() || 'this class')
     : 'this class';
@@ -135,9 +131,15 @@ const Index = () => {
       courseActionTarget === `${courseActionPrompt.yearId}:${courseActionPrompt.termId}`);
 
   const handleOpenAuth = () => setShowAuth(true);
+  const handleOpenProfile = () => setShowProfile(true);
   const handleOpenSettings = () => setShowSetup(true);
   const handleOpenExport = () => setShowExport(true);
   const toggleDeleteControls = () => setShowDeleteControls((prev) => !prev);
+
+  const handleSignOut = async () => {
+    await signOut();
+    window.location.reload();
+  };
 
   const plannerHeaderProps: PlannerHeaderSharedProps = {
     degreeName: plannerTitle,
@@ -148,7 +150,8 @@ const Index = () => {
     cloudStatus,
     cloudBusy,
     onSignIn: handleOpenAuth,
-    onSignOut: signOut,
+    onSignOut: handleSignOut,
+    onOpenProfile: handleOpenProfile,
     onOpenSettings: handleOpenSettings,
     onOpenExport: handleOpenExport,
     planProfiles,
@@ -195,30 +198,6 @@ const Index = () => {
       addCourseToTerm(yearId, termId, course, options?.targetIndex);
     }
     setDraggedCourse(null);
-  };
-
-  const handleQuickAddRequest = (course: Course) => {
-    setQuickAddCourse(course);
-    const defaultTarget =
-      (preferredQuickAddTarget && quickAddOptions.find((option) => option.value === preferredQuickAddTarget)?.value) ||
-      quickAddOptions[0]?.value ||
-      '';
-    setQuickAddTarget(defaultTarget);
-  };
-
-  const closeQuickAddDialog = () => {
-    setQuickAddCourse(null);
-    setQuickAddTarget('');
-  };
-
-  const handleQuickAddConfirm = () => {
-    if (!quickAddCourse || !quickAddTarget) return;
-    const [targetYearId, targetTermId] = quickAddTarget.split(':');
-    if (!targetYearId || !targetTermId) return;
-    handleDropCourse(targetYearId, targetTermId, quickAddCourse);
-    setPreferredQuickAddTarget(quickAddTarget);
-    setQuickAddCourse(null);
-    setQuickAddTarget('');
   };
 
   const handleRequestCourseAction = (payload: { course: Course; yearId: string; termId: string }) => {
@@ -272,13 +251,19 @@ const Index = () => {
   }, [hasConfig]);
 
   useEffect(() => {
+    if (!user) {
+      setShowProfile(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
     if (!isMobile) return;
     const storageKey = 'majorbuddy-mobile-add-hint';
     if (typeof window === 'undefined') return;
     const hasSeen = window.localStorage.getItem(storageKey);
     if (hasSeen) return;
     toast('Add classes without dragging', {
-      description: 'Tap "Add to term" inside Class Library cards to place a course into a term.',
+      description: 'Tap "Add class" inside a term to pick from your library.',
     });
     window.localStorage.setItem(storageKey, 'seen');
   }, [isMobile]);
@@ -351,54 +336,16 @@ const Index = () => {
         onEmailSignIn={signInWithEmail}
         onEmailRegister={registerWithEmail}
       />
-      <Dialog
-        open={Boolean(quickAddCourse)}
-        onOpenChange={(open) => {
-          if (!open) {
-            closeQuickAddDialog();
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add {quickAddCourseLabel} to a term</DialogTitle>
-            <DialogDescription>
-              Choose where this class should appear in your schedule.
-            </DialogDescription>
-          </DialogHeader>
-          {quickAddOptions.length > 0 ? (
-            <>
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">Destination term</p>
-                <Select value={quickAddTarget} onValueChange={setQuickAddTarget}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a term" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {quickAddOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <DialogFooter className="gap-2 pt-4">
-                <Button type="button" variant="outline" onClick={closeQuickAddDialog}>
-                  Cancel
-                </Button>
-                <Button type="button" onClick={handleQuickAddConfirm} disabled={!quickAddTarget}>
-                  Add class
-                </Button>
-              </DialogFooter>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Add a year or term to choose a destination for {quickAddCourseLabel}.
-            </p>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ProfileDialog
+        open={showProfile}
+        onOpenChange={setShowProfile}
+        userLabel={userLabel}
+        userEmail={user?.email}
+        userPhotoUrl={user?.photoURL}
+        cloudStatus={cloudStatus}
+        colorPalette={state.colorPalette}
+        onSignOut={handleSignOut}
+      />
       <Dialog
         open={Boolean(courseActionPrompt)}
         onOpenChange={(open) => {
@@ -484,7 +431,6 @@ const Index = () => {
           onRemoveTerm={removeTerm}
           onRemoveYear={removeYear}
           onRequestCourseAction={handleRequestCourseAction}
-          onQuickAddCourse={handleQuickAddRequest}
           onAddPlan={addPlan}
           onUpdatePlan={updatePlan}
           onRemovePlan={removePlan}
@@ -582,7 +528,7 @@ const MobilePlannerToolbar = ({
       </Button>
       <Button variant="outline" className="justify-center gap-1.5 py-2 text-xs" onClick={onAddClass}>
         <Plus className="h-3.5 w-3.5" />
-        Add class
+        New class
       </Button>
     </div>
     <div className="grid grid-cols-3 gap-3 text-xs font-medium">
@@ -651,7 +597,6 @@ type MobilePlannerLayoutProps = {
   onRemoveTerm: (yearId: string, termId: string) => void;
   onRemoveYear: (yearId: string) => void;
   onRequestCourseAction: (payload: { course: Course; yearId: string; termId: string }) => void;
-  onQuickAddCourse: (course: Course) => void;
   onAddPlan: (plan: PlanInput) => PlannerPlan | null;
   onUpdatePlan: (planId: string, plan: PlanInput) => void;
   onRemovePlan: (planId: string) => void;
@@ -679,7 +624,6 @@ const MobilePlannerLayout = ({
   onRemoveTerm,
   onRemoveYear,
   onRequestCourseAction,
-  onQuickAddCourse,
   onAddPlan,
   onUpdatePlan,
   onRemovePlan,
@@ -695,19 +639,55 @@ const MobilePlannerLayout = ({
 }: MobilePlannerLayoutProps) => {
   const [activeYearId, setActiveYearId] = useState(() => state.years[0]?.id ?? '');
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryMode, setLibraryMode] = useState<'browse' | 'select'>('browse');
+  const [libraryTarget, setLibraryTarget] = useState<{ yearId: string; termId: string } | null>(null);
   const [requirementsOpen, setRequirementsOpen] = useState(false);
   const [catalogAddTrigger, setCatalogAddTrigger] = useState(0);
+
+  const libraryTargetLabel = useMemo(() => {
+    if (!libraryTarget) return null;
+    const year = state.years.find((item) => item.id === libraryTarget.yearId);
+    const term = year?.terms.find((item) => item.id === libraryTarget.termId);
+    if (!year || !term) return null;
+    return `${year.name} • ${term.name} ${term.year}`;
+  }, [libraryTarget, state.years]);
+
+  const libraryTitle = libraryMode === 'select' ? 'Add class' : 'Class Library';
+  const libraryDescription =
+    libraryMode === 'select'
+      ? `Select a class from your library to add to ${libraryTargetLabel ?? 'this term'}.`
+      : 'Browse and edit your saved courses.';
 
   const handleLibraryOpenChange = (open: boolean) => {
     setLibraryOpen(open);
     if (!open) {
       setCatalogAddTrigger(0);
+      setLibraryMode('browse');
+      setLibraryTarget(null);
     }
   };
 
-  const handleStartAddClass = () => {
+  const openLibraryBrowse = () => {
+    setLibraryMode('browse');
+    setLibraryTarget(null);
     setLibraryOpen(true);
+  };
+
+  const handleStartAddClass = () => {
+    openLibraryBrowse();
     setCatalogAddTrigger(Date.now());
+  };
+
+  const handleOpenTermPicker = (yearId: string, termId: string) => {
+    setLibraryMode('select');
+    setLibraryTarget({ yearId, termId });
+    setCatalogAddTrigger(0);
+    setLibraryOpen(true);
+  };
+
+  const handleQuickAddCourse = (course: Course) => {
+    if (!libraryTarget) return;
+    onDropCourse(libraryTarget.yearId, libraryTarget.termId, course);
   };
 
   return (
@@ -734,6 +714,7 @@ const MobilePlannerLayout = ({
                 canRemoveYear={canRemoveYear}
                 termSystem={termSystem}
                 onRequestCourseAction={onRequestCourseAction}
+                onAddCourseToTerm={(termId) => handleOpenTermPicker(year.id, termId)}
               />
             ))}
         </div>
@@ -742,8 +723,22 @@ const MobilePlannerLayout = ({
       <Sheet open={libraryOpen} onOpenChange={handleLibraryOpenChange}>
         <SheetContent side="bottom" className="h-[90vh] overflow-y-auto px-2">
           <SheetHeader className="pb-2 text-left">
-            <SheetTitle>Class Library</SheetTitle>
-            <SheetDescription>Browse and edit your saved courses.</SheetDescription>
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <SheetTitle>{libraryTitle}</SheetTitle>
+                <SheetDescription>{libraryDescription}</SheetDescription>
+              </div>
+              {libraryMode === 'select' && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleLibraryOpenChange(false)}
+                >
+                  Done
+                </Button>
+              )}
+            </div>
           </SheetHeader>
           <div className="pb-6">
             <CourseCatalog
@@ -760,7 +755,8 @@ const MobilePlannerLayout = ({
               onCreateDistributive={addDistributive}
               onCollapsePanel={() => handleLibraryOpenChange(false)}
               isMobile
-              onQuickAddCourse={onQuickAddCourse}
+              onQuickAddCourse={libraryMode === 'select' ? handleQuickAddCourse : undefined}
+              quickAddLabel="Add"
               addCourseTrigger={catalogAddTrigger}
             />
           </div>
@@ -789,7 +785,7 @@ const MobilePlannerLayout = ({
         </SheetContent>
       </Sheet>
       <MobilePlannerToolbar
-        onOpenLibrary={() => setLibraryOpen(true)}
+        onOpenLibrary={openLibraryBrowse}
         onOpenRequirements={() => setRequirementsOpen(true)}
         onAddYear={onAddYear}
         onAddClass={handleStartAddClass}

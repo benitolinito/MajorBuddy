@@ -39,6 +39,7 @@ export const PlanSwitcher = ({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [planName, setPlanName] = useState('');
   const [startBlank, setStartBlank] = useState(false);
+  const planLabel = activePlan?.name ?? 'Select a plan';
 
   const defaultNewPlanName = useMemo(() => {
     if (activePlan?.name) return buildDuplicatePlanName(activePlan.name, plans);
@@ -66,51 +67,55 @@ export const PlanSwitcher = ({
   const dropdown = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1">
-          My Plans
+        <Button
+          variant="outline"
+          size="sm"
+          className={compact ? 'max-w-[200px] justify-between' : 'w-full justify-between'}
+        >
+          <span className="min-w-0 flex-1 truncate text-left">{planLabel}</span>
           <ChevronDown className="h-4 w-4" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-72" align={compact ? "end" : "start"} sideOffset={8}>
-            <DropdownMenuLabel>Saved plans</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuRadioGroup value={activePlanId} onValueChange={onSelectPlan}>
-              {plans.map((plan) => (
-                <DropdownMenuRadioItem key={plan.id} value={plan.id}>
-                  {plan.name}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onSelect={(event) => {
-                event.preventDefault();
-                openCreateDialog(false);
-              }}
-            >
-              <Copy className="h-4 w-4 mr-2" aria-hidden />
-              Duplicate current plan
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={(event) => {
-                event.preventDefault();
-                openCreateDialog(true);
-              }}
-            >
-              <Sparkles className="h-4 w-4 mr-2" aria-hidden />
-              New blank plan
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={plans.length <= 1}
-              className="text-destructive focus:text-destructive"
-              onSelect={(event) => {
-                event.preventDefault();
-                handleDeletePlan();
-              }}
-            >
-              <Trash2 className="h-4 w-4 mr-2" aria-hidden />
-              Delete current plan
-            </DropdownMenuItem>
+      <DropdownMenuContent className="w-72" align={compact ? 'end' : 'start'} sideOffset={8}>
+        <DropdownMenuLabel>Saved plans</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup value={activePlanId} onValueChange={onSelectPlan}>
+          {plans.map((plan) => (
+            <DropdownMenuRadioItem key={plan.id} value={plan.id}>
+              {plan.name}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault();
+            openCreateDialog(false);
+          }}
+        >
+          <Copy className="h-4 w-4 mr-2" aria-hidden />
+          Duplicate current plan
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault();
+            openCreateDialog(true);
+          }}
+        >
+          <Sparkles className="h-4 w-4 mr-2" aria-hidden />
+          New blank plan
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          disabled={plans.length <= 1}
+          className="text-destructive focus:text-destructive"
+          onSelect={(event) => {
+            event.preventDefault();
+            handleDeletePlan();
+          }}
+        >
+          <Trash2 className="h-4 w-4 mr-2" aria-hidden />
+          Delete current plan
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -172,13 +177,10 @@ export const PlanSwitcher = ({
 
   return (
     <div className="rounded-lg border border-border bg-card/80 p-3 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">My Plans</p>
-          <p className="text-sm font-semibold text-foreground">{activePlan?.name ?? 'Select a plan'}</p>
-          <p className="text-[11px] text-muted-foreground">Save variations and swap quickly.</p>
-        </div>
+      <div className="space-y-1.5">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">My Plans</p>
         {dropdown}
+        <p className="text-[11px] text-muted-foreground">Save variations and swap quickly.</p>
       </div>
       {dialog}
     </div>

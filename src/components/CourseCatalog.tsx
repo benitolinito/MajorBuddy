@@ -29,6 +29,7 @@ interface CourseCatalogProps {
   isMobile?: boolean;
   onQuickAddCourse?: (course: Course) => void;
   addCourseTrigger?: number;
+  quickAddLabel?: string;
 }
 
 const TogglePill = ({
@@ -121,6 +122,7 @@ export const CourseCatalog = ({
   isMobile = false,
   onQuickAddCourse,
   addCourseTrigger,
+  quickAddLabel = 'Add to term',
 }: CourseCatalogProps) => {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -357,37 +359,42 @@ export const CourseCatalog = ({
 
   const isEditing = Boolean(editingCourse);
   const mobileQuickAdd = isMobile && Boolean(onQuickAddCourse);
+  const isDraggable = !isMobile;
+  const headerDescription = isMobile
+    ? mobileQuickAdd
+      ? 'Pick a class to add it to this term.'
+      : 'Create and edit classes in your library.'
+    : 'Add your classes, then drag to a term.';
+  const addCourseLabel = mobileQuickAdd ? 'New class' : 'Add class';
+  const containerClassName = cn(
+    'flex flex-col max-w-full',
+    isMobile
+      ? 'bg-transparent'
+      : 'bg-card border-r border-border h-screen sticky top-0 min-w-[260px]',
+  );
 
   return (
-    <aside className="bg-card border-r border-border flex flex-col h-screen sticky top-0 min-w-[260px] max-w-full">
+    <aside className={containerClassName}>
       <div className="p-4 border-b border-border space-y-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-muted-foreground" />
             <div>
               <h2 className="font-semibold text-foreground leading-tight">Class Library</h2>
-              <p className="text-xs text-muted-foreground">
-                {mobileQuickAdd ? 'Tap "Add to term" from a class card to place it in your schedule.' : 'Add your classes, then drag to a term.'}
-              </p>
+              <p className="text-xs text-muted-foreground">{headerDescription}</p>
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            <Button size="sm" onClick={startAddCourse}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add class
+          {onCollapsePanel && !isMobile && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              onClick={onCollapsePanel}
+              aria-label="Collapse class library"
+            >
+              <ChevronsLeft className="h-4 w-4" />
             </Button>
-            {onCollapsePanel && !isMobile && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={onCollapsePanel}
-                aria-label="Collapse class library"
-              >
-                <ChevronsLeft className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+          )}
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -415,9 +422,9 @@ export const CourseCatalog = ({
             return (
               <div
                 key={course.id}
-                draggable={!mobileQuickAdd}
+                draggable={isDraggable}
                 onDragStart={(e) => {
-                  if (mobileQuickAdd) return;
+                  if (!isDraggable) return;
                   e.dataTransfer.setData('course', JSON.stringify(course));
                   e.dataTransfer.setData('course-source', '');
                   e.dataTransfer.effectAllowed = 'copy';
@@ -425,7 +432,7 @@ export const CourseCatalog = ({
                 }}
                 className={cn(
                   'group relative bg-card border border-border rounded-lg p-3 transition-all',
-                  mobileQuickAdd ? 'cursor-default' : 'cursor-grab hover:shadow-md hover:border-primary/30 active:cursor-grabbing',
+                  isDraggable ? 'cursor-grab hover:shadow-md hover:border-primary/30 active:cursor-grabbing' : 'cursor-default',
                 )}
               >
                 <Button
@@ -482,12 +489,18 @@ export const CourseCatalog = ({
                     onClick={() => onQuickAddCourse?.(course)}
                   >
                     <ArrowRight className="h-4 w-4" />
-                    Add to term
+                    {quickAddLabel}
                   </Button>
                 )}
               </div>
             );
           })}
+        </div>
+        <div className="pt-4">
+          <Button variant="outline" size="sm" className="w-full border-dashed" onClick={startAddCourse}>
+            <Plus className="h-4 w-4 mr-1.5" />
+            {addCourseLabel}
+          </Button>
         </div>
       </ScrollArea>
 
