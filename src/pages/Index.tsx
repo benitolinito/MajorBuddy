@@ -251,12 +251,6 @@ const Index = () => {
   }, [hasConfig]);
 
   useEffect(() => {
-    if (!user) {
-      setShowProfile(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
     if (!isMobile) return;
     const storageKey = 'majorbuddy-mobile-add-hint';
     if (typeof window === 'undefined') return;

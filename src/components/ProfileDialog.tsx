@@ -40,6 +40,7 @@ export const ProfileDialog = ({
   const displayName = userLabel?.trim() || 'Student';
   const emailValue = userEmail?.trim() || 'No email on file';
   const initials = getInitials(userLabel, userEmail);
+  const canSignOut = Boolean(onSignOut && (userLabel || userEmail));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -89,7 +90,7 @@ export const ProfileDialog = ({
                     <p className="mt-1 text-xs text-muted-foreground">
                       Keep your plan in sync across devices and browsers.
                     </p>
-                    {onSignOut && (
+                    {canSignOut && (
                       <Button type="button" variant="outline" size="sm" className="mt-4" onClick={onSignOut}>
                         Sign out
                       </Button>

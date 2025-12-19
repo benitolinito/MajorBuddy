@@ -1,4 +1,4 @@
-import { GraduationCap, RotateCcw, Download, Settings } from 'lucide-react';
+import { GraduationCap, RotateCcw, Download, Settings, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PlanSwitcher } from '@/components/PlanSwitcher';
@@ -50,7 +50,7 @@ export const PlannerHeader = ({
   const showAuth = Boolean(onSignIn || onSignOut);
   const signedIn = Boolean(userLabel);
   const authAction = signedIn ? onSignOut : onSignIn;
-  const canOpenProfile = signedIn && Boolean(onOpenProfile);
+  const canOpenProfile = Boolean(onOpenProfile);
   const handlersReady =
     planProfiles && onSelectPlanProfile && onCreatePlanProfile && onDeletePlanProfile;
   const activePlanProfile =
@@ -59,6 +59,7 @@ export const PlannerHeader = ({
     sticky ? 'sticky top-0 z-10' : 'relative z-10'
   }`;
   const canUsePlanSwitcher = Boolean(handlersReady && planProfiles?.length);
+  const planTitleContainerClass = 'min-w-0 flex-1 w-full max-w-full sm:max-w-[520px]';
   const planSwitcherControl = canUsePlanSwitcher ? (
     <PlanSwitcher
       plans={planProfiles!}
@@ -72,7 +73,7 @@ export const PlannerHeader = ({
       onOpenSettings={onOpenSettings}
     />
   ) : (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 min-w-0">
       <h1 className="text-base sm:text-lg font-semibold text-foreground leading-tight break-words">
         {degreeName}
       </h1>
@@ -106,10 +107,21 @@ export const PlannerHeader = ({
             <div className="p-2 rounded-lg bg-primary text-primary-foreground">
               <GraduationCap className="h-5 w-5" />
             </div>
-            <div className="flex-1 min-w-0">
+            <div className={planTitleContainerClass}>
               {planSwitcherControl}
               <div className="mt-1">{planMeta}</div>
             </div>
+            {canOpenProfile && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="mt-1 shrink-0"
+                onClick={onOpenProfile}
+                aria-label="Open planner tools"
+              >
+                <Wrench className="h-4 w-4" />
+              </Button>
+            )}
           </div>
           <div className="flex gap-2">
             {showAuth && (
@@ -146,11 +158,11 @@ export const PlannerHeader = ({
   return (
     <header className={headerClass}>
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="flex items-center gap-3 flex-1 min-w-0 sm:flex-none">
           <div className="p-2 rounded-lg bg-primary text-primary-foreground">
             <GraduationCap className="h-5 w-5" />
           </div>
-          <div className="min-w-0 flex-1">
+          <div className={planTitleContainerClass}>
             {planSwitcherControl}
             <div className="mt-1">{planMeta}</div>
           </div>
@@ -186,24 +198,23 @@ export const PlannerHeader = ({
                 <Settings className="h-4 w-4" />
               </Button>
             )}
+            {canOpenProfile && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={onOpenProfile}
+                aria-label="Open planner tools"
+              >
+                <Wrench className="h-4 w-4" />
+              </Button>
+            )}
           </div>
           {showAuth && (
             <div className="flex items-center gap-2">
               <div className="hidden lg:flex flex-col items-end">
-                {canOpenProfile ? (
-                  <button
-                    type="button"
-                    onClick={onOpenProfile}
-                    className="text-xs font-medium text-foreground transition hover:text-primary"
-                    aria-haspopup="dialog"
-                  >
-                    {userLabel}
-                  </button>
-                ) : (
-                  <span className="text-xs font-medium text-foreground">
-                    {signedIn ? userLabel : "Sign in to sync"}
-                  </span>
-                )}
+                <span className="text-xs font-medium text-foreground">
+                  {signedIn ? userLabel : "Sign in to sync"}
+                </span>
                 {cloudStatus && (
                   <span className="text-[11px] text-muted-foreground">{cloudStatus}</span>
                 )}
