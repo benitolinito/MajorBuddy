@@ -1,4 +1,5 @@
-import { GraduationCap, RotateCcw, Download, Settings, Wrench } from 'lucide-react';
+import { GraduationCap, RotateCcw, Download, Settings, Wrench, UserRound } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PlanSwitcher } from '@/components/PlanSwitcher';
@@ -10,6 +11,7 @@ interface PlannerHeaderProps {
   classYear: number;
   onReset: () => void;
   userLabel?: string;
+  userPhotoUrl?: string;
   cloudStatus?: string;
   cloudBusy?: boolean;
   onSignIn?: () => void;
@@ -36,6 +38,7 @@ export const PlannerHeader = ({
   cloudBusy,
   onSignIn,
   onSignOut,
+  userPhotoUrl,
   onOpenSettings,
   onOpenExport,
   onOpenProfile,
@@ -102,6 +105,11 @@ export const PlannerHeader = ({
     </p>
   );
 
+  const mobileUserAction = signedIn ? onOpenProfile ?? onSignOut : onSignIn;
+  const showMobileUserAction = Boolean(isMobile && mobileUserAction);
+  const mobileUserLabel = signedIn ? 'Open profile' : 'Sign in to sync';
+  const userInitial = userLabel?.charAt(0)?.toUpperCase() ?? 'U';
+
   if (isMobile) {
     return (
       <header className={headerClass}>
@@ -113,34 +121,34 @@ export const PlannerHeader = ({
             <div className={planTitleContainerClass}>
               {planSwitcherControl}
               <div className="mt-1">{planMeta}</div>
+              {cloudStatus && (
+                <p className="text-[11px] text-muted-foreground/80">{cloudStatus}</p>
+              )}
             </div>
-            {canOpenProfile && (
+            {showMobileUserAction && (
               <Button
-                variant="outline"
+                variant="ghost"
                 size="icon"
-                className="mt-1 shrink-0"
-                onClick={onOpenProfile}
-                aria-label="Open planner tools"
+                className="mt-1 shrink-0 h-10 w-10 rounded-full border border-border/70 bg-background/80"
+                onClick={mobileUserAction!}
+                aria-label={mobileUserLabel}
+                disabled={cloudBusy && !signedIn}
               >
-                <Wrench className="h-4 w-4" />
+                {signedIn && userPhotoUrl ? (
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={userPhotoUrl} alt={userLabel ?? 'Profile photo'} />
+                    <AvatarFallback>{userInitial}</AvatarFallback>
+                  </Avatar>
+                ) : (
+                  <UserRound className="h-5 w-5" />
+                )}
               </Button>
             )}
           </div>
           <div className="flex gap-2">
-            {showAuth && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 text-xs"
-                onClick={authAction}
-                disabled={!authAction || cloudBusy}
-              >
-                {signedIn ? 'Sign out' : 'Sign in to sync'}
-              </Button>
-            )}
             <ConfirmDialog
               trigger={
-                <Button variant="outline" size="sm" className="flex-1 text-xs">
+                <Button variant="outline" size="sm" className="flex-1 text-sm">
                   <RotateCcw className="h-4 w-4 mr-1.5" />
                   Reset
                 </Button>

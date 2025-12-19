@@ -151,6 +151,7 @@ const Index = () => {
     classYear: state.classYear,
     onReset: reset,
     userLabel,
+    userPhotoUrl: user?.photoURL ?? undefined,
     cloudStatus,
     cloudBusy,
     onSignIn: handleOpenAuth,
@@ -577,27 +578,6 @@ const MOBILE_TABS: { id: MobilePane; label: string }[] = [
   { id: 'requirements', label: 'Goals' },
 ];
 
-const MobilePrimaryNav = ({ active, onChange }: { active: MobilePane; onChange: (pane: MobilePane) => void }) => (
-  <div className="rounded-full bg-muted/60 p-1">
-    <div className="grid grid-cols-3 gap-1">
-      {MOBILE_TABS.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          onClick={() => onChange(tab.id)}
-          className={cn(
-            'rounded-full py-2 text-sm font-medium transition',
-            active === tab.id ? 'bg-background shadow text-foreground' : 'text-muted-foreground',
-          )}
-          aria-pressed={active === tab.id}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
-  </div>
-);
-
 const MobilePaneCard = ({ children }: { children: ReactNode }) => (
   <div className="rounded-3xl border border-border/60 bg-card/95 p-3 shadow-[0_30px_65px_-35px_rgba(15,23,42,0.8)]">
     {children}
@@ -615,30 +595,36 @@ const MobileDock = ({ activePane, onSelectPane, onAddClass, onOpenSettings }: Mo
   <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4">
     <div className="pointer-events-auto relative w-full max-w-[420px]">
       <div className="flex items-center justify-between rounded-3xl border border-border/70 bg-card/95 px-4 py-3 shadow-[0_25px_55px_-20px_rgba(15,23,42,0.85)] backdrop-blur">
-        {MOBILE_TABS.map((tab) => {
-          const Icon = tab.id === 'plan' ? PenLine : tab.id === 'library' ? BookOpen : ListChecks;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => onSelectPane(tab.id)}
-              className={cn(
-                'flex flex-col items-center gap-1 px-3 text-[11px] font-medium transition',
-                activePane === tab.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/80',
-              )}
-              aria-pressed={activePane === tab.id}
-            >
-              <Icon className="h-5 w-5" aria-hidden />
-              {tab.label}
-            </button>
-          );
-        })}
+        <div className="flex flex-1 items-center justify-around gap-1">
+          {MOBILE_TABS.map((tab) => {
+            const Icon = tab.id === 'plan' ? PenLine : tab.id === 'library' ? BookOpen : ListChecks;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => onSelectPane(tab.id)}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-2xl px-3 py-2 text-[11px] font-semibold transition',
+                  activePane === tab.id
+                    ? 'bg-primary/10 text-foreground'
+                    : 'text-muted-foreground hover:text-foreground/80',
+                )}
+                aria-pressed={activePane === tab.id}
+              >
+                <Icon className="h-4 w-4" aria-hidden />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
         <button
           type="button"
           onClick={onOpenSettings}
-          className="flex flex-col items-center gap-1 px-3 text-[11px] font-medium text-muted-foreground transition hover:text-foreground/80"
+          className="ml-3 flex flex-shrink-0 items-center gap-2 rounded-2xl border border-border/70 px-3 py-2 text-[11px] font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
         >
-          <Settings className="h-5 w-5" aria-hidden />
+          <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-muted/60 text-foreground">
+            <Settings className="h-4 w-4" aria-hidden />
+          </span>
           Settings
         </button>
       </div>
@@ -805,6 +791,7 @@ const MobilePlannerLayout = ({
   const planMeta = `${state.years.length || 0} year${state.years.length === 1 ? '' : 's'} • ${totalTerms} term${totalTerms === 1 ? '' : 's'}`;
 
   const filteredYears = state.years.filter((year) => !activeYearId || year.id === activeYearId);
+  const activePaneLabel = MOBILE_TABS.find((tab) => tab.id === activePane)?.label ?? 'Plan';
 
   return (
     <>
@@ -821,7 +808,12 @@ const MobilePlannerLayout = ({
               onOpenExport={onOpenExport}
               onOpenSettings={onOpenSettings}
             />
-            <MobilePrimaryNav active={activePane} onChange={(pane) => setActivePane(pane)} />
+            <div className="rounded-2xl border border-border/70 bg-card/70 px-4 py-3 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-foreground">{activePaneLabel} view</p>
+                <span className="text-[11px] text-muted-foreground">Use the dock to switch</span>
+              </div>
+            </div>
             {activePane === 'plan' && (
               <MobileYearNavigator years={state.years} activeYearId={activeYearId} onSelectYear={setActiveYearId} />
             )}

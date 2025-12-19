@@ -12,6 +12,8 @@ type TagColorPickerProps = {
   size?: 'default' | 'compact';
   customColors?: string[];
   onAddCustomColor?: (hex: string) => string | void;
+  layout?: 'grid' | 'carousel';
+  showSelectionInfo?: boolean;
 };
 
 const sizeVariants = {
@@ -43,6 +45,8 @@ export const TagColorPicker = ({
   size = 'default',
   customColors = [],
   onAddCustomColor,
+  layout = 'grid',
+  showSelectionInfo = false,
 }: TagColorPickerProps) => {
   const { swatch, grid, gap } = sizeVariants[size];
   const colorInputRef = useRef<HTMLInputElement | null>(null);
@@ -51,6 +55,7 @@ export const TagColorPicker = ({
   );
   const normalizedValue = normalizeColorHex(value ?? undefined);
   const canAddCustomColor = !!normalizeColorHex(customColor);
+  const isCarousel = layout === 'carousel';
 
   useEffect(() => {
     const normalized = normalizeColorHex(value ?? undefined);
@@ -82,6 +87,14 @@ export const TagColorPicker = ({
 
     return Array.from(seen.values());
   }, [customColors]);
+
+  const selectedSwatch = swatches.find((swatchEntry) => {
+    const normalized = normalizeColorHex(swatchEntry.value);
+    return (
+      value === swatchEntry.id ||
+      (normalizedValue && normalized && normalizedValue === normalized)
+    );
+  });
 
   const selectColor = (colorId: string) => {
     if (disabled) return;
@@ -119,9 +132,13 @@ export const TagColorPicker = ({
     selectColor(added || normalized);
   };
 
+  const swatchBaseClass = 'relative flex items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2';
+  const swatchShapeClass = isCarousel ? 'h-12 w-12 flex-shrink-0 rounded-2xl' : swatch;
+  const swatchGridClass = isCarousel ? 'flex gap-2 overflow-x-auto pb-1 -mx-1 px-1' : cn('grid', grid, gap);
+
   return (
     <div className={cn('space-y-3', className)}>
-      <div className={cn('grid', grid, gap)}>
+      <div className={swatchGridClass}>
         {swatches.map((swatchEntry) => {
           const normalized = normalizeColorHex(swatchEntry.value);
           const isSelected =
@@ -134,8 +151,8 @@ export const TagColorPicker = ({
               disabled={disabled}
               onClick={() => selectColor(swatchEntry.id)}
               className={cn(
-                'relative flex items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-                swatch,
+                swatchBaseClass,
+                swatchShapeClass,
                 isSelected ? 'ring-2 ring-primary ring-offset-2 border-primary/60' : 'border-border hover:border-primary/60',
                 disabled && 'cursor-not-allowed opacity-60 hover:border-border',
               )}
@@ -158,8 +175,9 @@ export const TagColorPicker = ({
           disabled={disabled}
           onClick={() => colorInputRef.current?.click()}
           className={cn(
-            'relative flex items-center justify-center rounded-full border border-dashed border-border/80 bg-muted/40 text-muted-foreground transition hover:border-primary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-            swatch,
+            swatchBaseClass,
+            swatchShapeClass,
+            'border-dashed border-border/80 bg-muted/40 text-muted-foreground transition hover:border-primary/60 hover:text-foreground',
             disabled && 'cursor-not-allowed opacity-60 hover:border-border',
           )}
           aria-label="Pick a custom color"
@@ -179,6 +197,14 @@ export const TagColorPicker = ({
           />
         </button>
       </div>
+      {showSelectionInfo && (
+        <div className="flex items-center justify-between rounded-xl border border-border/70 bg-muted/40 px-3 py-2 text-xs sm:text-sm">
+          <span className="font-semibold text-foreground">
+            {selectedSwatch?.label ?? (normalizedValue ?? 'No color selected')}
+          </span>
+          {normalizedValue && <span className="text-muted-foreground">{normalizedValue}</span>}
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-muted/40 px-3 py-2">
         <div className="flex items-center gap-2">
           <span

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ArrowRight, BookOpen, ChevronsLeft, Pencil, Plus, Search, Tag, Trash } from 'lucide-react';
 import { Course, NewCourseInput, PlannerPlan, TermName, TermSystem } from '@/types/planner';
 import { Input } from '@/components/ui/input';
@@ -79,6 +79,24 @@ const TogglePill = ({
     </button>
   );
 };
+
+const SectionCard = ({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) => (
+  <section className="space-y-3 rounded-2xl border border-border/70 bg-card/90 p-4 shadow-sm">
+    <div className="space-y-1">
+      <p className="text-base font-semibold leading-tight text-foreground">{title}</p>
+      {description && <p className="text-sm text-muted-foreground">{description}</p>}
+    </div>
+    {children}
+  </section>
+);
 
 type CourseFormState = {
   code: string;
@@ -373,6 +391,400 @@ export const CourseCatalog = ({
       : 'bg-card border-r border-border h-screen sticky top-0 min-w-[260px]',
   );
 
+  const renderDesktopForm = () => (
+    <>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="class-code">Class code</Label>
+          <Input
+            id="class-code"
+            placeholder="e.g., MATH210"
+            value={code}
+            onChange={(e) => updateFormField('code', e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="class-title">Title</Label>
+          <Input
+            id="class-title"
+            placeholder="Linear Algebra"
+            value={title}
+            onChange={(e) => updateFormField('title', e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 items-start">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="class-credits">Credits</Label>
+            <Input
+              id="class-credits"
+              type="number"
+              min={0}
+              max={20}
+              value={credits}
+              onChange={(e) => updateFormField('credits', Number(e.target.value))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Distributive colors</Label>
+            <TagColorPicker
+              value={activeDistributiveColor}
+              onSelect={handleActiveColorSelect}
+              disabled={!activeDistributiveForColor}
+              allowDeselect
+              size="compact"
+              className="gap-1.5"
+              customColors={colorPalette}
+              onAddCustomColor={(hex) => {
+                const added = onAddPaletteColor(hex);
+                handleActiveColorSelect(added || hex);
+              }}
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="class-distributives">Distributives</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="class-distributives"
+              placeholder="Add a distributive"
+              value={newDistributive}
+              onChange={(e) => updateFormField('newDistributive', e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddDistributive();
+                }
+              }}
+            />
+            <Button type="button" variant="secondary" onClick={handleAddDistributive}>
+              <Tag className="h-4 w-4 mr-1" />
+              Add
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-1">
+            {distributives.map((dist) => (
+              <TogglePill
+                key={dist}
+                label={dist}
+                active={selectedDistributives.includes(dist)}
+                colorClassName={
+                  selectedDistributiveColors[dist]
+                    ? getTagColorClasses(dist, selectedDistributiveColors[dist])
+                    : undefined
+                }
+                colorAccentClass={
+                  selectedDistributiveColors[dist]
+                    ? getTagAccentClass(dist, selectedDistributiveColors[dist])
+                    : undefined
+                }
+                colorStyle={
+                  selectedDistributiveColors[dist]
+                    ? getTagColorStyle(dist, selectedDistributiveColors[dist])
+                    : undefined
+                }
+                colorAccentStyle={
+                  selectedDistributiveColors[dist]
+                    ? getTagAccentStyle(dist, selectedDistributiveColors[dist])
+                    : undefined
+                }
+                onClick={() => toggleDistributive(dist)}
+              />
+            ))}
+            {selectedDistributives
+              .filter((dist) => !distributives.includes(dist))
+              .map((dist) => (
+                <TogglePill
+                  key={dist}
+                  label={dist}
+                  active
+                  colorClassName={
+                    selectedDistributiveColors[dist]
+                      ? getTagColorClasses(dist, selectedDistributiveColors[dist])
+                      : undefined
+                  }
+                  colorAccentClass={
+                    selectedDistributiveColors[dist]
+                      ? getTagAccentClass(dist, selectedDistributiveColors[dist])
+                      : undefined
+                  }
+                  colorStyle={
+                    selectedDistributiveColors[dist]
+                      ? getTagColorStyle(dist, selectedDistributiveColors[dist])
+                      : undefined
+                  }
+                  colorAccentStyle={
+                    selectedDistributiveColors[dist]
+                      ? getTagAccentStyle(dist, selectedDistributiveColors[dist])
+                      : undefined
+                  }
+                  onClick={() => toggleDistributive(dist)}
+                />
+              ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="space-y-1">
+          <Label>Major/Minor alignment</Label>
+          <p className="text-[11px] text-muted-foreground">
+            Tag this class to the majors or minors you&apos;ve added in the Requirements panel.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {plans.length === 0 && (
+            <p className="text-xs text-muted-foreground">No plans yet. Add a major or minor on the right.</p>
+          )}
+          {plans.map((plan) => (
+            <TogglePill
+              key={plan.id}
+              label={`${plan.type === 'major' ? 'Major' : 'Minor'} • ${plan.name}`}
+              active={selectedPlans.includes(plan.id)}
+              tone={plan.type === 'major' ? 'major' : 'minor'}
+              colorClassName={getTagColorClasses(plan.name, plan.color)}
+              colorAccentClass={getTagAccentClass(plan.name, plan.color)}
+              colorStyle={getTagColorStyle(plan.name, plan.color)}
+              colorAccentStyle={getTagAccentStyle(plan.name, plan.color)}
+              onClick={() => togglePlan(plan.id)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="space-y-1">
+          <Label>Typical terms offered</Label>
+          <p className="text-[11px] text-muted-foreground">
+            Pick every term this class usually runs in your {termSystem === 'quarter' ? 'quarter' : 'semester'} system.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {termOptions.map((term) => {
+            const selected = offeredTerms.includes(term);
+            const isExtra = !baseTermOptions.includes(term);
+            return (
+              <label
+                key={term}
+                className={cn(
+                  'flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5',
+                  selected && 'border-primary bg-primary/10',
+                )}
+              >
+                <Checkbox
+                  checked={selected}
+                  onCheckedChange={(checked) => setOfferedTerm(term, Boolean(checked))}
+                  aria-label={`Typically offered in ${term}`}
+                />
+                <div className="leading-tight">
+                  <p>{term}</p>
+                  {isExtra && <p className="text-[11px] text-muted-foreground">From a previous setup</p>}
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="class-description">Description</Label>
+        <Textarea
+          id="class-description"
+          placeholder="What does this class cover?"
+          value={description}
+          onChange={(e) => updateFormField('description', e.target.value)}
+        />
+      </div>
+    </>
+  );
+
+  const renderMobileForm = () => (
+    <div className="space-y-4">
+      <SectionCard title="Class basics" description="Name your class and capture the essentials.">
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="class-code">Class code</Label>
+            <Input
+              id="class-code"
+              placeholder="e.g., MATH210"
+              value={code}
+              onChange={(e) => updateFormField('code', e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="class-title">Title</Label>
+            <Input
+              id="class-title"
+              placeholder="Linear Algebra"
+              value={title}
+              onChange={(e) => updateFormField('title', e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="class-credits">Credits</Label>
+            <Input
+              id="class-credits"
+              type="number"
+              min={0}
+              max={20}
+              value={credits}
+              onChange={(e) => updateFormField('credits', Number(e.target.value))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="class-description">Description</Label>
+            <Textarea
+              id="class-description"
+              placeholder="What does this class cover?"
+              value={description}
+              onChange={(e) => updateFormField('description', e.target.value)}
+              className="min-h-[120px]"
+            />
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Tags & colors"
+        description="Group this class into your custom goals, then give each tag a color."
+      >
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="class-distributives">Add a tag</Label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                id="class-distributives"
+                placeholder="Add a distributive"
+                value={newDistributive}
+                onChange={(e) => updateFormField('newDistributive', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddDistributive();
+                  }
+                }}
+              />
+              <Button type="button" variant="secondary" onClick={handleAddDistributive}>
+                <Tag className="h-4 w-4 mr-1" />
+                Add
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {distributives.length === 0 && selectedDistributives.length === 0 && (
+              <p className="text-sm text-muted-foreground">No tags yet. Add one above to get started.</p>
+            )}
+            {[...distributives, ...selectedDistributives.filter((dist) => !distributives.includes(dist))].map((dist) => (
+              <TogglePill
+                key={dist}
+                label={dist}
+                active={selectedDistributives.includes(dist)}
+                colorClassName={
+                  selectedDistributiveColors[dist]
+                    ? getTagColorClasses(dist, selectedDistributiveColors[dist])
+                    : undefined
+                }
+                colorAccentClass={
+                  selectedDistributiveColors[dist]
+                    ? getTagAccentClass(dist, selectedDistributiveColors[dist])
+                    : undefined
+                }
+                colorStyle={
+                  selectedDistributiveColors[dist]
+                    ? getTagColorStyle(dist, selectedDistributiveColors[dist])
+                    : undefined
+                }
+                colorAccentStyle={
+                  selectedDistributiveColors[dist]
+                    ? getTagAccentStyle(dist, selectedDistributiveColors[dist])
+                    : undefined
+                }
+                onClick={() => toggleDistributive(dist)}
+              />
+            ))}
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <span>{activeDistributiveForColor ? `Color for ${activeDistributiveForColor}` : 'Select a tag to color'}</span>
+              <span>{activeDistributiveColor ?? '—'}</span>
+            </div>
+            <TagColorPicker
+              value={activeDistributiveColor}
+              onSelect={handleActiveColorSelect}
+              disabled={!activeDistributiveForColor}
+              allowDeselect
+              size="default"
+              layout="carousel"
+              showSelectionInfo
+              customColors={colorPalette}
+              onAddCustomColor={(hex) => {
+                const added = onAddPaletteColor(hex);
+                handleActiveColorSelect(added || hex);
+              }}
+            />
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Programs & goals"
+        description="Tie the class into majors, minors, or other requirement sets."
+      >
+        <div className="flex flex-wrap gap-2">
+          {plans.length === 0 && (
+            <p className="text-sm text-muted-foreground">No plans yet. Add a major or minor in Goals.</p>
+          )}
+          {plans.map((plan) => (
+            <TogglePill
+              key={plan.id}
+              label={`${plan.type === 'major' ? 'Major' : 'Minor'} • ${plan.name}`}
+              active={selectedPlans.includes(plan.id)}
+              tone={plan.type === 'major' ? 'major' : 'minor'}
+              colorClassName={getTagColorClasses(plan.name, plan.color)}
+              colorAccentClass={getTagAccentClass(plan.name, plan.color)}
+              colorStyle={getTagColorStyle(plan.name, plan.color)}
+              colorAccentStyle={getTagAccentStyle(plan.name, plan.color)}
+              onClick={() => togglePlan(plan.id)}
+            />
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Availability"
+        description="Pick every term this class typically runs so you can plan faster."
+      >
+        <div className="grid grid-cols-2 gap-2">
+          {termOptions.map((term) => {
+            const selected = offeredTerms.includes(term);
+            const isExtra = !baseTermOptions.includes(term);
+            return (
+              <label
+                key={term}
+                className={cn(
+                  'flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5',
+                  selected && 'border-primary bg-primary/10',
+                )}
+              >
+                <Checkbox
+                  checked={selected}
+                  onCheckedChange={(checked) => setOfferedTerm(term, Boolean(checked))}
+                  aria-label={`Typically offered in ${term}`}
+                />
+                <div className="leading-tight">
+                  <p>{term}</p>
+                  {isExtra && <p className="text-[11px] text-muted-foreground">From another setup</p>}
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      </SectionCard>
+    </div>
+  );
+
   return (
     <aside className={containerClassName}>
       <div className="p-4 border-b border-border space-y-4">
@@ -515,248 +927,65 @@ export const CourseCatalog = ({
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
-        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{isEditing ? 'Edit class' : 'Add a class'}</DialogTitle>
-            <DialogDescription>
-              {isEditing
-                ? 'Update the details for this class and keep your library tidy.'
-                : 'Give us the basics for this class and tag where it fits in your plan.'}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent
+          className={cn(
+            'sm:max-w-xl max-h-[85vh] overflow-y-auto',
+            isMobile && 'h-[92vh] max-h-none w-screen max-w-none rounded-none border-0 bg-background p-0',
+          )}
+        >
+          <div className={cn(isMobile && 'flex h-full flex-col')}>
+            <DialogHeader className={isMobile ? 'px-4 pt-4 pb-2 text-left' : undefined}>
+              <DialogTitle>{isEditing ? 'Edit class' : 'Add a class'}</DialogTitle>
+              <DialogDescription>
+                {isEditing
+                  ? 'Update the details for this class and keep your library tidy.'
+                  : 'Give us the basics for this class and tag where it fits in your plan.'}
+              </DialogDescription>
+            </DialogHeader>
 
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSave();
-            }}
-          >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="class-code">Class code</Label>
-                <Input
-                  id="class-code"
-                  placeholder="e.g., MATH210"
-                  value={code}
-                  onChange={(e) => updateFormField('code', e.target.value)}
-                />
+            <form
+              className={cn(isMobile ? 'flex h-full flex-col gap-4' : 'space-y-4')}
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSave();
+              }}
+            >
+              <div className={cn(isMobile ? 'flex-1 overflow-y-auto px-4 space-y-4' : 'space-y-4')}>
+                {isMobile ? renderMobileForm() : renderDesktopForm()}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="class-title">Title</Label>
-                <Input
-                  id="class-title"
-                  placeholder="Linear Algebra"
-                  value={title}
-                  onChange={(e) => updateFormField('title', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 items-start">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="class-credits">Credits</Label>
-                  <Input
-                    id="class-credits"
-                    type="number"
-                    min={0}
-                    max={20}
-                    value={credits}
-                    onChange={(e) => updateFormField('credits', Number(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Distributive colors</Label>
-                  <TagColorPicker
-                    value={activeDistributiveColor}
-                    onSelect={handleActiveColorSelect}
-                    disabled={!activeDistributiveForColor}
-                    allowDeselect
-                    size="compact"
-                    className="gap-1.5"
-                    customColors={colorPalette}
-                    onAddCustomColor={(hex) => {
-                      const added = onAddPaletteColor(hex);
-                      handleActiveColorSelect(added || hex);
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="class-distributives">Distributives</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="class-distributives"
-                    placeholder="Add a distributive"
-                    value={newDistributive}
-                    onChange={(e) => updateFormField('newDistributive', e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddDistributive();
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="secondary" onClick={handleAddDistributive}>
-                    <Tag className="h-4 w-4 mr-1" />
-                    Add
+              <div
+                className={cn(
+                  'flex items-center gap-2 pt-2',
+                  isMobile && 'flex-col-reverse gap-3 border-t border-border/70 px-4 pb-4',
+                )}
+              >
+                {isEditing && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleRemoveCourse}
+                    className={cn('mr-auto', isMobile && 'mr-0 w-full justify-center')}
+                  >
+                    <Trash className="h-4 w-4" />
+                    Remove class
+                  </Button>
+                )}
+                <div className={cn('ml-auto flex gap-2', isMobile && 'ml-0 w-full flex-col-reverse')}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => handleDialogChange(false)}
+                    className={isMobile ? 'w-full justify-center' : undefined}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" className={isMobile ? 'w-full justify-center' : undefined}>
+                    {isEditing ? 'Save changes' : 'Save class'}
                   </Button>
                 </div>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {distributives.map((dist) => (
-                    <TogglePill
-                      key={dist}
-                      label={dist}
-                      active={selectedDistributives.includes(dist)}
-                      colorClassName={
-                        selectedDistributiveColors[dist]
-                          ? getTagColorClasses(dist, selectedDistributiveColors[dist])
-                          : undefined
-                      }
-                      colorAccentClass={
-                        selectedDistributiveColors[dist]
-                          ? getTagAccentClass(dist, selectedDistributiveColors[dist])
-                          : undefined
-                      }
-                      colorStyle={
-                        selectedDistributiveColors[dist]
-                          ? getTagColorStyle(dist, selectedDistributiveColors[dist])
-                          : undefined
-                      }
-                      colorAccentStyle={
-                        selectedDistributiveColors[dist]
-                          ? getTagAccentStyle(dist, selectedDistributiveColors[dist])
-                          : undefined
-                      }
-                      onClick={() => toggleDistributive(dist)}
-                    />
-                  ))}
-                  {selectedDistributives
-                    .filter((dist) => !distributives.includes(dist))
-                    .map((dist) => (
-                      <TogglePill
-                        key={dist}
-                        label={dist}
-                        active
-                        colorClassName={
-                          selectedDistributiveColors[dist]
-                            ? getTagColorClasses(dist, selectedDistributiveColors[dist])
-                            : undefined
-                        }
-                        colorAccentClass={
-                          selectedDistributiveColors[dist]
-                            ? getTagAccentClass(dist, selectedDistributiveColors[dist])
-                            : undefined
-                        }
-                        colorStyle={
-                          selectedDistributiveColors[dist]
-                            ? getTagColorStyle(dist, selectedDistributiveColors[dist])
-                            : undefined
-                        }
-                        colorAccentStyle={
-                          selectedDistributiveColors[dist]
-                            ? getTagAccentStyle(dist, selectedDistributiveColors[dist])
-                            : undefined
-                        }
-                        onClick={() => toggleDistributive(dist)}
-                      />
-                    ))}
-                </div>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="space-y-1">
-                <Label>Major/Minor alignment</Label>
-                <p className="text-[11px] text-muted-foreground">
-                  Tag this class to the majors or minors you&apos;ve added in the Requirements panel.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {plans.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No plans yet. Add a major or minor on the right.</p>
-                )}
-                {plans.map((plan) => (
-                  <TogglePill
-                    key={plan.id}
-                    label={`${plan.type === 'major' ? 'Major' : 'Minor'} • ${plan.name}`}
-                    active={selectedPlans.includes(plan.id)}
-                    tone={plan.type === 'major' ? 'major' : 'minor'}
-                    colorClassName={getTagColorClasses(plan.name, plan.color)}
-                    colorAccentClass={getTagAccentClass(plan.name, plan.color)}
-                    colorStyle={getTagColorStyle(plan.name, plan.color)}
-                    colorAccentStyle={getTagAccentStyle(plan.name, plan.color)}
-                    onClick={() => togglePlan(plan.id)}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="space-y-1">
-                <Label>Typical terms offered</Label>
-                <p className="text-[11px] text-muted-foreground">
-                  Pick every term this class usually runs in your {termSystem === 'quarter' ? 'quarter' : 'semester'} system.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {termOptions.map((term) => {
-                  const selected = offeredTerms.includes(term);
-                  const isExtra = !baseTermOptions.includes(term);
-                  return (
-                    <label
-                      key={term}
-                      className={cn(
-                        'flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5',
-                        selected && 'border-primary bg-primary/10',
-                      )}
-                    >
-                      <Checkbox
-                        checked={selected}
-                        onCheckedChange={(checked) => setOfferedTerm(term, Boolean(checked))}
-                        aria-label={`Typically offered in ${term}`}
-                      />
-                      <div className="leading-tight">
-                        <p>{term}</p>
-                        {isExtra && <p className="text-[11px] text-muted-foreground">From a previous setup</p>}
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="class-description">Description</Label>
-              <Textarea
-                id="class-description"
-                placeholder="What does this class cover?"
-                value={description}
-                onChange={(e) => updateFormField('description', e.target.value)}
-              />
-            </div>
-
-            <div className="flex items-center gap-2 pt-2">
-              {isEditing && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={handleRemoveCourse}
-                  className="mr-auto"
-                >
-                  <Trash className="h-4 w-4" />
-                  Remove class
-                </Button>
-              )}
-              <div className="ml-auto flex gap-2">
-                <Button type="button" variant="ghost" onClick={() => handleDialogChange(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">{isEditing ? 'Save changes' : 'Save class'}</Button>
-              </div>
-            </div>
-          </form>
+            </form>
+          </div>
         </DialogContent>
       </Dialog>
     </aside>
