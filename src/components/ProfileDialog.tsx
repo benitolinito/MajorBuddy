@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -15,6 +16,10 @@ type ProfileDialogProps = {
   cloudStatus?: string;
   colorPalette?: string[];
   onSignOut?: () => void;
+  onDeleteData?: () => void | Promise<void>;
+  onDeleteAccount?: () => void | Promise<void>;
+  deletingData?: boolean;
+  deletingAccount?: boolean;
 };
 
 const getInitials = (label?: string, email?: string | null) => {
@@ -36,6 +41,10 @@ export const ProfileDialog = ({
   cloudStatus,
   colorPalette = [],
   onSignOut,
+  onDeleteData,
+  onDeleteAccount,
+  deletingData = false,
+  deletingAccount = false,
 }: ProfileDialogProps) => {
   const displayName = userLabel?.trim() || 'Student';
   const emailValue = userEmail?.trim() || 'No email on file';
@@ -162,13 +171,29 @@ export const ProfileDialog = ({
                           Clears schedules, saved courses, and requirements but keeps your account.
                         </p>
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="border-destructive/40 text-destructive hover:bg-destructive/10"
-                      >
-                        Delete my data
-                      </Button>
+                      <ConfirmDialog
+                        title="Delete planner data?"
+                        description="This removes schedules, saved courses, and requirements from this device and the cloud."
+                        confirmLabel={deletingData ? 'Deleting...' : 'Delete data'}
+                        cancelLabel="Keep data"
+                        confirmVariant="destructive"
+                        confirmationText="DELETE"
+                        confirmationLabel="Type DELETE to confirm"
+                        confirmationPlaceholder="DELETE"
+                        confirmationHint="This action cannot be undone."
+                        confirmDisabled={deletingData || !onDeleteData}
+                        onConfirm={() => onDeleteData?.()}
+                        trigger={
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                            disabled={deletingData || !onDeleteData}
+                          >
+                            {deletingData ? 'Deleting...' : 'Delete my data'}
+                          </Button>
+                        }
+                      />
                     </div>
                     <Separator className="bg-destructive/20" />
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -178,9 +203,28 @@ export const ProfileDialog = ({
                           Permanently removes your account and all associated planner data.
                         </p>
                       </div>
-                      <Button type="button" variant="destructive">
-                        Delete account
-                      </Button>
+                      <ConfirmDialog
+                        title="Delete your account?"
+                        description="This permanently removes your account and planner data. You may be asked to sign in again before continuing."
+                        confirmLabel={deletingAccount ? 'Deleting...' : 'Delete account'}
+                        cancelLabel="Keep account"
+                        confirmVariant="destructive"
+                        confirmationText="DELETE ACCOUNT"
+                        confirmationLabel="Type DELETE ACCOUNT"
+                        confirmationPlaceholder="DELETE ACCOUNT"
+                        confirmationHint="This action cannot be undone."
+                        confirmDisabled={deletingAccount || !onDeleteAccount}
+                        onConfirm={() => onDeleteAccount?.()}
+                        trigger={
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            disabled={deletingAccount || !onDeleteAccount}
+                          >
+                            {deletingAccount ? 'Deleting...' : 'Delete account'}
+                          </Button>
+                        }
+                      />
                     </div>
                   </div>
                 </div>

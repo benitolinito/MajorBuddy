@@ -2,13 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   User,
   createUserWithEmailAndPassword,
+  deleteUser,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
 } from "firebase/auth";
 
-import { PlannerSnapshot, loadPlannerSnapshot, savePlannerSnapshot } from "@/cloudPlanStore";
+import { PlannerSnapshot, deletePlannerSnapshot, loadPlannerSnapshot, savePlannerSnapshot } from "@/cloudPlanStore";
 import { auth, googleProvider } from "@/firebaseClient";
 
 type UseCloudPlannerArgs = {
@@ -162,6 +163,42 @@ export const useCloudPlanner = ({ state, applySnapshot }: UseCloudPlannerArgs) =
     };
   }, [state, user]);
 
+  const deletePlannerData = useCallback(async () => {
+    const currentUser = userRef.current;
+    if (!currentUser) return;
+    setCloudStatus("Deleting your planner data...");
+    try {
+      await deletePlannerSnapshot(currentUser.uid);
+      setCloudStatus("Planner data deleted.");
+    } catch (error) {
+      const message = getErrorMessage(error, "Could not delete planner data");
+      setCloudStatus(message);
+      throw new Error(message);
+    }
+  }, []);
+
+  const deleteAccount = useCallback(async () => {
+    const currentUser = userRef.current;
+    if (!currentUser) {
+      throw new Error("You need to be signed in to delete your account.");
+    }
+    setAuthBusy(true);
+    setCloudStatus("Deleting your account...");
+    try {
+      await deletePlannerSnapshot(currentUser.uid);
+      await deleteUser(currentUser);
+      hasLoadedRef.current = false;
+      setUser(null);
+      setCloudStatus("Account deleted.");
+    } catch (error) {
+      const message = getErrorMessage(error, "Could not delete account");
+      setCloudStatus(message);
+      throw new Error(message);
+    } finally {
+      setAuthBusy(false);
+    }
+  }, []);
+
   return {
     user,
     cloudStatus,
@@ -172,5 +209,7 @@ export const useCloudPlanner = ({ state, applySnapshot }: UseCloudPlannerArgs) =
     signInWithEmail,
     registerWithEmail,
     signOut: signOutUser,
+    deletePlannerData,
+    deleteAccount,
   };
 };

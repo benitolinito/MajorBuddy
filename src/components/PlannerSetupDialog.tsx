@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PlannerConfig, TermSystem } from "@/types/planner";
 import { UNIVERSITY_SUGGESTIONS } from '@/data/universities';
 
@@ -42,6 +43,7 @@ type PlannerSetupDialogProps = {
   onClose?: () => void;
   onSave: (config: PlannerConfig) => void;
   initialConfig?: PlannerConfig | null;
+  onReset?: () => void;
 };
 
 type StepperButtonsProps = {
@@ -72,7 +74,7 @@ const StepperButtons = ({ onIncrement, onDecrement, increaseLabel, decreaseLabel
   </div>
 );
 
-export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: PlannerSetupDialogProps) => {
+export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onReset }: PlannerSetupDialogProps) => {
   const fallbackDefaults = useMemo(() => {
     const currentYear = new Date().getFullYear();
     return {
@@ -323,6 +325,36 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig }: Pla
               </div>
             </div>
           </div>
+
+          {onReset ? (
+            <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Reset schedule</p>
+                  <p className="text-xs text-muted-foreground">
+                    Clear planned classes and rebuild your timeline using this configuration.
+                  </p>
+                </div>
+                <ConfirmDialog
+                  title="Reset your schedule?"
+                  description="This removes planned classes from every term. Your class library stays intact."
+                  confirmLabel="Reset schedule"
+                  cancelLabel="Keep schedule"
+                  confirmVariant="destructive"
+                  onConfirm={onReset}
+                  trigger={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                    >
+                      Reset schedule
+                    </Button>
+                  }
+                />
+              </div>
+            </div>
+          ) : null}
 
           <div className="flex justify-end gap-2 pt-2">
             {onClose && (

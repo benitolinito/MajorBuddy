@@ -1,7 +1,6 @@
-import { GraduationCap, RotateCcw, Download, Settings, Wrench, UserRound } from 'lucide-react';
+import { GraduationCap, Download, Settings, Wrench, UserRound } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PlanSwitcher } from '@/components/PlanSwitcher';
 import { PlanProfile } from '@/types/planner';
 
@@ -9,7 +8,6 @@ interface PlannerHeaderProps {
   degreeName: string;
   university: string;
   classYear: number;
-  onReset: () => void;
   userLabel?: string;
   userPhotoUrl?: string;
   cloudStatus?: string;
@@ -32,7 +30,6 @@ export const PlannerHeader = ({
   degreeName,
   university,
   classYear,
-  onReset,
   userLabel,
   cloudStatus,
   cloudBusy,
@@ -145,22 +142,6 @@ export const PlannerHeader = ({
               </Button>
             )}
           </div>
-          <div className="flex gap-2">
-            <ConfirmDialog
-              trigger={
-                <Button variant="outline" size="sm" className="flex-1 text-sm">
-                  <RotateCcw className="h-4 w-4 mr-1.5" />
-                  Reset
-                </Button>
-              }
-              title="Reset your schedule?"
-              description="Are you sure you want to reset? This will clear planned classes from your schedule. Your class library will be unaffected."
-              confirmLabel="Reset schedule"
-              cancelLabel="Keep schedule"
-              confirmVariant="destructive"
-              onConfirm={onReset}
-            />
-          </div>
         </div>
       </header>
     );
@@ -181,20 +162,6 @@ export const PlannerHeader = ({
 
         <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:justify-end">
           <div className="flex items-center gap-2">
-            <ConfirmDialog
-              trigger={
-                <Button variant="outline" size="sm">
-                  <RotateCcw className="h-4 w-4 mr-1.5" />
-                  Reset
-                </Button>
-            }
-              title="Reset your schedule?"
-              description="Are you sure you want to reset? This will clear planned classes and restore missing years or terms. Your class library will be unaffected."
-              confirmLabel="Reset schedule"
-              cancelLabel="Keep schedule"
-              confirmVariant="destructive"
-              onConfirm={onReset}
-            />
             <Button size="sm" onClick={onOpenExport} disabled={!onOpenExport}>
               <Download className="h-4 w-4 mr-1.5" />
               Export Schedule

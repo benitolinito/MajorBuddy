@@ -81,6 +81,8 @@ const Index = () => {
     signInWithEmail,
     registerWithEmail,
     signOut,
+    deletePlannerData: deleteRemotePlannerData,
+    deleteAccount: deleteCloudAccount,
   } = useCloudPlanner({
     state,
     applySnapshot,
@@ -92,6 +94,7 @@ const Index = () => {
   const [showAuth, setShowAuth] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showDeleteControls, setShowDeleteControls] = useState(false);
+  const [profileActionPending, setProfileActionPending] = useState<null | 'delete-data' | 'delete-account'>(null);
   const [duplicatePrompt, setDuplicatePrompt] = useState<{
     course: Course;
     placement: { yearName: string; termName: string; termYear: number };
@@ -140,16 +143,72 @@ const Index = () => {
   const handleOpenExport = () => setShowExport(true);
   const toggleDeleteControls = () => setShowDeleteControls((prev) => !prev);
 
+  const formatProfileActionError = (error: unknown, fallback: string) => {
+    if (error instanceof Error) {
+      if (error.message.includes('auth/requires-recent-login')) {
+        return 'Please sign in again before deleting your account.';
+      }
+      return error.message;
+    }
+    return fallback;
+  };
+
+  const handleDeletePlannerData = async () => {
+    if (profileActionPending) return;
+    setProfileActionPending('delete-data');
+    try {
+      if (user) {
+        await deleteRemotePlannerData();
+      }
+      clearPlannerStorage();
+      setShowProfile(false);
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
+    } catch (error) {
+      toast('Unable to delete planner data', {
+        description: formatProfileActionError(error, 'Please try again.'),
+      });
+    } finally {
+      setProfileActionPending(null);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (profileActionPending) return;
+    if (!user) {
+      toast('Sign in required', { description: 'Sign in before deleting your account.' });
+      return;
+    }
+    setProfileActionPending('delete-account');
+    try {
+      await deleteCloudAccount();
+      clearPlannerStorage();
+      setShowProfile(false);
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
+    } catch (error) {
+      toast('Unable to delete account', {
+        description: formatProfileActionError(error, 'Please try again.'),
+      });
+    } finally {
+      setProfileActionPending(null);
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
     window.location.reload();
   };
 
+  const deletingData = profileActionPending === 'delete-data';
+  const deletingAccount = profileActionPending === 'delete-account';
+
   const plannerHeaderProps: PlannerHeaderSharedProps = {
     degreeName: plannerTitle,
     university: state.university,
     classYear: state.classYear,
-    onReset: reset,
     userLabel,
     userPhotoUrl: user?.photoURL ?? undefined,
     cloudStatus,
@@ -292,6 +351,7 @@ const Index = () => {
         onClose={hasConfig ? () => setShowSetup(false) : undefined}
         onSave={handleSaveSetup}
         initialConfig={state.config ?? null}
+        onReset={hasConfig ? reset : undefined}
       />
       <ExportScheduleDialog
         open={showExport}
@@ -344,6 +404,10 @@ const Index = () => {
         cloudStatus={cloudStatus}
         colorPalette={state.colorPalette}
         onSignOut={handleSignOut}
+        onDeleteData={handleDeletePlannerData}
+        onDeleteAccount={user ? handleDeleteAccount : undefined}
+        deletingData={deletingData}
+        deletingAccount={deletingAccount}
       />
       <Dialog
         open={Boolean(courseActionPrompt)}
