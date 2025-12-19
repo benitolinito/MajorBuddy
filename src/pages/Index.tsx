@@ -10,9 +10,10 @@ import { Course, CourseDropOptions, PlannerConfig, PlannerState, PlanInput, Plan
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlannerSetupDialog } from '@/components/PlannerSetupDialog';
 import { ExportScheduleDialog } from '@/components/ExportScheduleDialog';
+import { SharePlanDialog } from '@/components/SharePlanDialog';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
-import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks, PenLine, Wrench, Share2, FileDown } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks, PenLine, Wrench, Download, Link2 } from 'lucide-react';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { cn } from '@/lib/utils';
 import { AuthDialog } from '@/components/AuthDialog';
@@ -24,7 +25,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/components/ui/sonner';
 import { DEFAULT_PLAN_NAME } from '@/lib/plannerProfiles';
-import { buildScheduleRows, buildCsvContent, createScheduleFileName, triggerCsvDownload } from '@/lib/scheduleExport';
 
 type PlannerStats = {
   totalCredits: number;
@@ -92,6 +92,7 @@ const Index = () => {
   const [, setDraggedCourse] = useState<Course | null>(null);
   const [showSetup, setShowSetup] = useState(!hasConfig);
   const [showExport, setShowExport] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showDeleteControls, setShowDeleteControls] = useState(false);
@@ -142,6 +143,7 @@ const Index = () => {
   const handleOpenProfile = () => setShowProfile(true);
   const handleOpenSettings = () => setShowSetup(true);
   const handleOpenExport = () => setShowExport(true);
+  const handleOpenShare = () => setShowShare(true);
   const toggleDeleteControls = () => setShowDeleteControls((prev) => !prev);
 
   const formatProfileActionError = (error: unknown, fallback: string) => {
@@ -219,6 +221,7 @@ const Index = () => {
     onOpenProfile: handleOpenProfile,
     onOpenSettings: handleOpenSettings,
     onOpenExport: handleOpenExport,
+    onOpenShare: handleOpenShare,
     planProfiles,
     activePlanProfileId,
     onSelectPlanProfile: selectPlanProfile,
@@ -362,6 +365,14 @@ const Index = () => {
         degreeName={plannerTitle}
         university={state.university}
       />
+      <SharePlanDialog
+        open={showShare}
+        onOpenChange={setShowShare}
+        planName={plannerTitle}
+        snapshot={state}
+        ownerId={user?.uid ?? null}
+        activeProfileId={activePlanProfileId}
+      />
       <ConfirmDialog
         open={Boolean(duplicatePrompt)}
         onOpenChange={(open) => {
@@ -404,6 +415,7 @@ const Index = () => {
         userPhotoUrl={user?.photoURL}
         cloudStatus={cloudStatus}
         colorPalette={state.colorPalette}
+        onSignIn={handleOpenAuth}
         onSignOut={handleSignOut}
         onDeleteData={handleDeletePlannerData}
         onDeleteAccount={user ? handleDeleteAccount : undefined}
@@ -506,6 +518,7 @@ const Index = () => {
           addColorToPalette={addColorToPalette}
           onDragStart={handleDragStart}
           onOpenExport={handleOpenExport}
+          onOpenShare={handleOpenShare}
           onOpenSettings={handleOpenSettings}
         />
       ) : (
@@ -566,36 +579,29 @@ const CollapsedRail = ({ side, ariaLabel, onExpand }: CollapsedRailProps) => (
 type MobilePane = 'plan' | 'library' | 'requirements';
 
 type MobilePlanOverviewProps = {
-  title: string;
-  subtitle?: string;
   onOpenExport: () => void;
-  onDownloadCsv: () => void;
+  onShareSchedule?: () => void;
 };
 
-const MobilePlanOverview = ({ title, subtitle, onOpenExport, onDownloadCsv }: MobilePlanOverviewProps) => (
-  <div className="rounded-2xl border border-border/80 bg-card/90 p-4 shadow-[0_28px_45px_-30px_rgba(15,23,42,0.55)]">
-    <div className="space-y-1">
-      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Quick exports</p>
-      <p className="text-xl font-semibold leading-snug">{title}</p>
-      {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
-    </div>
-    <div className="mt-4 grid grid-cols-2 gap-2">
+const MobilePlanOverview = ({ onOpenExport, onShareSchedule }: MobilePlanOverviewProps) => (
+  <div className="rounded-2xl border border-border/80 bg-card/90 p-3 shadow-[0_28px_45px_-30px_rgba(15,23,42,0.55)]">
+    <div className="grid grid-cols-2 gap-2">
       <Button
         type="button"
         className="h-11 rounded-xl"
         onClick={onOpenExport}
       >
-        <Share2 className="mr-2 h-4 w-4" />
-        Export options
+        <Download className="mr-2 h-4 w-4" />
+        Export schedule
       </Button>
       <Button
         type="button"
         variant="outline"
         className="h-11 rounded-xl"
-        onClick={onDownloadCsv}
+        onClick={onShareSchedule}
       >
-        <FileDown className="mr-2 h-4 w-4" />
-        Download CSV
+        <Link2 className="mr-2 h-4 w-4" />
+        Share schedule
       </Button>
     </div>
   </div>
@@ -661,25 +667,14 @@ const MobileConfigurationButton = ({ onOpenSettings }: { onOpenSettings: () => v
   </button>
 );
 
-const MobileAddCourseFab = ({ onAddClass }: { onAddClass: () => void }) => (
-  <button
-    type="button"
-    onClick={onAddClass}
-    className="fixed bottom-6 right-4 z-40 flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-[0_24px_45px_-20px_rgba(79,70,229,0.65)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30"
-    aria-label="Add class"
-  >
-    <Plus className="h-4 w-4" />
-    Add class
-  </button>
-);
-
 type MobileYearNavigatorProps = {
   years: { id: string; name: string }[];
   activeYearId: string;
   onSelectYear: (yearId: string) => void;
+  onAddYear: () => void;
 };
 
-const MobileYearNavigator = ({ years, activeYearId, onSelectYear }: MobileYearNavigatorProps) => (
+const MobileYearNavigator = ({ years, activeYearId, onSelectYear, onAddYear }: MobileYearNavigatorProps) => (
   <div className="border-t border-border/60 bg-background/70 px-4 py-3">
     <div className="relative">
       <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent" />
@@ -704,6 +699,14 @@ const MobileYearNavigator = ({ years, activeYearId, onSelectYear }: MobileYearNa
             </button>
           ))
         )}
+        <button
+          type="button"
+          onClick={onAddYear}
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-dashed border-border/70 text-muted-foreground transition hover:border-primary/60 hover:text-primary"
+          aria-label="Add academic year"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
       </div>
     </div>
   </div>
@@ -733,6 +736,7 @@ type MobilePlannerLayoutProps = {
   addColorToPalette: (hex: string) => string;
   onDragStart: (course: Course) => void;
   onOpenExport: () => void;
+  onOpenShare: () => void;
   onOpenSettings: () => void;
 };
 
@@ -760,14 +764,13 @@ const MobilePlannerLayout = ({
   addColorToPalette,
   onDragStart,
   onOpenExport,
+  onOpenShare,
   onOpenSettings,
 }: MobilePlannerLayoutProps) => {
   const [activeYearId, setActiveYearId] = useState(() => state.years[0]?.id ?? '');
   const [activePane, setActivePane] = useState<MobilePane>('plan');
   const [libraryTarget, setLibraryTarget] = useState<{ yearId: string; termId: string } | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [catalogAddTrigger, setCatalogAddTrigger] = useState(0);
-  const pendingAddRef = useRef(false);
 
   useEffect(() => {
     if (activeYearId && state.years.some((year) => year.id === activeYearId)) {
@@ -779,12 +782,6 @@ const MobilePlannerLayout = ({
     }
   }, [state.years, activeYearId]);
 
-  useEffect(() => {
-    if (activePane !== 'library' || !pendingAddRef.current) return;
-    pendingAddRef.current = false;
-    setCatalogAddTrigger(Date.now());
-  }, [activePane]);
-
   const libraryTargetLabel = useMemo(() => {
     if (!libraryTarget) return null;
     const year = state.years.find((item) => item.id === libraryTarget.yearId);
@@ -792,15 +789,6 @@ const MobilePlannerLayout = ({
     if (!year || !term) return null;
     return `${year.name} • ${term.name} ${term.year}`;
   }, [libraryTarget, state.years]);
-
-  const handleStartAddClass = () => {
-    if (activePane === 'library') {
-      setCatalogAddTrigger(Date.now());
-      return;
-    }
-    pendingAddRef.current = true;
-    setActivePane('library');
-  };
 
   const handleOpenTermPicker = (yearId: string, termId: string) => {
     setLibraryTarget({ yearId, termId });
@@ -819,18 +807,7 @@ const MobilePlannerLayout = ({
     onDropCourse(libraryTarget.yearId, libraryTarget.termId, course);
   };
 
-  const planSubtitle = stats.totalCredits > 0 ? `${stats.totalCredits} credits planned` : 'No credits planned yet';
-  const scheduleRows = useMemo(() => buildScheduleRows(state.years, state.plans), [state.years, state.plans]);
-  const csvContent = useMemo(() => buildCsvContent(scheduleRows), [scheduleRows]);
-  const csvFileName = useMemo(
-    () => createScheduleFileName(headerProps.degreeName, state.university || 'plan'),
-    [headerProps.degreeName, state.university],
-  );
   const filteredYears = state.years.filter((year) => !activeYearId || year.id === activeYearId);
-  const handleDownloadCsv = () => {
-    triggerCsvDownload(csvContent, csvFileName);
-    toast('CSV exported', { description: 'Check your downloads for the schedule export.' });
-  };
 
   return (
     <>
@@ -839,15 +816,18 @@ const MobilePlannerLayout = ({
           <PlannerHeader {...headerProps} sticky={false} isMobile />
           <div className="space-y-4 px-4 pb-4 pt-3">
             <MobilePlanOverview
-              title={headerProps.degreeName || 'Planner'}
-              subtitle={planSubtitle}
               onOpenExport={onOpenExport}
-              onDownloadCsv={handleDownloadCsv}
+              onShareSchedule={onOpenShare}
             />
             <MobileConfigurationButton onOpenSettings={onOpenSettings} />
             <MobilePaneSwitch activePane={activePane} onSelectPane={setActivePane} />
             {activePane === 'plan' && (
-              <MobileYearNavigator years={state.years} activeYearId={activeYearId} onSelectYear={setActiveYearId} />
+              <MobileYearNavigator
+                years={state.years}
+                activeYearId={activeYearId}
+                onSelectYear={setActiveYearId}
+                onAddYear={onAddYear}
+              />
             )}
           </div>
         </div>
@@ -908,7 +888,6 @@ const MobilePlannerLayout = ({
                 onRemoveCourse={removeCourseFromCatalog}
                 onCreateDistributive={addDistributive}
                 isMobile
-                addCourseTrigger={catalogAddTrigger}
               />
             </MobilePaneCard>
           )}
@@ -931,8 +910,6 @@ const MobilePlannerLayout = ({
           )}
         </div>
       </div>
-
-      <MobileAddCourseFab onAddClass={handleStartAddClass} />
 
       <Sheet open={quickAddOpen} onOpenChange={handleQuickAddChange}>
         <SheetContent side="bottom" className="h-[85vh] overflow-y-auto px-4">

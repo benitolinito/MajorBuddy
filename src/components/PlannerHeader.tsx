@@ -1,6 +1,12 @@
-import { GraduationCap, Download, Settings, Wrench, UserRound } from 'lucide-react';
+import { GraduationCap, Download, Settings, Wrench, UserRound, Link2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { PlanSwitcher } from '@/components/PlanSwitcher';
 import { PlanProfile } from '@/types/planner';
 
@@ -16,6 +22,7 @@ interface PlannerHeaderProps {
   onSignOut?: () => void;
   onOpenSettings?: () => void;
   onOpenExport?: () => void;
+  onOpenShare?: () => void;
   onOpenProfile?: () => void;
   sticky?: boolean;
   isMobile?: boolean;
@@ -38,6 +45,7 @@ export const PlannerHeader = ({
   userPhotoUrl,
   onOpenSettings,
   onOpenExport,
+  onOpenShare,
   onOpenProfile,
   sticky = true,
   isMobile = false,
@@ -60,6 +68,7 @@ export const PlannerHeader = ({
   }`;
   const canUsePlanSwitcher = Boolean(handlersReady && planProfiles?.length);
   const planTitleContainerClass = 'min-w-0 flex-1 w-full max-w-full sm:max-w-[520px]';
+  const planSettingsHandler = !isMobile ? onOpenSettings : undefined;
   const planSwitcherControl = canUsePlanSwitcher ? (
     <PlanSwitcher
       plans={planProfiles!}
@@ -70,14 +79,14 @@ export const PlannerHeader = ({
       variant="title"
       className="w-full"
       fallbackLabel={degreeName}
-      onOpenSettings={onOpenSettings}
+      onOpenSettings={planSettingsHandler}
     />
   ) : (
     <div className="flex items-center gap-2 min-w-0">
       <h1 className="text-base sm:text-lg font-semibold text-foreground leading-tight break-words">
         {degreeName}
       </h1>
-      {onOpenSettings && (
+      {!isMobile && onOpenSettings && (
         <Button
           variant="ghost"
           size="icon"
@@ -106,33 +115,39 @@ export const PlannerHeader = ({
   const showMobileUserAction = Boolean(isMobile && mobileUserAction);
   const mobileUserLabel = signedIn ? 'Open profile' : 'Sign in to sync';
   const userInitial = userLabel?.charAt(0)?.toUpperCase() ?? 'U';
+  const showProfileMenu = Boolean((showAuth && authAction) || canOpenProfile);
+  const profileMenuLabel = signedIn ? 'Open profile menu' : 'Open sign-in menu';
+  const authMenuLabel = signedIn ? 'Sign out' : 'Sign in';
+  const authActionDisabled = Boolean(!authAction || cloudBusy);
 
   if (isMobile) {
     return (
       <header className={headerClass}>
-        <div className="flex flex-col gap-2">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-              <GraduationCap className="h-5 w-5" />
-            </div>
-            <div className={planTitleContainerClass}>
-              {planSwitcherControl}
-              <div className="mt-1">{planMeta}</div>
-              {cloudStatus && (
-                <p className="text-[11px] text-muted-foreground/80">{cloudStatus}</p>
-              )}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
+                <GraduationCap className="h-5 w-5" />
+              </div>
+              <div className={`${planTitleContainerClass} space-y-1`}>
+                {planSwitcherControl}
+                <div>{planMeta}</div>
+                {cloudStatus && (
+                  <p className="text-[11px] text-muted-foreground/80">{cloudStatus}</p>
+                )}
+              </div>
             </div>
             {showMobileUserAction && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="mt-1 shrink-0 h-10 w-10 rounded-full border border-border/70 bg-background/80"
+                className="h-12 w-12 shrink-0 rounded-full border border-border/60 bg-background/90 shadow-sm"
                 onClick={mobileUserAction!}
                 aria-label={mobileUserLabel}
                 disabled={cloudBusy && !signedIn}
               >
                 {signedIn && userPhotoUrl ? (
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-10 w-10">
                     <AvatarImage src={userPhotoUrl} alt={userLabel ?? 'Profile photo'} />
                     <AvatarFallback>{userInitial}</AvatarFallback>
                   </Avatar>
@@ -162,6 +177,15 @@ export const PlannerHeader = ({
 
         <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:justify-end">
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onOpenShare}
+              disabled={!onOpenShare}
+            >
+              <Link2 className="h-4 w-4 mr-1.5" />
+              Share
+            </Button>
             <Button size="sm" onClick={onOpenExport} disabled={!onOpenExport}>
               <Download className="h-4 w-4 mr-1.5" />
               Export Schedule
@@ -176,30 +200,54 @@ export const PlannerHeader = ({
                 <Settings className="h-4 w-4" />
               </Button>
             )}
-            {canOpenProfile && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={onOpenProfile}
-                aria-label="Open profile"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-            )}
           </div>
-          {showAuth && (
+          {(showAuth || canOpenProfile) && (
             <div className="flex items-center gap-2">
-              <div className="hidden lg:flex flex-col items-end">
-                <span className="text-xs font-medium text-foreground">
-                  {signedIn ? userLabel : "Sign in to sync"}
-                </span>
-                {cloudStatus && (
-                  <span className="text-[11px] text-muted-foreground">{cloudStatus}</span>
-                )}
-              </div>
-              <Button variant="outline" size="sm" onClick={authAction} disabled={!authAction || cloudBusy}>
-                {signedIn ? "Sign out" : "Sign in"}
-              </Button>
+              {showAuth && (
+                <div className="hidden lg:flex flex-col items-end">
+                  <span className="text-xs font-medium text-foreground">
+                    {signedIn ? userLabel : 'Sign in to sync'}
+                  </span>
+                  {cloudStatus && (
+                    <span className="text-[11px] text-muted-foreground">{cloudStatus}</span>
+                  )}
+                </div>
+              )}
+              {showProfileMenu && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-12 w-12 rounded-full border border-border/60 bg-background/90 shadow-sm"
+                      aria-label={profileMenuLabel}
+                      disabled={!showProfileMenu}
+                    >
+                      {signedIn && userPhotoUrl ? (
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={userPhotoUrl} alt={userLabel ?? 'Profile photo'} />
+                          <AvatarFallback>{userInitial}</AvatarFallback>
+                        </Avatar>
+                      ) : (
+                        <UserRound className="h-5 w-5" />
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    {authAction && (
+                      <DropdownMenuItem
+                        onSelect={() => authAction?.()}
+                        disabled={authActionDisabled}
+                      >
+                        {authMenuLabel}
+                      </DropdownMenuItem>
+                    )}
+                    {onOpenProfile && (
+                      <DropdownMenuItem onSelect={() => onOpenProfile?.()}>Settings</DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           )}
         </div>

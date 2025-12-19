@@ -15,6 +15,7 @@ type ProfileDialogProps = {
   userPhotoUrl?: string | null;
   cloudStatus?: string;
   colorPalette?: string[];
+  onSignIn?: () => void;
   onSignOut?: () => void;
   onDeleteData?: () => void | Promise<void>;
   onDeleteAccount?: () => void | Promise<void>;
@@ -40,16 +41,19 @@ export const ProfileDialog = ({
   userPhotoUrl,
   cloudStatus,
   colorPalette = [],
+  onSignIn,
   onSignOut,
   onDeleteData,
   onDeleteAccount,
   deletingData = false,
   deletingAccount = false,
 }: ProfileDialogProps) => {
-  const displayName = userLabel?.trim() || 'Student';
-  const emailValue = userEmail?.trim() || 'No email on file';
+  const isSignedIn = Boolean(userLabel || userEmail);
+  const displayName = isSignedIn ? userLabel?.trim() || 'Student' : 'Not signed in';
+  const emailValue = isSignedIn ? userEmail?.trim() || 'No email on file' : 'Connect your account to sync plans.';
   const initials = getInitials(userLabel, userEmail);
-  const canSignOut = Boolean(onSignOut && (userLabel || userEmail));
+  const canSignOut = Boolean(onSignOut && isSignedIn);
+  const canSignIn = Boolean(onSignIn && !isSignedIn);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -88,9 +92,11 @@ export const ProfileDialog = ({
                       <p className="text-sm font-semibold text-foreground">{displayName}</p>
                       <p className="text-xs text-muted-foreground">{emailValue}</p>
                     </div>
-                    <div className="ml-auto text-xs text-muted-foreground">
-                      {cloudStatus ? `Sync status: ${cloudStatus}` : 'Sync status: idle'}
-                    </div>
+                    {isSignedIn && (
+                      <div className="ml-auto text-xs text-muted-foreground">
+                        {cloudStatus ? `Sync status: ${cloudStatus}` : 'Sync status: idle'}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -102,6 +108,11 @@ export const ProfileDialog = ({
                     {canSignOut && (
                       <Button type="button" variant="outline" size="sm" className="mt-4" onClick={onSignOut}>
                         Sign out
+                      </Button>
+                    )}
+                    {canSignIn && (
+                      <Button type="button" size="sm" className="mt-4" onClick={onSignIn}>
+                        Sign in
                       </Button>
                     )}
                   </div>
