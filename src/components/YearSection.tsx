@@ -16,9 +16,7 @@ interface YearSectionProps {
   onRemoveTerm: (termId: string) => void;
   onRemoveYear: () => void;
   canRemoveYear: boolean;
-  termSystem: TermSystem;
-  showDeleteControls?: boolean;
-  onRequestAddCourse?: (yearId: string, termId: string) => void;
+  onRequestCourseAction?: (payload: { yearId: string; termId: string; course: Course }) => void;
 }
 
 export const YearSection = ({
@@ -31,9 +29,7 @@ export const YearSection = ({
   onRemoveTerm,
   onRemoveYear,
   canRemoveYear,
-  termSystem,
-  showDeleteControls = false,
-  onRequestAddCourse,
+  onRequestCourseAction,
 }: YearSectionProps) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const maxTerms = termSystem === 'quarter' ? 4 : 3;
@@ -45,9 +41,9 @@ export const YearSection = ({
   );
 
   return (
-    <section className="mb-8">
-      <div className="mb-4 flex items-center gap-2">
-        <h3 className="text-xl font-semibold text-foreground">{year.name}</h3>
+    <section className="group mb-6 sm:mb-8">
+      <div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-4">
+        <h3 className="text-lg font-semibold text-foreground sm:text-xl">{year.name}</h3>
         {canRemoveYear && (
           <ConfirmDialog
             trigger={
@@ -86,8 +82,11 @@ export const YearSection = ({
             onDropCourse={(course, options) => onDropCourse(year.id, term.id, course, options)}
             onRemoveTerm={() => onRemoveTerm(term.id)}
             isStacked={isMobile}
-            showDeleteControls={showDeleteControls}
-            onAddCourseClick={() => onRequestAddCourse?.(year.id, term.id)}
+            onRequestCourseAction={
+              onRequestCourseAction
+                ? (course) => onRequestCourseAction({ yearId: year.id, termId: term.id, course })
+                : undefined
+            }
           />
         ))}
         

@@ -13,7 +13,7 @@ import { ExportScheduleDialog } from '@/components/ExportScheduleDialog';
 import { PlannerConfig } from '@/types/planner';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
-import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks, PenLine } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Plus, BookOpen, ListChecks, Download, Settings } from 'lucide-react';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { cn } from '@/lib/utils';
 import { AuthDialog } from '@/components/AuthDialog';
@@ -22,6 +22,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from '@/components/ui/sonner';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -96,7 +97,14 @@ const Index = () => {
   } | null>(null);
   const [quickAddCourse, setQuickAddCourse] = useState<Course | null>(null);
   const [quickAddTarget, setQuickAddTarget] = useState('');
-  const [preferredQuickAddTarget, setPreferredQuickAddTarget] = useState<string | null>(null);
+  const [catalogAddTrigger, setCatalogAddTrigger] = useState(0);
+  const [courseActionPrompt, setCourseActionPrompt] = useState<{
+    course: Course;
+    yearId: string;
+    termId: string;
+  } | null>(null);
+  const [courseActionTarget, setCourseActionTarget] = useState('');
+  const [courseActionMode, setCourseActionMode] = useState<'move' | 'copy'>('move');
   const userLabel = user?.displayName || user?.email || undefined;
   const cloudBusy = cloudSaving || cloudLoading || authBusy;
   const canRemoveYear = state.years.length > 1;
@@ -119,6 +127,14 @@ const Index = () => {
   const quickAddCourseLabel = quickAddCourse
     ? ([quickAddCourse.code, quickAddCourse.name].filter(Boolean).join(' ').trim() || 'this class')
     : 'this class';
+  const courseActionCourseLabel = courseActionPrompt
+    ? ([courseActionPrompt.course.code, courseActionPrompt.course.name].filter(Boolean).join(' ').trim() || 'this class')
+    : 'this class';
+  const disableCourseActionConfirm =
+    !courseActionTarget ||
+    (courseActionMode === 'move' &&
+      courseActionPrompt &&
+      courseActionTarget === `${courseActionPrompt.yearId}:${courseActionPrompt.termId}`);
 
   const handleDragStart = (course: Course) => {
     setDraggedCourse(course);
@@ -182,6 +198,49 @@ const Index = () => {
     setQuickAddTarget('');
   };
 
+  const handleStartAddClass = () => {
+    setLibraryOpen(true);
+    setCatalogAddTrigger(Date.now());
+  };
+
+  const handleRequestCourseAction = (payload: { course: Course; yearId: string; termId: string }) => {
+    setCourseActionPrompt(payload);
+    const sourceValue = `${payload.yearId}:${payload.termId}`;
+    const defaultTarget =
+      quickAddOptions.find((option) => option.value === sourceValue)?.value ??
+      quickAddOptions[0]?.value ??
+      '';
+    setCourseActionTarget(defaultTarget);
+    setCourseActionMode('move');
+  };
+
+  const closeCourseActionDialog = () => {
+    setCourseActionPrompt(null);
+    setCourseActionTarget('');
+  };
+
+  const handleCourseActionConfirm = () => {
+    if (!courseActionPrompt || !courseActionTarget) return;
+    const [targetYearId, targetTermId] = courseActionTarget.split(':');
+    if (!targetYearId || !targetTermId) return;
+    if (courseActionMode === 'move') {
+      if (courseActionPrompt.yearId === targetYearId && courseActionPrompt.termId === targetTermId) {
+        closeCourseActionDialog();
+        return;
+      }
+      moveCourseBetweenTerms({
+        sourceYearId: courseActionPrompt.yearId,
+        sourceTermId: courseActionPrompt.termId,
+        courseId: courseActionPrompt.course.id,
+        targetYearId,
+        targetTermId,
+      });
+    } else {
+      handleDropCourse(targetYearId, targetTermId, courseActionPrompt.course);
+    }
+    closeCourseActionDialog();
+  };
+
   const handleSaveSetup = (config: PlannerConfig) => {
     configurePlanner(config);
     setShowSetup(false);
@@ -191,17 +250,17 @@ const Index = () => {
     setShowSetup(!hasConfig);
   }, [hasConfig]);
 
-  // If a signed-in user signs out, clear local planner storage and return to the landing page.
   useEffect(() => {
-    if (user) {
-      hasAuthenticatedRef.current = true;
-      return;
-    }
-    if (!hasAuthenticatedRef.current) return;
-    clearPlannerStorage();
-    hasAuthenticatedRef.current = false;
-    navigate("/", { replace: true });
-  }, [navigate, user]);
+    if (!isMobile) return;
+    const storageKey = 'majorbuddy-mobile-add-hint';
+    if (typeof window === 'undefined') return;
+    const hasSeen = window.localStorage.getItem(storageKey);
+    if (hasSeen) return;
+    toast('Add classes without dragging', {
+      description: 'Tap "Add to term" inside Class Library cards to place a course into a term.',
+    });
+    window.localStorage.setItem(storageKey, 'seen');
+  }, [isMobile]);
 
   const handleConfirmDuplicate = () => {
     if (!duplicatePrompt) return;
@@ -326,53 +385,102 @@ const Index = () => {
           )}
         </DialogContent>
       </Dialog>
+      <Dialog
+        open={Boolean(courseActionPrompt)}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeCourseActionDialog();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Manage {courseActionCourseLabel}</DialogTitle>
+            <DialogDescription>Move or copy this class to another term.</DialogDescription>
+          </DialogHeader>
+          {quickAddOptions.length > 0 ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">Action</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'move', title: 'Move', description: 'Remove from original term' },
+                    { key: 'copy', title: 'Copy', description: 'Keep a copy in both terms' },
+                  ].map((option) => (
+                    <button
+                      type="button"
+                      key={option.key}
+                      onClick={() => setCourseActionMode(option.key as 'move' | 'copy')}
+                      className={cn(
+                        'rounded-lg border p-3 text-left text-sm font-medium transition',
+                        courseActionMode === option.key
+                          ? 'border-primary bg-primary/5 text-foreground'
+                          : 'border-border text-foreground',
+                      )}
+                    >
+                      {option.title}
+                      <p className="text-xs font-normal text-muted-foreground">{option.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">Destination term</p>
+                <Select value={courseActionTarget} onValueChange={setCourseActionTarget}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a term" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {quickAddOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter className="gap-2">
+                <Button type="button" variant="outline" onClick={closeCourseActionDialog}>
+                  Cancel
+                </Button>
+                <Button type="button" onClick={handleCourseActionConfirm} disabled={disableCourseActionConfirm}>
+                  {courseActionMode === 'move' ? 'Move class' : 'Copy class'}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Add a year or term to choose a destination for {courseActionCourseLabel}.
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {isMobile ? (
         <>
-          <PlannerHeader
-            degreeName={plannerTitle}
-            university={state.university}
-            classYear={state.classYear}
-            onReset={reset}
-            userLabel={userLabel}
-            cloudStatus={cloudStatus}
-            cloudBusy={cloudBusy}
-            onSignIn={() => setShowAuth(true)}
-            onSignOut={signOut}
-            onOpenSettings={() => setShowSetup(true)}
-            onOpenExport={() => setShowExport(true)}
-          />
-          <div className="space-y-4 px-4 py-4 pb-40">
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {state.years.map((year) => (
-                <button
-                  key={year.id}
-                  type="button"
-                  onClick={() => setActiveMobileYear(year.id)}
-                  className={cn(
-                    "rounded-full border px-4 py-1 text-sm font-medium",
-                    activeMobileYear === year.id
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-card text-muted-foreground",
-                  )}
-                >
-                  {year.name}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-3">
-              <Button
-                variant={showDeleteControls ? "default" : "outline"}
-                size="sm"
-                className="gap-2"
-                aria-pressed={showDeleteControls}
-                onClick={() => setShowDeleteControls((prev) => !prev)}
-              >
-                <PenLine className="h-4 w-4" />
-                {showDeleteControls ? "Done editing" : "Quick edit"}
-              </Button>
-              <p className="text-xs text-muted-foreground">Show delete buttons without hovering.</p>
-            </div>
+          <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+            <PlannerHeader
+              degreeName={plannerTitle}
+              university={state.university}
+              classYear={state.classYear}
+              onReset={reset}
+              userLabel={userLabel}
+              cloudStatus={cloudStatus}
+              cloudBusy={cloudBusy}
+              onSignIn={() => setShowAuth(true)}
+              onSignOut={signOut}
+              onOpenSettings={() => setShowSetup(true)}
+              onOpenExport={() => setShowExport(true)}
+              sticky={false}
+              isMobile
+            />
+            <MobileYearNavigator
+              years={state.years}
+              activeYearId={activeMobileYear}
+              onSelectYear={(yearId) => setActiveMobileYear(yearId)}
+            />
+          </div>
+          <div className="space-y-4 px-4 py-4 pb-44">
             <div className="space-y-6">
               {state.years
                 .filter((year) => !activeMobileYear || year.id === activeMobileYear)
@@ -383,20 +491,15 @@ const Index = () => {
                     getTermCredits={(termId) => getTermCredits(year.id, termId)}
                     plans={state.plans}
                     onRemoveCourse={(termId, courseId) => removeCourse(year.id, termId, courseId)}
-                  onDropCourse={handleDropCourse}
-                  onAddTerm={() => addTerm(year.id)}
-                  onRemoveTerm={(termId) => removeTerm(year.id, termId)}
-                  onRemoveYear={() => removeYear(year.id)}
-                  canRemoveYear={canRemoveYear}
-                  termSystem={termSystem}
-                  showDeleteControls={showDeleteControls}
-                  onRequestAddCourse={handleRequestAddCourse}
-                />
-              ))}
+                    onDropCourse={handleDropCourse}
+                    onAddTerm={() => addTerm(year.id)}
+                    onRemoveTerm={(termId) => removeTerm(year.id, termId)}
+                    onRemoveYear={() => removeYear(year.id)}
+                    canRemoveYear={canRemoveYear}
+                    onRequestCourseAction={handleRequestCourseAction}
+                  />
+                ))}
             </div>
-            <Button variant="outline" className="w-full border-dashed" onClick={addYear}>
-              <Plus className="mr-2 h-4 w-4" /> Add another academic year
-            </Button>
           </div>
 
           <Sheet open={libraryOpen} onOpenChange={setLibraryOpen}>
@@ -426,7 +529,7 @@ const Index = () => {
                   onCollapsePanel={() => setLibraryOpen(false)}
                   isMobile
                   onQuickAddCourse={handleQuickAddRequest}
-                  termSystem={termSystem}
+                  addCourseTrigger={catalogAddTrigger}
                 />
               </div>
             </SheetContent>
@@ -456,6 +559,9 @@ const Index = () => {
             onOpenLibrary={() => setLibraryOpen(true)}
             onOpenRequirements={() => setRequirementsOpen(true)}
             onAddYear={addYear}
+            onAddClass={handleStartAddClass}
+            onOpenExport={() => setShowExport(true)}
+            onOpenSettings={() => setShowSetup(true)}
           />
         </>
       ) : (
@@ -491,7 +597,7 @@ const Index = () => {
               onRenamePlanProfile={renamePlanProfile}
               onDeletePlanProfile={deletePlanProfile}
               onCollapsePanel={() => catalogPanelRef.current?.collapse()}
-              termSystem={termSystem}
+              addCourseTrigger={catalogAddTrigger}
             />
           )}
         </ResizablePanel>
@@ -628,23 +734,83 @@ type MobileToolbarProps = {
   onOpenLibrary: () => void;
   onOpenRequirements: () => void;
   onAddYear: () => void;
+  onAddClass: () => void;
+  onOpenExport: () => void;
+  onOpenSettings: () => void;
 };
 
-const MobilePlannerToolbar = ({ onOpenLibrary, onOpenRequirements, onAddYear }: MobileToolbarProps) => (
+const MobilePlannerToolbar = ({
+  onOpenLibrary,
+  onOpenRequirements,
+  onAddYear,
+  onAddClass,
+  onOpenExport,
+  onOpenSettings,
+}: MobileToolbarProps) => (
   <div className="fixed inset-x-0 bottom-0 border-t border-border bg-card/95 px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.2)] backdrop-blur">
-    <div className="flex gap-3">
-      <Button variant="outline" className="flex-1 justify-center gap-2" onClick={onOpenLibrary}>
-        <BookOpen className="h-4 w-4" />
+    <div className="grid grid-cols-3 gap-3 pb-2 text-xs font-medium">
+      <Button variant="outline" className="justify-center gap-1.5 py-2 text-xs" onClick={onOpenLibrary}>
+        <BookOpen className="h-3.5 w-3.5" />
         Library
       </Button>
-      <Button variant="outline" className="flex-1 justify-center gap-2" onClick={onOpenRequirements}>
-        <ListChecks className="h-4 w-4" />
+      <Button variant="outline" className="justify-center gap-1.5 py-2 text-xs" onClick={onOpenRequirements}>
+        <ListChecks className="h-3.5 w-3.5" />
         Requirements
       </Button>
-      <Button variant="default" className="flex-1 justify-center gap-2" onClick={onAddYear}>
-        <Plus className="h-4 w-4" />
-        Add Year
+      <Button variant="outline" className="justify-center gap-1.5 py-2 text-xs" onClick={onAddClass}>
+        <Plus className="h-3.5 w-3.5" />
+        Add class
       </Button>
+    </div>
+    <div className="grid grid-cols-3 gap-3 text-xs font-medium">
+      <Button variant="default" className="justify-center gap-1.5 py-2 text-xs" onClick={onAddYear}>
+        <Plus className="h-3.5 w-3.5" />
+        Add year
+      </Button>
+      <Button variant="outline" className="justify-center gap-1.5 py-2 text-xs" onClick={onOpenExport}>
+        <Download className="h-3.5 w-3.5" />
+        Export
+      </Button>
+      <Button variant="outline" className="justify-center gap-1.5 py-2 text-xs" onClick={onOpenSettings}>
+        <Settings className="h-3.5 w-3.5" />
+        Settings
+      </Button>
+    </div>
+  </div>
+);
+
+type MobileYearNavigatorProps = {
+  years: { id: string; name: string }[];
+  activeYearId: string;
+  onSelectYear: (yearId: string) => void;
+};
+
+const MobileYearNavigator = ({ years, activeYearId, onSelectYear }: MobileYearNavigatorProps) => (
+  <div className="border-t border-border/60 bg-background/70 px-4 py-3">
+    <div className="relative">
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
+      <div className="flex gap-2 overflow-x-auto pb-1 pr-2" aria-label="Select academic year">
+        {years.length === 0 ? (
+          <span className="text-sm text-muted-foreground">Add an academic year to get started.</span>
+        ) : (
+          years.map((year) => (
+            <button
+              key={year.id}
+              type="button"
+              onClick={() => onSelectYear(year.id)}
+              className={cn(
+                'flex-shrink-0 rounded-full border px-4 py-1 text-sm font-medium transition',
+                activeYearId === year.id
+                  ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                  : 'bg-card text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {year.name}
+            </button>
+          ))
+        )}
+      </div>
     </div>
   </div>
 );

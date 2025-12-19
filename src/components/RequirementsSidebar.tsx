@@ -261,7 +261,7 @@ export const RequirementsSidebar = ({
       </div>
 
       <Dialog open={showDialog} onOpenChange={handleDialogChange}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingPlan ? `Edit ${editingPlan.name}` : 'Add a major or minor'}</DialogTitle>
             <DialogDescription>

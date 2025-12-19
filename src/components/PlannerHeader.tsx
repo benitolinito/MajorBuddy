@@ -15,6 +15,8 @@ interface PlannerHeaderProps {
   onSignOut?: () => void;
   onOpenSettings?: () => void;
   onOpenExport?: () => void;
+  sticky?: boolean;
+  isMobile?: boolean;
 }
 
 export const PlannerHeader = ({
@@ -29,15 +31,70 @@ export const PlannerHeader = ({
   onSignOut,
   onOpenSettings,
   onOpenExport,
+  sticky = true,
+  isMobile = false,
 }: PlannerHeaderProps) => {
   const showAuth = Boolean(onSignIn || onSignOut);
   const signedIn = Boolean(userLabel);
   const authAction = signedIn ? onSignOut : onSignIn;
+  const headerClass = `bg-card border-b border-border ${isMobile ? 'px-4 py-3' : 'px-6 py-4'} ${
+    sticky ? 'sticky top-0 z-10' : 'relative z-10'
+  }`;
+
+  if (isMobile) {
+    return (
+      <header className={headerClass}>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex flex-1 items-center gap-2">
+              <div className="p-2 rounded-lg bg-primary text-primary-foreground">
+                <GraduationCap className="h-5 w-5" />
+              </div>
+              <div>
+                <h1 className="text-base font-semibold text-foreground leading-tight">{degreeName}</h1>
+                <p className="text-xs text-muted-foreground">
+                  {university} • Class of {classYear}
+                </p>
+              </div>
+            </div>
+            <ThemeToggle className="h-8 w-8" />
+          </div>
+          <div className="flex gap-2">
+            {showAuth && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 text-xs"
+                onClick={authAction}
+                disabled={!authAction || cloudBusy}
+              >
+                {signedIn ? 'Sign out' : 'Sign in to sync'}
+              </Button>
+            )}
+            <ConfirmDialog
+              trigger={
+                <Button variant="outline" size="sm" className="flex-1 text-xs">
+                  <RotateCcw className="h-4 w-4 mr-1.5" />
+                  Reset
+                </Button>
+              }
+              title="Reset your schedule?"
+              description="Are you sure you want to reset? This will clear planned classes from your schedule. Your class library will be unaffected."
+              confirmLabel="Reset schedule"
+              cancelLabel="Keep schedule"
+              confirmVariant="destructive"
+              onConfirm={onReset}
+            />
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
-    <header className="bg-card border-b border-border px-6 py-4 sticky top-0 z-10">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
+    <header className={headerClass}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-primary text-primary-foreground">
             <GraduationCap className="h-5 w-5" />
           </div>
