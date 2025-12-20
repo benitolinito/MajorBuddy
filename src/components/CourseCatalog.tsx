@@ -30,6 +30,10 @@ interface CourseCatalogProps {
   onQuickAddCourse?: (course: Course) => void;
   addCourseTrigger?: number;
   quickAddLabel?: string;
+  colorPalette?: string[];
+  onAddPaletteColor?: (hex: string) => string;
+  defaultCourseCredits?: number;
+  onUpdateDefaultCourseCredits?: (credits: number) => void;
 }
 
 const TogglePill = ({
@@ -103,6 +107,8 @@ type CourseFormState = {
   title: string;
   description: string;
   credits: number;
+  subject: string;
+  prerequisiteIds: string[];
   distributives: string[];
   newDistributive: string;
   planIds: string[];
@@ -126,11 +132,15 @@ const SORT_LABELS: Record<SortOption, string> = {
   plan: 'Major/Minor',
 };
 
-const createEmptyCourseForm = (): CourseFormState => ({
+const DEFAULT_COURSE_CREDITS = 3;
+
+const createEmptyCourseForm = (defaultCredits: number = DEFAULT_COURSE_CREDITS): CourseFormState => ({
   code: '',
   title: '',
   description: '',
-  credits: 3,
+  subject: '',
+  prerequisiteIds: [],
+  credits: defaultCredits,
   distributives: [],
   newDistributive: '',
   planIds: [],
@@ -153,7 +163,14 @@ export const CourseCatalog = ({
   onQuickAddCourse,
   addCourseTrigger,
   quickAddLabel = 'Add to term',
+  colorPalette: _colorPalette,
+  onAddPaletteColor: _onAddPaletteColor,
+  defaultCourseCredits,
+  onUpdateDefaultCourseCredits,
 }: CourseCatalogProps) => {
+  const resolvedDefaultCredits = Number.isFinite(Number(defaultCourseCredits))
+    ? Math.max(0, Number(defaultCourseCredits))
+    : DEFAULT_COURSE_CREDITS;
   const [search, setSearch] = useState('');
   const [sortOption, setSortOption] = useState<SortOption>('order-added');
   const [termFilter, setTermFilter] = useState<TermName | null>(null);
@@ -161,19 +178,23 @@ export const CourseCatalog = ({
   const [planFilter, setPlanFilter] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [formState, setFormState] = useState<CourseFormState>(() => createEmptyCourseForm());
+  const [formState, setFormState] = useState<CourseFormState>(() => createEmptyCourseForm(resolvedDefaultCredits));
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [defaultCreditsDraft, setDefaultCreditsDraft] = useState<number>(resolvedDefaultCredits);
 
   const {
     code,
     title,
     description,
     credits,
+    subject,
+    prerequisiteIds,
     distributives: selectedDistributives,
     newDistributive,
     planIds: selectedPlans,
     offeredTerms,
   } = formState;
+  const courseLookup = useMemo(() => new Map(courses.map((course) => [course.id, course])), [courses]);
   const updateFormField = <K extends keyof CourseFormState>(key: K, value: CourseFormState[K]) => {
     setFormState((prev) => ({ ...prev, [key]: value }));
   };
@@ -191,6 +212,10 @@ export const CourseCatalog = ({
   const planLookup = useMemo(() => new Map(plans.map((plan) => [plan.id, plan])), [plans]);
 
   const courseOrder = useMemo(() => new Map(courses.map((course, index) => [course.id, index])), [courses]);
+  const prerequisiteOptions = useMemo(() => {
+    const filtered = courses.filter((course) => !editingCourse || course.id !== editingCourse.id);
+    return filtered.sort((a, b) => (courseOrder.get(a.id) ?? 0) - (courseOrder.get(b.id) ?? 0));
+  }, [courses, editingCourse, courseOrder]);
   const hasCourses = courses.length > 0;
 
   const termFilterOptions = useMemo<TermName[]>(() => {
@@ -357,8 +382,18 @@ export const CourseCatalog = ({
     }));
   };
 
+  const togglePrerequisite = (courseId: string) => {
+    if (editingCourse?.id === courseId) return;
+    setFormState((prev) => ({
+      ...prev,
+      prerequisiteIds: prev.prerequisiteIds.includes(courseId)
+        ? prev.prerequisiteIds.filter((id) => id !== courseId)
+        : [...prev.prerequisiteIds, courseId],
+    }));
+  };
+
   const resetForm = () => {
-    setFormState(createEmptyCourseForm());
+    setFormState(createEmptyCourseForm(resolvedDefaultCredits));
     setEditingCourse(null);
   };
 
@@ -368,15 +403,30 @@ export const CourseCatalog = ({
   };
 
   const lastAddTrigger = useRef<number | null>(null);
+  const previousDefaultCreditsRef = useRef(resolvedDefaultCredits);
 
   useEffect(() => {
     if (!addCourseTrigger) return;
     if (lastAddTrigger.current === addCourseTrigger) return;
     lastAddTrigger.current = addCourseTrigger;
-    setFormState(createEmptyCourseForm());
+    setFormState(createEmptyCourseForm(resolvedDefaultCredits));
     setEditingCourse(null);
     setDialogOpen(true);
   }, [addCourseTrigger]);
+
+  useEffect(() => {
+    setDefaultCreditsDraft(resolvedDefaultCredits);
+  }, [resolvedDefaultCredits]);
+
+  useEffect(() => {
+    if (!editingCourse) {
+      setFormState((prev) => {
+        if (prev.credits !== previousDefaultCreditsRef.current) return prev;
+        return { ...prev, credits: resolvedDefaultCredits };
+      });
+    }
+    previousDefaultCreditsRef.current = resolvedDefaultCredits;
+  }, [editingCourse, resolvedDefaultCredits]);
 
   const startEditCourse = (course: Course) => {
     setEditingCourse(course);
@@ -385,12 +435,25 @@ export const CourseCatalog = ({
       title: course.name,
       description: course.description ?? '',
       credits: course.credits,
+      subject: course.subject ?? '',
+      prerequisiteIds: course.prerequisiteIds ?? [],
       distributives: course.distributives,
       newDistributive: '',
       planIds: course.planIds,
       offeredTerms: course.offeredTerms ?? [],
     });
     setDialogOpen(true);
+  };
+
+  const handleSaveDefaultCredits = () => {
+    const normalized = Number.isFinite(Number(defaultCreditsDraft))
+      ? Math.max(0, Number(defaultCreditsDraft))
+      : resolvedDefaultCredits;
+    setDefaultCreditsDraft(normalized);
+    onUpdateDefaultCourseCredits?.(normalized);
+    if (!editingCourse && credits === resolvedDefaultCredits) {
+      updateFormField('credits', normalized);
+    }
   };
 
   const handleRemoveCourse = () => {
@@ -408,6 +471,10 @@ export const CourseCatalog = ({
     const orderedOfferedTerms = (['Fall', 'Winter', 'Spring', 'Summer'] as TermName[]).filter((term) =>
       normalizedOfferedTerms.includes(term),
     );
+    const normalizedSubject = subject.trim() || undefined;
+    const normalizedPrerequisites = Array.from(
+      new Set(prerequisiteIds.filter((id) => courseLookup.has(id))),
+    );
 
     const payload: NewCourseInput = {
       code: trimmedCode || 'NEW-000',
@@ -417,6 +484,8 @@ export const CourseCatalog = ({
       distributives: selectedDistributives,
       planIds: activePlanIds,
       offeredTerms: orderedOfferedTerms,
+      subject: normalizedSubject,
+      prerequisiteIds: normalizedPrerequisites,
     };
 
     if (editingCourse) {
@@ -429,7 +498,10 @@ export const CourseCatalog = ({
 
   const handleDialogChange = (open: boolean) => {
     setDialogOpen(open);
-    if (!open) resetForm();
+    if (!open) {
+      resetForm();
+      setDefaultCreditsDraft(resolvedDefaultCredits);
+    }
   };
 
   const selectedDistributiveColors = distributiveColorMap ?? {};
@@ -485,6 +557,49 @@ export const CourseCatalog = ({
               value={credits}
               onChange={(e) => updateFormField('credits', Number(e.target.value))}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="class-subject">Subject</Label>
+            <Input
+              id="class-subject"
+              placeholder="Math, Science, Languages"
+              value={subject}
+              onChange={(e) => updateFormField('subject', e.target.value)}
+            />
+            <p className="text-[11px] text-muted-foreground">Use your own subject label for quick scanning.</p>
+          </div>
+          <div className="space-y-2 rounded-xl border border-dashed border-border/70 bg-card/70 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="space-y-0.5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Default credits</p>
+                <p className="text-[11px] text-muted-foreground">Pre-fill new classes with this number.</p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="h-8"
+                onClick={() => setDefaultCreditsDraft(credits)}
+              >
+                Use current
+              </Button>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <Input
+                id="class-default-credits"
+                type="number"
+                min={0}
+                max={20}
+                value={defaultCreditsDraft}
+                onChange={(e) => {
+                  const value = Number(e.target.value);
+                  setDefaultCreditsDraft(Number.isFinite(value) ? value : 0);
+                }}
+              />
+              <Button type="button" size="sm" onClick={handleSaveDefaultCredits}>
+                Save
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -552,6 +667,40 @@ export const CourseCatalog = ({
               onClick={() => togglePlan(plan.id)}
             />
           ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="space-y-1">
+          <Label>Prerequisites</Label>
+          <p className="text-[11px] text-muted-foreground">Pick classes from your library that should come first.</p>
+        </div>
+        <div className="max-h-44 space-y-2 overflow-y-auto rounded-xl border border-border/70 bg-card/70 p-3">
+          {prerequisiteOptions.length === 0 && (
+            <p className="text-xs text-muted-foreground">Add another class to choose it as a prerequisite.</p>
+          )}
+          {prerequisiteOptions.map((course) => {
+            const selected = prerequisiteIds.includes(course.id);
+            return (
+              <label
+                key={course.id}
+                className={cn(
+                  'flex items-start gap-3 rounded-lg border px-3 py-2 text-left transition',
+                  selected ? 'border-primary/70 bg-primary/5' : 'border-border/70 bg-background',
+                )}
+              >
+                <Checkbox
+                  checked={selected}
+                  onCheckedChange={() => togglePrerequisite(course.id)}
+                  aria-label={`Require ${course.code}`}
+                />
+                <div className="space-y-0.5 leading-tight">
+                  <p className="text-sm font-semibold text-foreground">{course.code}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{course.name}</p>
+                </div>
+              </label>
+            );
+          })}
         </div>
       </div>
 
@@ -635,6 +784,15 @@ export const CourseCatalog = ({
             />
           </div>
           <div className="space-y-2">
+            <Label htmlFor="class-subject">Subject</Label>
+            <Input
+              id="class-subject"
+              placeholder="Math, Science, Languages"
+              value={subject}
+              onChange={(e) => updateFormField('subject', e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="class-credits">Credits</Label>
             <Input
               id="class-credits"
@@ -644,6 +802,31 @@ export const CourseCatalog = ({
               value={credits}
               onChange={(e) => updateFormField('credits', Number(e.target.value))}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="class-default-credits-mobile">Default credits for new classes</Label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input
+                id="class-default-credits-mobile"
+                type="number"
+                min={0}
+                max={20}
+                value={defaultCreditsDraft}
+                onChange={(e) => {
+                  const value = Number(e.target.value);
+                  setDefaultCreditsDraft(Number.isFinite(value) ? value : 0);
+                }}
+              />
+              <div className="flex gap-2">
+                <Button type="button" variant="secondary" onClick={() => setDefaultCreditsDraft(credits)}>
+                  Use current
+                </Button>
+                <Button type="button" onClick={handleSaveDefaultCredits}>
+                  Save
+                </Button>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">Pre-fill new classes with this credit number.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="class-description">Description</Label>
@@ -741,6 +924,41 @@ export const CourseCatalog = ({
               onClick={() => togglePlan(plan.id)}
             />
           ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Prerequisites"
+        description="Select the classes a student should take first."
+      >
+        <div className="space-y-2">
+          {prerequisiteOptions.length === 0 && (
+            <p className="text-sm text-muted-foreground">Add another class to choose it as a prerequisite.</p>
+          )}
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {prerequisiteOptions.map((course) => {
+              const selected = prerequisiteIds.includes(course.id);
+              return (
+                <label
+                  key={course.id}
+                  className={cn(
+                    'flex items-start gap-3 rounded-xl border px-3 py-3 text-sm transition',
+                    selected ? 'border-primary/70 bg-primary/5' : 'border-border/70 bg-background',
+                  )}
+                >
+                  <Checkbox
+                    checked={selected}
+                    onCheckedChange={() => togglePrerequisite(course.id)}
+                    aria-label={`Require ${course.code}`}
+                  />
+                  <div className="leading-tight">
+                    <p className="font-semibold text-foreground">{course.code}</p>
+                    <p className="text-xs text-muted-foreground">{course.name}</p>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
         </div>
       </SectionCard>
 
@@ -1012,6 +1230,11 @@ export const CourseCatalog = ({
                   <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
                 )}
                 <div className="flex flex-wrap gap-1.5 mt-2">
+                  {course.subject && (
+                    <Badge variant="secondary" className="text-[11px] font-medium">
+                      {course.subject}
+                    </Badge>
+                  )}
                   {coursePlans.map((plan) => (
                     <Badge
                       key={plan.id}
@@ -1033,6 +1256,17 @@ export const CourseCatalog = ({
                     </Badge>
                   ))}
                 </div>
+                {course.prerequisiteIds && course.prerequisiteIds.length > 0 && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Prereqs: {course.prerequisiteIds
+                      .map((id) => {
+                        const prereq = courseLookup.get(id);
+                        if (!prereq) return id;
+                        return prereq.code || prereq.name || id;
+                      })
+                      .join(', ')}
+                  </p>
+                )}
                 {mobileQuickAdd && (
                   <Button
                     type="button"

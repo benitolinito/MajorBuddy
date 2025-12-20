@@ -34,6 +34,8 @@ export interface Course {
   distributiveColors?: Record<string, string>;
   planIds: string[];
   offeredTerms?: TermName[];
+  subject?: string;
+  prerequisiteIds?: string[];
 }
 
 export interface NewCourseInput {
@@ -45,6 +47,12 @@ export interface NewCourseInput {
   distributiveColors?: Record<string, string>;
   planIds: string[];
   offeredTerms?: TermName[];
+  subject?: string;
+  prerequisiteIds?: string[];
+}
+
+export interface CourseDefaults {
+  defaultCredits: number;
 }
 
 export interface Term {
@@ -89,6 +97,7 @@ export interface PlannerState {
   plans: PlannerPlan[];
   colorPalette: string[];
   config?: PlannerConfig;
+  courseDefaults: CourseDefaults;
 }
 
 export type PlanProfile = {

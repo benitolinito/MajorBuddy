@@ -68,6 +68,7 @@ const Index = () => {
     addCourseToCatalog,
     updateCourseInCatalog,
     removeCourseFromCatalog,
+    setCourseDefaultCredits,
     addDistributive,
     addDistributiveRequirement,
     updateDistributiveRequirement,
@@ -680,6 +681,8 @@ const Index = () => {
           addCourseToCatalog={addCourseToCatalog}
           updateCourseInCatalog={updateCourseInCatalog}
           removeCourseFromCatalog={removeCourseFromCatalog}
+          defaultCourseCredits={state.courseDefaults.defaultCredits}
+          onUpdateDefaultCourseCredits={setCourseDefaultCredits}
           addDistributive={addDistributive}
           addColorToPalette={addColorToPalette}
           onDragStart={handleDragStart}
@@ -713,6 +716,8 @@ const Index = () => {
           addCourseToCatalog={addCourseToCatalog}
           updateCourseInCatalog={updateCourseInCatalog}
           removeCourseFromCatalog={removeCourseFromCatalog}
+          defaultCourseCredits={state.courseDefaults.defaultCredits}
+          onUpdateDefaultCourseCredits={setCourseDefaultCredits}
           addDistributive={addDistributive}
           addColorToPalette={addColorToPalette}
           onDragStart={handleDragStart}
@@ -860,6 +865,8 @@ type MobilePlannerLayoutProps = {
   addCourseToCatalog: (course: NewCourseInput) => Course;
   updateCourseInCatalog: (courseId: string, course: NewCourseInput) => void;
   removeCourseFromCatalog: (courseId: string) => void;
+  defaultCourseCredits: number;
+  onUpdateDefaultCourseCredits: (credits: number) => void;
   addDistributive: (label: string) => string;
   addColorToPalette: (hex: string) => string;
   onDragStart: (course: Course) => void;
@@ -892,6 +899,8 @@ const MobilePlannerLayout = ({
   addCourseToCatalog,
   updateCourseInCatalog,
   removeCourseFromCatalog,
+  defaultCourseCredits,
+  onUpdateDefaultCourseCredits,
   addDistributive,
   addColorToPalette,
   onDragStart,
@@ -1010,6 +1019,8 @@ const MobilePlannerLayout = ({
                 termSystem={termSystem}
                 colorPalette={state.colorPalette}
                 onAddPaletteColor={addColorToPalette}
+                defaultCourseCredits={defaultCourseCredits}
+                onUpdateDefaultCourseCredits={onUpdateDefaultCourseCredits}
                 onDragStart={onDragStart}
                 onCreateCourse={addCourseToCatalog}
                 onUpdateCourse={updateCourseInCatalog}
@@ -1057,6 +1068,8 @@ const MobilePlannerLayout = ({
             termSystem={termSystem}
             colorPalette={state.colorPalette}
             onAddPaletteColor={addColorToPalette}
+            defaultCourseCredits={defaultCourseCredits}
+            onUpdateDefaultCourseCredits={onUpdateDefaultCourseCredits}
             onDragStart={onDragStart}
             onCreateCourse={addCourseToCatalog}
             onUpdateCourse={updateCourseInCatalog}
@@ -1098,6 +1111,8 @@ type DesktopPlannerLayoutProps = {
   addCourseToCatalog: (course: NewCourseInput) => Course;
   updateCourseInCatalog: (courseId: string, course: NewCourseInput) => void;
   removeCourseFromCatalog: (courseId: string) => void;
+  defaultCourseCredits: number;
+  onUpdateDefaultCourseCredits: (credits: number) => void;
   addDistributive: (label: string) => string;
   addColorToPalette: (hex: string) => string;
   onDragStart: (course: Course) => void;
@@ -1128,6 +1143,8 @@ const DesktopPlannerLayout = ({
   addCourseToCatalog,
   updateCourseInCatalog,
   removeCourseFromCatalog,
+  defaultCourseCredits,
+  onUpdateDefaultCourseCredits,
   addDistributive,
   addColorToPalette,
   onDragStart,
@@ -1160,6 +1177,8 @@ const DesktopPlannerLayout = ({
             termSystem={termSystem}
             colorPalette={state.colorPalette}
             onAddPaletteColor={addColorToPalette}
+            defaultCourseCredits={defaultCourseCredits}
+            onUpdateDefaultCourseCredits={onUpdateDefaultCourseCredits}
             onDragStart={onDragStart}
             onCreateCourse={addCourseToCatalog}
             onUpdateCourse={updateCourseInCatalog}

@@ -3,6 +3,7 @@ import {
   PlannerState,
   AcademicYear,
   Course,
+  CourseDefaults,
   PlannerConfig,
   Term,
   TermName,
@@ -20,6 +21,7 @@ import { DEFAULT_PLAN_NAME, ensureUniquePlanName } from '@/lib/plannerProfiles';
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const CONFIG_STORAGE_KEY = 'plannerSetup';
 const COURSE_STORAGE_KEY = 'plannerCourseCatalog';
+const COURSE_DEFAULTS_STORAGE_KEY = 'plannerCourseDefaults';
 const DISTRIBUTIVES_STORAGE_KEY = 'plannerDistributives';
 const DISTRIBUTIVE_REQUIREMENTS_STORAGE_KEY = 'plannerDistributiveRequirements';
 const PLANS_STORAGE_KEY = 'plannerPlans';
@@ -29,9 +31,11 @@ const COLOR_PALETTE_STORAGE_KEY = 'plannerColorPalette';
 const PLAN_SHARE_STORAGE_KEY = 'plannerPlanShares';
 const DEFAULT_MAJOR_CREDITS = 48;
 const DEFAULT_MINOR_CREDITS = 24;
+const DEFAULT_COURSE_CREDITS = 3;
 const PLANNER_STORAGE_KEYS = [
   CONFIG_STORAGE_KEY,
   COURSE_STORAGE_KEY,
+  COURSE_DEFAULTS_STORAGE_KEY,
   DISTRIBUTIVES_STORAGE_KEY,
   DISTRIBUTIVE_REQUIREMENTS_STORAGE_KEY,
   PLANS_STORAGE_KEY,
@@ -53,6 +57,10 @@ const persistJson = (key: string, value: unknown) => {
 
 const persistPalette = (palette: string[]) => {
   persistJson(COLOR_PALETTE_STORAGE_KEY, palette);
+};
+
+const persistCourseDefaults = (defaults: CourseDefaults) => {
+  persistJson(COURSE_DEFAULTS_STORAGE_KEY, defaults);
 };
 
 type PlanShareMeta = { shareId: string | null; linkAccess?: ShareLinkAccess };
@@ -152,6 +160,15 @@ const normalizeOptionalNumber = (value: unknown, fallback: number | null = null)
   return Math.max(0, numeric);
 };
 
+const normalizeCourseDefaults = (value: unknown): CourseDefaults => {
+  const record = (value ?? {}) as Record<string, unknown>;
+  const defaultCredits = normalizeOptionalNumber(record.defaultCredits, DEFAULT_COURSE_CREDITS) ?? DEFAULT_COURSE_CREDITS;
+  return { defaultCredits };
+};
+
+const loadStoredCourseDefaults = (): CourseDefaults =>
+  normalizeCourseDefaults(loadJson(COURSE_DEFAULTS_STORAGE_KEY, { defaultCredits: DEFAULT_COURSE_CREDITS }));
+
 const normalizePlan = (value: unknown): PlannerPlan => {
   const plan = (value ?? {}) as Record<string, unknown>;
   const type: PlanType = plan.type === 'minor' ? 'minor' : 'major';
@@ -180,6 +197,20 @@ const normalizeCourse = (value: unknown, termSystem?: TermSystem): Course => {
   const distributives = normalizeDistributives(distributivesSource);
   const planIds = Array.isArray(course.planIds) ? course.planIds.filter(isNonEmptyString) : [];
   const sourceId = isNonEmptyString(course.sourceId) ? course.sourceId.trim() : undefined;
+  const subject = isNonEmptyString(course.subject) ? course.subject.trim() : undefined;
+  const prerequisitesSource =
+    Array.isArray(course.prerequisiteIds)
+      ? course.prerequisiteIds
+      : Array.isArray((course as { prerequisites?: unknown }).prerequisites)
+        ? (course as { prerequisites?: unknown }).prerequisites
+        : [];
+  const prerequisiteIds = Array.from(
+    new Set(
+      (prerequisitesSource as unknown[])
+        .filter(isNonEmptyString)
+        .map((id) => id.trim()),
+    ),
+  );
   const colorSource = course.distributiveColors;
   const distributiveColors =
     colorSource && typeof colorSource === 'object'
@@ -209,6 +240,8 @@ const normalizeCourse = (value: unknown, termSystem?: TermSystem): Course => {
     distributiveColors,
     planIds,
     offeredTerms,
+    subject,
+    prerequisiteIds,
   };
 };
 
@@ -498,6 +531,7 @@ const sanitizeSnapshotForPlanner = (snapshot: PlannerState): PlannerState => {
   ]);
   const normalizedPlans = snapshot.plans?.map(normalizePlan) ?? [];
   const normalizedPalette = normalizePalette(snapshot.colorPalette ?? []);
+  const normalizedCourseDefaults = normalizeCourseDefaults(snapshot.courseDefaults ?? loadStoredCourseDefaults());
   return {
     ...snapshot,
     courseCatalog: (snapshot.courseCatalog ?? []).map((course) => normalizeCourse(course, termSystem)),
@@ -505,6 +539,7 @@ const sanitizeSnapshotForPlanner = (snapshot: PlannerState): PlannerState => {
     distributives: normalizedDistributives,
     plans: normalizedPlans,
     colorPalette: normalizedPalette,
+    courseDefaults: normalizedCourseDefaults,
     years: sanitizeYears(snapshot.years, config),
   };
 };
@@ -618,6 +653,7 @@ const createPlannerState = (
     meta?: PlannerMeta;
     years?: AcademicYear[];
     colorPalette?: string[];
+    courseDefaults?: CourseDefaults;
   },
 ): PlannerState => {
   const defaults = createDefaultConfig();
@@ -634,6 +670,7 @@ const createPlannerState = (
   const plans = options?.plans?.map(normalizePlan) ?? [];
   const years = sanitizeYears(options?.years ?? loadStoredYears(), effectiveConfig);
   const colorPalette = normalizePalette(options?.colorPalette ?? loadStoredPalette());
+  const courseDefaults = normalizeCourseDefaults(options?.courseDefaults ?? loadStoredCourseDefaults());
 
   return {
     degreeName: options?.meta?.degreeName ?? planName,
@@ -650,6 +687,7 @@ const createPlannerState = (
     distributiveRequirements,
     plans,
     colorPalette,
+    courseDefaults,
     config: effectiveConfig,
   };
 };
@@ -1040,6 +1078,15 @@ export const usePlanner = () => {
     persistJson(YEARS_STORAGE_KEY, state.years);
   }, [state.years]);
 
+  const setCourseDefaultCredits = useCallback((credits: number) => {
+    const normalized = normalizeOptionalNumber(credits, DEFAULT_COURSE_CREDITS) ?? DEFAULT_COURSE_CREDITS;
+    setState((prev) => {
+      const nextDefaults: CourseDefaults = { ...prev.courseDefaults, defaultCredits: normalized };
+      persistCourseDefaults(nextDefaults);
+      return { ...prev, courseDefaults: nextDefaults };
+    });
+  }, []);
+
   const addCourseToCatalog = useCallback((courseInput: NewCourseInput) => {
     const courseId = generateId();
     let normalizedCourse: Course | null = null;
@@ -1088,6 +1135,8 @@ export const usePlanner = () => {
         distributiveColors: courseWithPlans.distributiveColors,
         planIds: courseWithPlans.planIds,
         offeredTerms: courseWithPlans.offeredTerms,
+        subject: courseWithPlans.subject,
+        prerequisiteIds: courseWithPlans.prerequisiteIds,
         sourceId: existing.sourceId ?? courseWithPlans.sourceId,
       });
 
@@ -1123,24 +1172,33 @@ export const usePlanner = () => {
   const removeCourseFromCatalog = useCallback((courseId: string) => {
     setState((prev) => {
       const updatedCatalog = prev.courseCatalog.filter((course) => course.id !== courseId);
+      const cleanedCatalog = updatedCatalog.map((course) => ({
+        ...course,
+        prerequisiteIds: (course.prerequisiteIds ?? []).filter((id) => id !== courseId),
+      }));
       const removedCourse = prev.courseCatalog.find((course) => course.id === courseId);
       const updatedYears = prev.years.map((year) => ({
         ...year,
         terms: year.terms.map((term) => ({
           ...term,
-          courses: term.courses.filter((course) => {
-            if (course.id === courseId || course.sourceId === courseId) return false;
-            if (!course.sourceId && removedCourse && course.code === removedCourse.code) return false;
-            return true;
-          }),
+          courses: term.courses
+            .filter((course) => {
+              if (course.id === courseId || course.sourceId === courseId) return false;
+              if (!course.sourceId && removedCourse && course.code === removedCourse.code) return false;
+              return true;
+            })
+            .map((course) => ({
+              ...course,
+              prerequisiteIds: (course.prerequisiteIds ?? []).filter((id) => id !== courseId),
+            })),
         })),
       }));
 
-      persistJson(COURSE_STORAGE_KEY, updatedCatalog);
+      persistJson(COURSE_STORAGE_KEY, cleanedCatalog);
 
       return {
         ...prev,
-        courseCatalog: updatedCatalog,
+        courseCatalog: cleanedCatalog,
         years: updatedYears,
       };
     });
@@ -1665,6 +1723,7 @@ export const usePlanner = () => {
         plans: prev.plans,
         years: restoredYears,
         colorPalette: prev.colorPalette,
+        courseDefaults: prev.courseDefaults,
         meta: {
           degreeName: prev.degreeName,
           university: prev.university,
@@ -1733,6 +1792,9 @@ export const usePlanner = () => {
     const normalizedPlans = snapshot.plans?.length ? snapshot.plans.map(normalizePlan) : loadStoredPlans();
     const normalizedPalette =
       snapshot.colorPalette?.length ? normalizePalette(snapshot.colorPalette) : loadStoredPalette();
+    const normalizedCourseDefaults = snapshot.courseDefaults
+      ? normalizeCourseDefaults(snapshot.courseDefaults)
+      : loadStoredCourseDefaults();
     const planIdSet = new Set(normalizedPlans.map((plan) => plan.id));
     const sanitizedCatalog = normalizedCatalog.map((course) => ({
       ...course,
@@ -1740,10 +1802,11 @@ export const usePlanner = () => {
     }));
 
     persistJson(COURSE_STORAGE_KEY, sanitizedCatalog);
-  persistJson(DISTRIBUTIVE_REQUIREMENTS_STORAGE_KEY, normalizedDistributiveRequirements);
-  persistJson(DISTRIBUTIVES_STORAGE_KEY, mergedDistributives);
+    persistJson(DISTRIBUTIVE_REQUIREMENTS_STORAGE_KEY, normalizedDistributiveRequirements);
+    persistJson(DISTRIBUTIVES_STORAGE_KEY, mergedDistributives);
     persistJson(PLANS_STORAGE_KEY, normalizedPlans);
     persistPalette(normalizedPalette);
+    persistCourseDefaults(normalizedCourseDefaults);
 
     setState({
       ...snapshot,
@@ -1756,6 +1819,7 @@ export const usePlanner = () => {
       distributives: mergedDistributives,
       plans: normalizedPlans,
       colorPalette: normalizedPalette,
+      courseDefaults: normalizedCourseDefaults,
       years: snapshot.years.map((year, index) => {
         const startYear = year.startYear ?? year.terms?.[0]?.year ?? (normalizedConfig.startYear + index);
         const defaultTermName = getTermSequenceForSystem(normalizedConfig.termSystem)[0] ?? 'Fall';
@@ -1810,6 +1874,7 @@ export const usePlanner = () => {
           plans: prev.plans,
           years,
           colorPalette: prev.colorPalette,
+          courseDefaults: prev.courseDefaults,
           meta: { degreeName: config.planName, university: config.university },
         },
       );
@@ -1826,6 +1891,7 @@ export const usePlanner = () => {
     addCourseToCatalog,
     updateCourseInCatalog,
     removeCourseFromCatalog,
+    setCourseDefaultCredits,
     createPlanProfile,
     selectPlanProfile,
     renamePlanProfile,
