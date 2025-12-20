@@ -318,7 +318,7 @@ const resolveCourseLibraryState = (
   const activeLibraryId = activeLibrary?.id ?? nextLibraries[0]?.id ?? '';
   return {
     courseLibraries: nextLibraries,
-    activeCourseLibraryId,
+    activeCourseLibraryId: activeLibraryId,
     courseCatalog: activeLibrary?.courses ?? [],
   };
 };

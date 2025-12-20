@@ -322,7 +322,7 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
           </div>
 
           <div className="space-y-3">
-            <Label htmlFor="school-logo">School logo</Label>
+            <Label htmlFor="school-logo">School logo (optional)</Label>
             <div className="flex flex-wrap items-center gap-3">
               <Avatar className="h-14 w-14 rounded-2xl border border-border bg-muted">
                 {universityLogo ? (

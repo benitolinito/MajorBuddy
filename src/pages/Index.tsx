@@ -7,7 +7,7 @@ import { YearSection } from '@/components/YearSection';
 import { RequirementsSidebar } from '@/components/RequirementsSidebar';
 import { usePlanner, clearPlannerStorage } from '@/hooks/usePlanner';
 import { useCloudPlanner } from '@/hooks/useCloudPlanner';
-import { Course, CourseDropOptions, DistributiveRequirement, PlannerConfig, PlannerState, PlanInput, PlannerPlan, NewCourseInput, TermName, TermSystem } from '@/types/planner';
+import { Course, CourseDropOptions, CourseLibrary, DistributiveRequirement, PlannerConfig, PlannerState, PlanInput, PlannerPlan, NewCourseInput, TermName, TermSystem } from '@/types/planner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlannerSetupDialog } from '@/components/PlannerSetupDialog';
 import { ExportScheduleDialog } from '@/components/ExportScheduleDialog';
@@ -581,6 +581,7 @@ const Index = () => {
         }}
       />
       <PlannerAuditDialog open={showAudit} onOpenChange={setShowAudit} audit={auditResult} />
+      <ConfirmDialog
         open={Boolean(duplicatePrompt)}
         onOpenChange={(open) => {
           if (!open) {
@@ -730,6 +731,12 @@ const Index = () => {
           addDistributive={addDistributive}
           addColorToPalette={addColorToPalette}
           onDragStart={handleDragStart}
+          courseLibraries={courseLibraries}
+          activeCourseLibraryId={activeCourseLibraryId}
+          selectCourseLibrary={selectCourseLibrary}
+          createCourseLibrary={createCourseLibrary}
+          renameCourseLibrary={renameCourseLibrary}
+          deleteCourseLibrary={deleteCourseLibrary}
           onOpenExport={handleOpenExport}
           onOpenShare={handleOpenShare}
           onOpenSettings={handleOpenSettings}
@@ -765,6 +772,12 @@ const Index = () => {
           addDistributive={addDistributive}
           addColorToPalette={addColorToPalette}
           onDragStart={handleDragStart}
+          courseLibraries={courseLibraries}
+          activeCourseLibraryId={activeCourseLibraryId}
+          selectCourseLibrary={selectCourseLibrary}
+          createCourseLibrary={createCourseLibrary}
+          renameCourseLibrary={renameCourseLibrary}
+          deleteCourseLibrary={deleteCourseLibrary}
         />
       )}
     </div>
@@ -914,6 +927,12 @@ type MobilePlannerLayoutProps = {
   addDistributive: (label: string) => string;
   addColorToPalette: (hex: string) => string;
   onDragStart: (course: Course) => void;
+  courseLibraries: CourseLibrary[];
+  activeCourseLibraryId: string;
+  selectCourseLibrary: (libraryId: string) => void;
+  createCourseLibrary: (name: string) => void;
+  renameCourseLibrary: (libraryId: string, name: string) => void;
+  deleteCourseLibrary: (libraryId: string) => void;
   onOpenExport: () => void;
   onOpenShare: () => void;
   onOpenSettings: () => void;
@@ -948,6 +967,12 @@ const MobilePlannerLayout = ({
   addDistributive,
   addColorToPalette,
   onDragStart,
+  courseLibraries,
+  activeCourseLibraryId,
+  selectCourseLibrary,
+  createCourseLibrary,
+  renameCourseLibrary,
+  deleteCourseLibrary,
   onOpenExport,
   onOpenShare,
   onOpenSettings,
@@ -1172,6 +1197,12 @@ type DesktopPlannerLayoutProps = {
   addDistributive: (label: string) => string;
   addColorToPalette: (hex: string) => string;
   onDragStart: (course: Course) => void;
+  courseLibraries: CourseLibrary[];
+  activeCourseLibraryId: string;
+  selectCourseLibrary: (libraryId: string) => void;
+  createCourseLibrary: (name: string) => void;
+  renameCourseLibrary: (libraryId: string, name: string) => void;
+  deleteCourseLibrary: (libraryId: string) => void;
 };
 
 const DesktopPlannerLayout = ({
@@ -1204,6 +1235,12 @@ const DesktopPlannerLayout = ({
   addDistributive,
   addColorToPalette,
   onDragStart,
+  courseLibraries,
+  activeCourseLibraryId,
+  selectCourseLibrary,
+  createCourseLibrary,
+  renameCourseLibrary,
+  deleteCourseLibrary,
 }: DesktopPlannerLayoutProps) => {
   const catalogPanelRef = useRef<ImperativePanelHandle>(null);
   const requirementsPanelRef = useRef<ImperativePanelHandle>(null);

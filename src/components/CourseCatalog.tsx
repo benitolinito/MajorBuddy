@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { getTagAccentClass, getTagAccentStyle, getTagColorClasses, getTagColorStyle } from '@/lib/tagColors';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -215,7 +215,7 @@ export const CourseCatalog = ({
     setFormState((prev) => ({ ...prev, [key]: value }));
   };
 
-  const resolvedLibraries = courseLibraries ?? [];
+  const resolvedLibraries = useMemo(() => courseLibraries ?? [], [courseLibraries]);
   const activeLibrary = useMemo(() => {
     if (!resolvedLibraries.length) return null;
     return resolvedLibraries.find((library) => library.id === activeCourseLibraryId) ?? resolvedLibraries[0];
@@ -435,7 +435,7 @@ export const CourseCatalog = ({
     setFormState(createEmptyCourseForm(resolvedDefaultCredits));
     setEditingCourse(null);
     setDialogOpen(true);
-  }, [addCourseTrigger]);
+  }, [addCourseTrigger, resolvedDefaultCredits]);
 
   useEffect(() => {
     setDefaultCreditsDraft(resolvedDefaultCredits);
@@ -1132,8 +1132,7 @@ export const CourseCatalog = ({
                 </DropdownMenuRadioGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onSelect={(event) => {
-                    event.preventDefault();
+                  onSelect={() => {
                     handleOpenCreateLibrary();
                   }}
                   disabled={!onCreateCourseLibrary}
@@ -1141,8 +1140,7 @@ export const CourseCatalog = ({
                   <Plus className="mr-2 h-4 w-4" /> New library
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onSelect={(event) => {
-                    event.preventDefault();
+                  onSelect={() => {
                     handleOpenRenameLibrary();
                   }}
                   disabled={!onRenameCourseLibrary || !activeLibrary}
@@ -1150,8 +1148,7 @@ export const CourseCatalog = ({
                   <Pencil className="mr-2 h-4 w-4" /> Rename current
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onSelect={(event) => {
-                    event.preventDefault();
+                  onSelect={() => {
                     setDeleteLibraryDialogOpen(true);
                   }}
                   disabled={!canDeleteLibrary}
@@ -1194,81 +1191,28 @@ export const CourseCatalog = ({
                   size="sm"
                   className="gap-2"
                 >
-              </aside>
+                  <Filter className="h-4 w-4" />
+                  Filters{hasActiveFilters ? ` (${activeFilters.length})` : ''}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-80 space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-foreground">Filter class library</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    onClick={clearFilters}
+                    disabled={!hasActiveFilters}
+                  >
+                    Clear
+                  </Button>
+                </div>
 
-              <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
-                <DialogContent className="max-w-3xl">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-3 text-2xl">
-                      {isEditing ? 'Edit class' : 'Add a class'}
-                      {isEditing && (
-                        <Badge variant="secondary" className="text-xs font-normal">
-                          {editingCourse?.code}
-                        </Badge>
-                      )}
-                    </DialogTitle>
-                    <DialogDescription>
-                      {isEditing
-                        ? 'Update the details and we will refresh it everywhere this class appears in your plan.'
-                        : 'Fill in the details and drop it into a term when you are ready.'}
-                    </DialogDescription>
-                  </DialogHeader>
-                  {renderDesktopForm()}
-                </DialogContent>
-              </Dialog>
-
-              <Dialog open={libraryEditor.open} onOpenChange={handleLibraryDialogChange}>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>{libraryEditor.mode === 'create' ? 'New class library' : 'Rename class library'}</DialogTitle>
-                    <DialogDescription>
-                      {libraryEditor.mode === 'create'
-                        ? 'Group different sets of saved classes, like electives or specific schools.'
-                        : 'Give this library a name that reflects the courses it holds.'}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-2">
-                    <Label htmlFor="library-name">Library name</Label>
-                    <Input
-                      id="library-name"
-                      value={libraryNameDraft}
-                      onChange={(event) => setLibraryNameDraft(event.target.value)}
-                      placeholder="e.g., STEM electives"
-                      autoComplete="off"
-                      autoFocus
-                    />
-                  </div>
-                  <DialogFooter className="gap-2 sm:gap-0">
-                    <Button variant="outline" onClick={() => handleLibraryDialogChange(false)}>
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleSubmitLibraryEditor}
-                      disabled={!libraryNameDraft.trim() || (libraryEditor.mode === 'create' ? !onCreateCourseLibrary : !onRenameCourseLibrary)}
-                    >
-                      {libraryEditor.mode === 'create' ? 'Create library' : 'Save name'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-              <ConfirmDialog
-                open={deleteLibraryDialogOpen}
-                onOpenChange={setDeleteLibraryDialogOpen}
-                title="Delete this library?"
-                description="Scheduled classes stay put, but the saved library will be removed."
-                confirmLabel="Delete"
-                confirmVariant="destructive"
-                confirmDisabled={!canDeleteLibrary}
-                onConfirm={() => {
-                  if (activeLibrary && canDeleteLibrary) {
-                    onDeleteCourseLibrary?.(activeLibrary.id);
-                  }
-                  setDeleteLibraryDialogOpen(false);
-                }}
-                onCancel={() => setDeleteLibraryDialogOpen(false)}
-              />
-            </>
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Term offered</p>
+                  <div className="flex flex-wrap gap-2">
+                    <TogglePill label="Any term" active={!termFilter} onClick={() => setTermFilter(null)} />
                     {termFilterOptions.map((term) => (
                       <TogglePill
                         key={term}
@@ -1542,5 +1486,59 @@ export const CourseCatalog = ({
         </DialogContent>
       </Dialog>
     </aside>
+
+    <Dialog open={libraryEditor.open} onOpenChange={handleLibraryDialogChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{libraryEditor.mode === 'create' ? 'New class library' : 'Rename class library'}</DialogTitle>
+          <DialogDescription>
+            {libraryEditor.mode === 'create'
+              ? 'Group different sets of saved classes, like electives or specific schools.'
+              : 'Give this library a name that reflects the courses it holds.'}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="library-name">Library name</Label>
+          <Input
+            id="library-name"
+            value={libraryNameDraft}
+            onChange={(event) => setLibraryNameDraft(event.target.value)}
+            placeholder="e.g., STEM electives"
+            autoComplete="off"
+            autoFocus
+          />
+        </div>
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="outline" onClick={() => handleLibraryDialogChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmitLibraryEditor}
+            disabled={!libraryNameDraft.trim() || (libraryEditor.mode === 'create' ? !onCreateCourseLibrary : !onRenameCourseLibrary)}
+          >
+            {libraryEditor.mode === 'create' ? 'Create library' : 'Save name'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <ConfirmDialog
+      open={deleteLibraryDialogOpen}
+      onOpenChange={setDeleteLibraryDialogOpen}
+      title="Delete this library?"
+      description="Scheduled classes stay put, but the saved library will be removed."
+      confirmLabel="Delete"
+      confirmVariant="destructive"
+      confirmDisabled={!canDeleteLibrary}
+      onConfirm={() => {
+        if (activeLibrary && canDeleteLibrary) {
+          onDeleteCourseLibrary?.(activeLibrary.id);
+        }
+        setDeleteLibraryDialogOpen(false);
+      }}
+      onCancel={() => setDeleteLibraryDialogOpen(false)}
+    />
+
+    </>
   );
 };
