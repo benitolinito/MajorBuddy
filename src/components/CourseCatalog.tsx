@@ -1304,7 +1304,7 @@ export const CourseCatalog = ({
       <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
         <DialogContent
           className={cn(
-            'sm:max-w-xl max-h-[85vh] overflow-y-auto',
+            'sm:max-w-xl max-h-[90vh] sm:!max-h-[90vh] overflow-y-auto',
             isMobile && 'h-[92vh] max-h-none w-screen max-w-none rounded-none border-0 bg-background p-0',
           )}
         >
