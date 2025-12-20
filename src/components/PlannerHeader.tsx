@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, Download, Settings, Wrench, UserRound, Link2, ChevronDown } from 'lucide-react';
+import { GraduationCap, Download, Settings, Wrench, UserRound, Link2, ChevronDown, ListChecks } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +26,7 @@ interface PlannerHeaderProps {
   onOpenSettings?: () => void;
   onOpenExport?: () => void;
   onOpenShare?: () => void;
+  onOpenAudit?: () => void;
   onOpenProfile?: () => void;
   sticky?: boolean;
   isMobile?: boolean;
@@ -50,6 +51,7 @@ export const PlannerHeader = ({
   onOpenSettings,
   onOpenExport,
   onOpenShare,
+  onOpenAudit,
   onOpenProfile,
   sticky = true,
   isMobile = false,
@@ -166,6 +168,16 @@ export const PlannerHeader = ({
             >
               <Download className="mr-2 h-4 w-4" />
               Export
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-11"
+              onClick={() => handlePlanAction(onOpenAudit)}
+              disabled={!onOpenAudit}
+            >
+              <ListChecks className="mr-2 h-4 w-4" />
+              Audit
             </Button>
             <Button
               type="button"
@@ -294,6 +306,15 @@ export const PlannerHeader = ({
             >
               <Link2 className="h-4 w-4 mr-1.5" />
               Share
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={onOpenAudit}
+              disabled={!onOpenAudit}
+            >
+              <ListChecks className="h-4 w-4 mr-1.5" />
+              Audit
             </Button>
             <Button size="sm" onClick={onOpenExport} disabled={!onOpenExport}>
               <Download className="h-4 w-4 mr-1.5" />

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps,
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CourseCatalog } from '@/components/CourseCatalog';
 import { PlannerHeader } from '@/components/PlannerHeader';
+import { PlannerAuditDialog, type PlannerAuditResult } from '@/components/PlannerAuditDialog';
 import { YearSection } from '@/components/YearSection';
 import { RequirementsSidebar } from '@/components/RequirementsSidebar';
 import { usePlanner, clearPlannerStorage } from '@/hooks/usePlanner';
@@ -104,6 +105,8 @@ const Index = () => {
   const [showSetup, setShowSetup] = useState(!hasConfig);
   const [showExport, setShowExport] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showAudit, setShowAudit] = useState(false);
+  const [auditResult, setAuditResult] = useState<PlannerAuditResult | null>(null);
   const [showAuth, setShowAuth] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showDeleteControls, setShowDeleteControls] = useState(false);
@@ -172,6 +175,56 @@ const Index = () => {
   const formatCourseLabel = (course?: Course | null) =>
     ([course?.code, course?.name].filter(Boolean).join(' ').trim() || 'this class');
   const courseActionCourseLabel = formatCourseLabel(courseActionPrompt?.course);
+  const buildPlannerAuditSnapshot = (): PlannerAuditResult => {
+    const totalTerms = state.years.reduce((sum, year) => sum + year.terms.length, 0);
+    const requiredCredits = state.config?.totalCredits ?? state.requirements?.totalCredits ?? 120;
+    const recommendedPerTerm = totalTerms > 0 ? requiredCredits / totalTerms : null;
+    const scheduledAverage = totalTerms > 0 ? stats.totalCredits / totalTerms : null;
+    const heavyThresholdRaw =
+      recommendedPerTerm != null
+        ? Math.ceil(recommendedPerTerm)
+        : scheduledAverage != null
+          ? Math.ceil(scheduledAverage)
+          : 21;
+    const termLoadWarnings: PlannerAuditResult['termLoadWarnings'] = [];
+    const offeringIssues: PlannerAuditResult['offeringIssues'] = [];
+
+    state.years.forEach((year) => {
+      year.terms.forEach((term) => {
+        const termLabel = `${term.name} ${term.year} • ${year.name}`;
+        const credits = term.courses.reduce((total, course) => total + course.credits, 0);
+        if (credits > heavyThresholdRaw) {
+          termLoadWarnings.push({
+            id: `${year.id}:${term.id}`,
+            termLabel,
+            credits,
+          });
+        }
+
+        term.courses.forEach((course) => {
+          const offeredTerms = course.offeredTerms ?? [];
+          if (offeredTerms.length && !offeredTerms.includes(term.name)) {
+            offeringIssues.push({
+              id: `${course.id}:${term.id}`,
+              termLabel,
+              courseLabel: formatCourseLabel(course),
+              offeredTerms,
+            });
+          }
+        });
+      });
+    });
+
+    return {
+      generatedAt: new Date().toISOString(),
+      requiredCredits,
+      recommendedPerTerm: recommendedPerTerm != null ? Number(recommendedPerTerm.toFixed(1)) : null,
+      scheduledAverage: scheduledAverage != null ? Number(scheduledAverage.toFixed(1)) : null,
+      heavyThreshold: heavyThresholdRaw,
+      termLoadWarnings,
+      offeringIssues,
+    };
+  };
   const findTermMeta = useCallback(
     (yearId: string, termId: string) => {
       const year = state.years.find((item) => item.id === yearId);
@@ -192,6 +245,10 @@ const Index = () => {
   const handleOpenSettings = () => setShowSetup(true);
   const handleOpenExport = () => setShowExport(true);
   const handleOpenShare = () => setShowShare(true);
+  const handleOpenAudit = () => {
+    setAuditResult(buildPlannerAuditSnapshot());
+    setShowAudit(true);
+  };
   const toggleDeleteControls = () => setShowDeleteControls((prev) => !prev);
 
   const formatProfileActionError = (error: unknown, fallback: string) => {
@@ -271,6 +328,7 @@ const Index = () => {
     onOpenSettings: handleOpenSettings,
     onOpenExport: handleOpenExport,
     onOpenShare: handleOpenShare,
+    onOpenAudit: handleOpenAudit,
     planProfiles,
     activePlanProfileId,
     onSelectPlanProfile: selectPlanProfile,
@@ -516,6 +574,7 @@ const Index = () => {
           });
         }}
       />
+      <PlannerAuditDialog open={showAudit} onOpenChange={setShowAudit} audit={auditResult} />
       <ConfirmDialog
         open={Boolean(offeredTermPrompt)}
         onOpenChange={(open) => {

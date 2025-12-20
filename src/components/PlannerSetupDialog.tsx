@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { ChevronDown, ChevronUp, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PlannerConfig, TermSystem } from "@/types/planner";
 import { UNIVERSITY_SUGGESTIONS } from '@/data/universities';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const formatInitialValue = (value?: number | string | null) =>
   (value !== null && value !== undefined ? String(value) : "");
@@ -84,6 +85,7 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
       termSystem: initialConfig?.termSystem ?? "semester",
       planName: initialConfig?.planName ?? "My Plan",
       university: initialConfig?.university ?? "University Name",
+      universityLogo: initialConfig?.universityLogo ?? null,
     };
   }, [initialConfig]);
 
@@ -93,7 +95,10 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
   const [termSystem, setTermSystem] = useState<TermSystem | "">(() => initialConfig?.termSystem ?? "");
   const [planName, setPlanName] = useState(() => initialConfig?.planName ?? "");
   const [university, setUniversity] = useState(() => initialConfig?.university ?? "");
+  const [universityLogo, setUniversityLogo] = useState<string | null>(() => initialConfig?.universityLogo ?? null);
   const [universityFocused, setUniversityFocused] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
   const filteredUniversities = useMemo(() => {
     const query = university.trim().toLowerCase();
     if (!query) return [];
@@ -142,9 +147,42 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
     setTermSystem(initialConfig?.termSystem ?? "");
     setPlanName(initialConfig?.planName ?? "");
     setUniversity(initialConfig?.university ?? "");
+    setUniversityLogo(initialConfig?.universityLogo ?? null);
+    setLogoError(null);
   }, [initialConfig]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setLogoError("Please choose an image file.");
+      return;
+    }
+    const maxBytes = 512 * 1024;
+    if (file.size > maxBytes) {
+      setLogoError("Logo must be smaller than 512 KB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setUniversityLogo(reader.result);
+        setLogoError(null);
+      } else {
+        setLogoError("We couldn't read that file. Try another image.");
+      }
+    };
+    reader.onerror = () => setLogoError("We couldn't read that file. Try another image.");
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearLogo = () => {
+    setUniversityLogo(null);
+    setLogoError(null);
+  };
+
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const parsedStartYear = Number(startYear);
     const parsedClasses = Number(classesPerTerm);
@@ -171,6 +209,7 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
       termSystem: normalizedTermSystem,
       planName: normalizedPlanName,
       university: normalizedUniversity,
+      universityLogo: universityLogo ?? null,
     });
   };
 
@@ -280,6 +319,43 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
                 </div>
               </RadioGroup>
             </div>
+          </div>
+
+          <div className="space-y-3">
+            <Label htmlFor="school-logo">School logo</Label>
+            <div className="flex flex-wrap items-center gap-3">
+              <Avatar className="h-14 w-14 rounded-2xl border border-border bg-muted">
+                {universityLogo ? (
+                  <AvatarImage src={universityLogo} alt={`${university || 'School'} logo`} className="object-cover" />
+                ) : (
+                  <AvatarFallback className="bg-primary text-primary-foreground">
+                    <GraduationCap className="h-5 w-5" />
+                  </AvatarFallback>
+                )}
+              </Avatar>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" onClick={() => logoInputRef.current?.click()}>
+                  {universityLogo ? "Replace logo" : "Upload logo"}
+                </Button>
+                {universityLogo ? (
+                  <Button type="button" variant="ghost" onClick={handleClearLogo}>
+                    Remove
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            <input
+              ref={logoInputRef}
+              id="school-logo"
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={handleLogoChange}
+            />
+            <p className="text-xs text-muted-foreground">
+              SVG or PNG with a transparent background works best. Max file size 512 KB.
+            </p>
+            {logoError ? <p className="text-xs text-destructive">{logoError}</p> : null}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">

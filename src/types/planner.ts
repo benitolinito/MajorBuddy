@@ -83,11 +83,13 @@ export interface PlannerConfig {
   termSystem: TermSystem;
   planName: string;
   university: string;
+  universityLogo?: string | null;
 }
 
 export interface PlannerState {
   degreeName: string;
   university: string;
+  universityLogo?: string | null;
   classYear: number;
   years: AcademicYear[];
   requirements: DegreeRequirements;

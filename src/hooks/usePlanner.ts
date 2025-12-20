@@ -517,6 +517,7 @@ const createDefaultConfig = (): PlannerConfig => {
     termSystem: 'semester',
     planName: '',
     university: '',
+    universityLogo: null,
   };
 };
 
@@ -641,7 +642,7 @@ const rebuildYearsForReset = (existingYears: AcademicYear[], config: PlannerConf
   return [...rebuilt, ...extraYears].sort((a, b) => a.startYear - b.startYear);
 };
 
-type PlannerMeta = { degreeName?: string; university?: string };
+type PlannerMeta = { degreeName?: string; university?: string; universityLogo?: string | null };
 
 const createPlannerState = (
   config: PlannerConfig | null,
@@ -658,7 +659,11 @@ const createPlannerState = (
 ): PlannerState => {
   const defaults = createDefaultConfig();
   const effectiveConfig = config ? { ...defaults, ...config } : defaults;
-  const { startYear, totalCredits, termSystem, planName, university } = effectiveConfig;
+  const normalizedConfig: PlannerConfig = {
+    ...effectiveConfig,
+    universityLogo: effectiveConfig.universityLogo ?? null,
+  };
+  const { startYear, totalCredits, termSystem, planName, university, universityLogo } = normalizedConfig;
   const courseCatalog = options?.courseCatalog?.map((course) => normalizeCourse(course, termSystem)) ?? [];
   const distributiveRequirements =
     options?.distributiveRequirements?.map(normalizeDistributiveRequirement) ??
@@ -675,6 +680,7 @@ const createPlannerState = (
   return {
     degreeName: options?.meta?.degreeName ?? planName,
     university: options?.meta?.university ?? university,
+    universityLogo: options?.meta?.universityLogo ?? universityLogo ?? null,
     classYear: startYear + 4,
     years,
     requirements: {
@@ -688,7 +694,7 @@ const createPlannerState = (
     plans,
     colorPalette,
     courseDefaults,
-    config: effectiveConfig,
+    config: normalizedConfig,
   };
 };
 
@@ -773,6 +779,9 @@ const loadStoredConfig = (): PlannerConfig | null => {
     const parsed = JSON.parse(raw) as Partial<PlannerConfig>;
     if (parsed.startYear == null || parsed.classesPerTerm == null || parsed.totalCredits == null) return null;
     const defaults = createDefaultConfig();
+    const logo = typeof parsed.universityLogo === 'string' && parsed.universityLogo.trim().length
+      ? parsed.universityLogo.trim()
+      : null;
     return {
       startYear: Number(parsed.startYear),
       classesPerTerm: Number(parsed.classesPerTerm),
@@ -786,6 +795,7 @@ const loadStoredConfig = (): PlannerConfig | null => {
         typeof parsed.university === 'string' && parsed.university.trim()
           ? parsed.university.trim()
           : defaults.university,
+      universityLogo: logo,
     };
   } catch {
     return null;
@@ -1727,6 +1737,7 @@ export const usePlanner = () => {
         meta: {
           degreeName: prev.degreeName,
           university: prev.university,
+          universityLogo: prev.universityLogo ?? prev.config?.universityLogo ?? null,
         },
       });
 
@@ -1768,6 +1779,12 @@ export const usePlanner = () => {
       termSystem: snapshot.config?.termSystem ?? storedConfig?.termSystem ?? defaults.termSystem,
       planName: snapshot.config?.planName ?? snapshot.degreeName ?? storedConfig?.planName ?? defaults.planName,
       university: snapshot.config?.university ?? snapshot.university ?? storedConfig?.university ?? defaults.university,
+      universityLogo:
+        snapshot.config?.universityLogo ??
+        snapshot.universityLogo ??
+        storedConfig?.universityLogo ??
+        defaults.universityLogo ??
+        null,
     };
 
     persistConfig(normalizedConfig);
@@ -1812,6 +1829,7 @@ export const usePlanner = () => {
       ...snapshot,
       degreeName: snapshot.degreeName ?? normalizedConfig.planName,
       university: snapshot.university ?? normalizedConfig.university,
+      universityLogo: snapshot.universityLogo ?? normalizedConfig.universityLogo ?? null,
       classYear: snapshot.classYear ?? normalizedConfig.startYear + 4,
       config: normalizedConfig,
       courseCatalog: sanitizedCatalog,
@@ -1856,17 +1874,21 @@ export const usePlanner = () => {
   }, []);
 
   const configurePlanner = useCallback((config: PlannerConfig) => {
-    persistConfig(config);
+    const normalizedConfig: PlannerConfig = {
+      ...config,
+      universityLogo: config.universityLogo ?? null,
+    };
+    persistConfig(normalizedConfig);
     setHasConfig(true);
     setState((prev) => {
       const previousTermSystem: TermSystem = prev.config?.termSystem ?? 'semester';
       const years =
-        previousTermSystem === 'semester' && config.termSystem === 'quarter'
-          ? convertSemesterYearsToQuarter(prev.years, config.startYear)
+        previousTermSystem === 'semester' && normalizedConfig.termSystem === 'quarter'
+          ? convertSemesterYearsToQuarter(prev.years, normalizedConfig.startYear)
           : prev.years;
 
       return createPlannerState(
-        config,
+        normalizedConfig,
         {
           courseCatalog: prev.courseCatalog,
           distributives: prev.distributives,
@@ -1875,7 +1897,11 @@ export const usePlanner = () => {
           years,
           colorPalette: prev.colorPalette,
           courseDefaults: prev.courseDefaults,
-          meta: { degreeName: config.planName, university: config.university },
+          meta: {
+            degreeName: normalizedConfig.planName,
+            university: normalizedConfig.university,
+            universityLogo: normalizedConfig.universityLogo ?? prev.universityLogo ?? null,
+          },
         },
       );
     });
