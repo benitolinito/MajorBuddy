@@ -55,6 +55,12 @@ export interface CourseDefaults {
   defaultCredits: number;
 }
 
+export interface CourseLibrary {
+  id: string;
+  name: string;
+  courses: Course[];
+}
+
 export interface Term {
   id: string;
   name: TermName;
@@ -94,6 +100,8 @@ export interface PlannerState {
   years: AcademicYear[];
   requirements: DegreeRequirements;
   courseCatalog: Course[];
+  courseLibraries: CourseLibrary[];
+  activeCourseLibraryId: string;
   distributives: string[];
   distributiveRequirements: DistributiveRequirement[];
   plans: PlannerPlan[];

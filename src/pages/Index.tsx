@@ -47,6 +47,8 @@ const Index = () => {
   const navigate = useNavigate();
   const {
     state,
+    courseLibraries,
+    activeCourseLibraryId,
     planProfiles,
     activePlanProfileId,
     getCoursePlacement,
@@ -69,6 +71,10 @@ const Index = () => {
     addCourseToCatalog,
     updateCourseInCatalog,
     removeCourseFromCatalog,
+    selectCourseLibrary,
+    createCourseLibrary,
+    renameCourseLibrary,
+    deleteCourseLibrary,
     setCourseDefaultCredits,
     addDistributive,
     addDistributiveRequirement,
@@ -575,27 +581,6 @@ const Index = () => {
         }}
       />
       <PlannerAuditDialog open={showAudit} onOpenChange={setShowAudit} audit={auditResult} />
-      <ConfirmDialog
-        open={Boolean(offeredTermPrompt)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setOfferedTermPrompt(null);
-          }
-        }}
-        title="Schedule outside typical term?"
-        description={offeredTermPrompt ? (
-          <>
-            <span className="font-medium text-foreground">{formatCourseLabel(offeredTermPrompt.course)}</span>{' '}
-            is usually offered in {offeredTermPrompt.offeredTerms.join(', ')}. Add it to {offeredTermPrompt.targetTermName}{' '}
-            {offeredTermPrompt.targetTermYear} ({offeredTermPrompt.targetYearName}) anyway?
-          </>
-        ) : undefined}
-        confirmLabel="Add anyway"
-        cancelLabel="Cancel"
-        onConfirm={handleConfirmOfferedTerm}
-        onCancel={handleCancelOfferedTerm}
-      />
-      <ConfirmDialog
         open={Boolean(duplicatePrompt)}
         onOpenChange={(open) => {
           if (!open) {
@@ -1085,6 +1070,12 @@ const MobilePlannerLayout = ({
                 onUpdateCourse={updateCourseInCatalog}
                 onRemoveCourse={removeCourseFromCatalog}
                 onCreateDistributive={addDistributive}
+                courseLibraries={courseLibraries}
+                activeCourseLibraryId={activeCourseLibraryId}
+                onSelectCourseLibrary={selectCourseLibrary}
+                onCreateCourseLibrary={createCourseLibrary}
+                onRenameCourseLibrary={renameCourseLibrary}
+                onDeleteCourseLibrary={deleteCourseLibrary}
                 isMobile
               />
             </MobilePaneCard>
@@ -1134,6 +1125,12 @@ const MobilePlannerLayout = ({
             onUpdateCourse={updateCourseInCatalog}
             onRemoveCourse={removeCourseFromCatalog}
             onCreateDistributive={addDistributive}
+            courseLibraries={courseLibraries}
+            activeCourseLibraryId={activeCourseLibraryId}
+            onSelectCourseLibrary={selectCourseLibrary}
+            onCreateCourseLibrary={createCourseLibrary}
+            onRenameCourseLibrary={renameCourseLibrary}
+            onDeleteCourseLibrary={deleteCourseLibrary}
             onCollapsePanel={() => handleQuickAddChange(false)}
             isMobile
             onQuickAddCourse={handleQuickAddCourse}
@@ -1243,6 +1240,12 @@ const DesktopPlannerLayout = ({
             onUpdateCourse={updateCourseInCatalog}
             onRemoveCourse={removeCourseFromCatalog}
             onCreateDistributive={addDistributive}
+            courseLibraries={courseLibraries}
+            activeCourseLibraryId={activeCourseLibraryId}
+            onSelectCourseLibrary={selectCourseLibrary}
+            onCreateCourseLibrary={createCourseLibrary}
+            onRenameCourseLibrary={renameCourseLibrary}
+            onDeleteCourseLibrary={deleteCourseLibrary}
             onCollapsePanel={() => catalogPanelRef.current?.collapse()}
           />
         )}

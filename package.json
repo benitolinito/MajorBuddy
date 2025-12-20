@@ -10,7 +10,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "generate:universities": "node scripts/generate-universities.cjs"
+    "generate:universities": "node scripts/generate-universities.cjs",
+    "generate:og": "node scripts/generate-og-image.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -80,6 +81,8 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
-    "vite": "^5.4.21"
+    "vite": "^5.4.21",
+    "satori": "^0.11.3",
+    "sharp": "^0.33.5"
   }
 }

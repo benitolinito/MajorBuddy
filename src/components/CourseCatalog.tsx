@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowRight, ArrowUpDown, BookOpen, ChevronsLeft, Filter, Pencil, Plus, Search, Tag, Trash, X } from 'lucide-react';
-import { Course, NewCourseInput, PlannerPlan, TermName, TermSystem } from '@/types/planner';
+import { ArrowRight, ArrowUpDown, BookOpen, ChevronDown, ChevronsLeft, Filter, Pencil, Plus, Search, Tag, Trash, X } from 'lucide-react';
+import { Course, CourseLibrary, NewCourseInput, PlannerPlan, TermName, TermSystem } from '@/types/planner';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { getTagAccentClass, getTagAccentStyle, getTagColorClasses, getTagColorStyle } from '@/lib/tagColors';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 interface CourseCatalogProps {
   courses: Course[];
@@ -34,6 +35,12 @@ interface CourseCatalogProps {
   onAddPaletteColor?: (hex: string) => string;
   defaultCourseCredits?: number;
   onUpdateDefaultCourseCredits?: (credits: number) => void;
+  courseLibraries?: CourseLibrary[];
+  activeCourseLibraryId?: string;
+  onSelectCourseLibrary?: (libraryId: string) => void;
+  onCreateCourseLibrary?: (name: string) => void;
+  onRenameCourseLibrary?: (libraryId: string, name: string) => void;
+  onDeleteCourseLibrary?: (libraryId: string) => void;
 }
 
 const TogglePill = ({
@@ -167,6 +174,12 @@ export const CourseCatalog = ({
   onAddPaletteColor: _onAddPaletteColor,
   defaultCourseCredits,
   onUpdateDefaultCourseCredits,
+  courseLibraries = [],
+  activeCourseLibraryId,
+  onSelectCourseLibrary,
+  onCreateCourseLibrary,
+  onRenameCourseLibrary,
+  onDeleteCourseLibrary,
 }: CourseCatalogProps) => {
   const resolvedDefaultCredits = Number.isFinite(Number(defaultCourseCredits))
     ? Math.max(0, Number(defaultCourseCredits))
@@ -181,6 +194,9 @@ export const CourseCatalog = ({
   const [formState, setFormState] = useState<CourseFormState>(() => createEmptyCourseForm(resolvedDefaultCredits));
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [defaultCreditsDraft, setDefaultCreditsDraft] = useState<number>(resolvedDefaultCredits);
+  const [libraryEditor, setLibraryEditor] = useState<{ mode: 'create' | 'rename'; open: boolean }>({ mode: 'create', open: false });
+  const [libraryNameDraft, setLibraryNameDraft] = useState('');
+  const [deleteLibraryDialogOpen, setDeleteLibraryDialogOpen] = useState(false);
 
   const {
     code,
@@ -198,6 +214,13 @@ export const CourseCatalog = ({
   const updateFormField = <K extends keyof CourseFormState>(key: K, value: CourseFormState[K]) => {
     setFormState((prev) => ({ ...prev, [key]: value }));
   };
+
+  const resolvedLibraries = courseLibraries ?? [];
+  const activeLibrary = useMemo(() => {
+    if (!resolvedLibraries.length) return null;
+    return resolvedLibraries.find((library) => library.id === activeCourseLibraryId) ?? resolvedLibraries[0];
+  }, [resolvedLibraries, activeCourseLibraryId]);
+  const canDeleteLibrary = resolvedLibraries.length > 1 && Boolean(onDeleteCourseLibrary);
 
   const baseTermOptions = useMemo<TermName[]>(
     () => (termSystem === 'quarter' ? ['Fall', 'Winter', 'Spring', 'Summer'] : ['Fall', 'Spring', 'Summer']),
@@ -504,6 +527,41 @@ export const CourseCatalog = ({
     }
   };
 
+  const handleLibraryDialogChange = (open: boolean) => {
+    setLibraryEditor((prev) => ({ ...prev, open }));
+    if (!open) {
+      setLibraryNameDraft('');
+    }
+  };
+
+  const handleSelectLibrary = (value: string) => {
+    if (!value || value === '__none') return;
+    onSelectCourseLibrary?.(value);
+  };
+
+  const handleOpenCreateLibrary = () => {
+    if (!onCreateCourseLibrary) return;
+    setLibraryEditor({ mode: 'create', open: true });
+    setLibraryNameDraft('');
+  };
+
+  const handleOpenRenameLibrary = () => {
+    if (!onRenameCourseLibrary || !activeLibrary) return;
+    setLibraryEditor({ mode: 'rename', open: true });
+    setLibraryNameDraft(activeLibrary.name);
+  };
+
+  const handleSubmitLibraryEditor = () => {
+    const trimmed = libraryNameDraft.trim();
+    if (!trimmed) return;
+    if (libraryEditor.mode === 'create') {
+      onCreateCourseLibrary?.(trimmed);
+    } else if (libraryEditor.mode === 'rename' && activeLibrary) {
+      onRenameCourseLibrary?.(activeLibrary.id, trimmed);
+    }
+    handleLibraryDialogChange(false);
+  };
+
   const selectedDistributiveColors = distributiveColorMap ?? {};
 
   const isEditing = Boolean(editingCourse);
@@ -514,6 +572,10 @@ export const CourseCatalog = ({
       ? 'Pick a class to add it to this term.'
       : 'Create and edit classes in your library.'
     : 'Add your classes, then drag to a term.';
+  const libraryMenuValue = activeLibrary?.id ?? (resolvedLibraries[0]?.id ?? '__none');
+  const libraryLabel = activeLibrary?.name ?? 'Select library';
+  const showLibraryControls = Boolean(onSelectCourseLibrary || onCreateCourseLibrary || resolvedLibraries.length);
+  const libraryCountLabel = resolvedLibraries.length > 1 ? `${resolvedLibraries.length} libraries` : null;
   const addCourseLabel = mobileQuickAdd ? 'New class' : 'Add class';
   const containerClassName = cn(
     'flex flex-col max-w-full',
@@ -1007,7 +1069,8 @@ export const CourseCatalog = ({
   );
 
   return (
-    <aside className={containerClassName}>
+    <>
+      <aside className={containerClassName}>
       <div className="p-4 border-b border-border space-y-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -1039,6 +1102,68 @@ export const CourseCatalog = ({
           />
         </div>
 
+        {showLibraryControls && (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Library</p>
+              {libraryCountLabel ? <span className="text-xs text-muted-foreground">{libraryCountLabel}</span> : null}
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full justify-between gap-2">
+                  <span className="truncate">{libraryLabel}</span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-64 space-y-1">
+                <DropdownMenuLabel>Class libraries</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={libraryMenuValue} onValueChange={handleSelectLibrary}>
+                  {resolvedLibraries.length === 0 ? (
+                    <DropdownMenuRadioItem value="__none" disabled>
+                      No libraries yet
+                    </DropdownMenuRadioItem>
+                  ) : (
+                    resolvedLibraries.map((library) => (
+                      <DropdownMenuRadioItem key={library.id} value={library.id}>
+                        {library.name}
+                      </DropdownMenuRadioItem>
+                    ))
+                  )}
+                </DropdownMenuRadioGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    handleOpenCreateLibrary();
+                  }}
+                  disabled={!onCreateCourseLibrary}
+                >
+                  <Plus className="mr-2 h-4 w-4" /> New library
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    handleOpenRenameLibrary();
+                  }}
+                  disabled={!onRenameCourseLibrary || !activeLibrary}
+                >
+                  <Pencil className="mr-2 h-4 w-4" /> Rename current
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    setDeleteLibraryDialogOpen(true);
+                  }}
+                  disabled={!canDeleteLibrary}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash className="mr-2 h-4 w-4" /> Delete current
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+
         {hasCourses && (
           <div className="flex flex-wrap items-center gap-2">
             <DropdownMenu>
@@ -1069,28 +1194,81 @@ export const CourseCatalog = ({
                   size="sm"
                   className="gap-2"
                 >
-                  <Filter className="h-4 w-4" />
-                  Filters{hasActiveFilters ? ` (${activeFilters.length})` : ''}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-80 space-y-4">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-foreground">Filter class library</p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2 text-xs"
-                    onClick={clearFilters}
-                    disabled={!hasActiveFilters}
-                  >
-                    Clear
-                  </Button>
-                </div>
+              </aside>
 
-                <div className="space-y-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Term offered</p>
-                  <div className="flex flex-wrap gap-2">
-                    <TogglePill label="Any term" active={!termFilter} onClick={() => setTermFilter(null)} />
+              <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
+                <DialogContent className="max-w-3xl">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-3 text-2xl">
+                      {isEditing ? 'Edit class' : 'Add a class'}
+                      {isEditing && (
+                        <Badge variant="secondary" className="text-xs font-normal">
+                          {editingCourse?.code}
+                        </Badge>
+                      )}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {isEditing
+                        ? 'Update the details and we will refresh it everywhere this class appears in your plan.'
+                        : 'Fill in the details and drop it into a term when you are ready.'}
+                    </DialogDescription>
+                  </DialogHeader>
+                  {renderDesktopForm()}
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={libraryEditor.open} onOpenChange={handleLibraryDialogChange}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>{libraryEditor.mode === 'create' ? 'New class library' : 'Rename class library'}</DialogTitle>
+                    <DialogDescription>
+                      {libraryEditor.mode === 'create'
+                        ? 'Group different sets of saved classes, like electives or specific schools.'
+                        : 'Give this library a name that reflects the courses it holds.'}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-2">
+                    <Label htmlFor="library-name">Library name</Label>
+                    <Input
+                      id="library-name"
+                      value={libraryNameDraft}
+                      onChange={(event) => setLibraryNameDraft(event.target.value)}
+                      placeholder="e.g., STEM electives"
+                      autoComplete="off"
+                      autoFocus
+                    />
+                  </div>
+                  <DialogFooter className="gap-2 sm:gap-0">
+                    <Button variant="outline" onClick={() => handleLibraryDialogChange(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleSubmitLibraryEditor}
+                      disabled={!libraryNameDraft.trim() || (libraryEditor.mode === 'create' ? !onCreateCourseLibrary : !onRenameCourseLibrary)}
+                    >
+                      {libraryEditor.mode === 'create' ? 'Create library' : 'Save name'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <ConfirmDialog
+                open={deleteLibraryDialogOpen}
+                onOpenChange={setDeleteLibraryDialogOpen}
+                title="Delete this library?"
+                description="Scheduled classes stay put, but the saved library will be removed."
+                confirmLabel="Delete"
+                confirmVariant="destructive"
+                confirmDisabled={!canDeleteLibrary}
+                onConfirm={() => {
+                  if (activeLibrary && canDeleteLibrary) {
+                    onDeleteCourseLibrary?.(activeLibrary.id);
+                  }
+                  setDeleteLibraryDialogOpen(false);
+                }}
+                onCancel={() => setDeleteLibraryDialogOpen(false)}
+              />
+            </>
                     {termFilterOptions.map((term) => (
                       <TogglePill
                         key={term}

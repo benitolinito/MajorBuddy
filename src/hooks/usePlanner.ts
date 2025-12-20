@@ -4,6 +4,7 @@ import {
   AcademicYear,
   Course,
   CourseDefaults,
+  CourseLibrary,
   PlannerConfig,
   Term,
   TermName,
@@ -21,6 +22,8 @@ import { DEFAULT_PLAN_NAME, ensureUniquePlanName } from '@/lib/plannerProfiles';
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const CONFIG_STORAGE_KEY = 'plannerSetup';
 const COURSE_STORAGE_KEY = 'plannerCourseCatalog';
+const COURSE_LIBRARIES_STORAGE_KEY = 'plannerCourseLibraries';
+const ACTIVE_COURSE_LIBRARY_STORAGE_KEY = 'plannerActiveCourseLibraryId';
 const COURSE_DEFAULTS_STORAGE_KEY = 'plannerCourseDefaults';
 const DISTRIBUTIVES_STORAGE_KEY = 'plannerDistributives';
 const DISTRIBUTIVE_REQUIREMENTS_STORAGE_KEY = 'plannerDistributiveRequirements';
@@ -29,12 +32,15 @@ const YEARS_STORAGE_KEY = 'plannerAcademicYears';
 const PLAN_PROFILES_STORAGE_KEY = 'plannerPlanProfiles';
 const COLOR_PALETTE_STORAGE_KEY = 'plannerColorPalette';
 const PLAN_SHARE_STORAGE_KEY = 'plannerPlanShares';
+const DEFAULT_COURSE_LIBRARY_NAME = 'Main Library';
 const DEFAULT_MAJOR_CREDITS = 48;
 const DEFAULT_MINOR_CREDITS = 24;
 const DEFAULT_COURSE_CREDITS = 3;
 const PLANNER_STORAGE_KEYS = [
   CONFIG_STORAGE_KEY,
   COURSE_STORAGE_KEY,
+  COURSE_LIBRARIES_STORAGE_KEY,
+  ACTIVE_COURSE_LIBRARY_STORAGE_KEY,
   COURSE_DEFAULTS_STORAGE_KEY,
   DISTRIBUTIVES_STORAGE_KEY,
   DISTRIBUTIVE_REQUIREMENTS_STORAGE_KEY,
@@ -249,6 +255,130 @@ const loadStoredCourses = (): Course[] => {
   const raw = loadJson<unknown>(COURSE_STORAGE_KEY, []);
   if (!Array.isArray(raw)) return [];
   return raw.map(normalizeCourse);
+};
+
+const normalizeCourseLibrary = (value: unknown, termSystem?: TermSystem): CourseLibrary => {
+  const record = (value ?? {}) as Record<string, unknown>;
+  const coursesSource = Array.isArray(record.courses) ? record.courses : [];
+  return {
+    id: isNonEmptyString(record.id) ? record.id : generateId(),
+    name: isNonEmptyString(record.name) ? record.name.trim() : DEFAULT_COURSE_LIBRARY_NAME,
+    courses: coursesSource.map((course) => normalizeCourse(course, termSystem)),
+  };
+};
+
+const normalizeCourseLibraries = (value: unknown, termSystem?: TermSystem): CourseLibrary[] => {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => normalizeCourseLibrary(entry, termSystem));
+};
+
+const loadStoredCourseLibraries = (termSystem?: TermSystem): CourseLibrary[] => {
+  const raw = loadJson<unknown>(COURSE_LIBRARIES_STORAGE_KEY, []);
+  if (!Array.isArray(raw)) return [];
+  return raw.map((entry) => normalizeCourseLibrary(entry, termSystem));
+};
+
+const loadStoredActiveCourseLibraryId = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  const stored = localStorage.getItem(ACTIVE_COURSE_LIBRARY_STORAGE_KEY);
+  return isNonEmptyString(stored) ? stored : null;
+};
+
+const persistActiveCourseLibraryId = (libraryId: string) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(ACTIVE_COURSE_LIBRARY_STORAGE_KEY, libraryId);
+};
+
+const persistCourseLibrariesStore = (libraries: CourseLibrary[]) => {
+  persistJson(COURSE_LIBRARIES_STORAGE_KEY, libraries);
+};
+
+const resolveCourseLibraryState = (
+  libraries: CourseLibrary[],
+  fallbackCourses: Course[],
+  desiredActiveId?: string | null,
+): {
+  courseLibraries: CourseLibrary[];
+  activeCourseLibraryId: string;
+  courseCatalog: Course[];
+} => {
+  const nextLibraries = libraries.length
+    ? libraries
+    : [
+        {
+          id: generateId(),
+          name: DEFAULT_COURSE_LIBRARY_NAME,
+          courses: fallbackCourses,
+        },
+      ];
+  const hasDesired = desiredActiveId && nextLibraries.some((library) => library.id === desiredActiveId);
+  const activeLibrary = hasDesired
+    ? nextLibraries.find((library) => library.id === desiredActiveId)
+    : nextLibraries[0];
+  const activeLibraryId = activeLibrary?.id ?? nextLibraries[0]?.id ?? '';
+  return {
+    courseLibraries: nextLibraries,
+    activeCourseLibraryId,
+    courseCatalog: activeLibrary?.courses ?? [],
+  };
+};
+
+const persistCourseLibraryState = (libraries: CourseLibrary[], activeLibraryId: string) => {
+  const resolvedLibraries = libraries.length
+    ? libraries
+    : [
+        {
+          id: generateId(),
+          name: DEFAULT_COURSE_LIBRARY_NAME,
+          courses: [],
+        },
+      ];
+  persistCourseLibrariesStore(resolvedLibraries);
+  const activeLibrary =
+    resolvedLibraries.find((library) => library.id === activeLibraryId) ?? resolvedLibraries[0] ?? null;
+  const resolvedActiveId = activeLibrary?.id ?? '';
+  persistActiveCourseLibraryId(resolvedActiveId);
+  persistJson(COURSE_STORAGE_KEY, activeLibrary?.courses ?? []);
+  return {
+    activeLibraryId: resolvedActiveId,
+    courseCatalog: activeLibrary?.courses ?? [],
+  };
+};
+
+const resolveActiveLibraryContext = (state: PlannerState) => {
+  const hasLibraries = Array.isArray(state.courseLibraries) && state.courseLibraries.length > 0;
+  const libraries = hasLibraries
+    ? state.courseLibraries
+    : [
+        {
+          id: generateId(),
+          name: DEFAULT_COURSE_LIBRARY_NAME,
+          courses: state.courseCatalog ?? [],
+        },
+      ];
+  const fallbackActive = libraries.find((library) => library.id === state.activeCourseLibraryId) ?? libraries[0];
+  const activeLibraryId = fallbackActive?.id ?? libraries[0]?.id ?? '';
+  const activeLibraryIndex = Math.max(
+    0,
+    libraries.findIndex((library) => library.id === activeLibraryId),
+  );
+  const activeLibrary = libraries[activeLibraryIndex] ?? libraries[0];
+  return { libraries, activeLibraryId, activeLibraryIndex, activeLibrary };
+};
+
+const ensureUniqueLibraryName = (baseName: string, libraries: CourseLibrary[], excludeId?: string): string => {
+  const normalizedBase = baseName.trim() || DEFAULT_COURSE_LIBRARY_NAME;
+  const taken = new Set(
+    libraries
+      .filter((library) => library.id !== excludeId)
+      .map((library) => library.name.trim().toLowerCase()),
+  );
+  if (!taken.has(normalizedBase.toLowerCase())) return normalizedBase;
+  let suffix = 2;
+  while (taken.has(`${normalizedBase} ${suffix}`.toLowerCase())) {
+    suffix += 1;
+  }
+  return `${normalizedBase} ${suffix}`;
 };
 
 const loadStoredDistributives = (): string[] => normalizeDistributives(loadJson(DISTRIBUTIVES_STORAGE_KEY, []));
@@ -533,9 +663,18 @@ const sanitizeSnapshotForPlanner = (snapshot: PlannerState): PlannerState => {
   const normalizedPlans = snapshot.plans?.map(normalizePlan) ?? [];
   const normalizedPalette = normalizePalette(snapshot.colorPalette ?? []);
   const normalizedCourseDefaults = normalizeCourseDefaults(snapshot.courseDefaults ?? loadStoredCourseDefaults());
+  const normalizedCatalog = (snapshot.courseCatalog ?? []).map((course) => normalizeCourse(course, termSystem));
+  const normalizedLibraries = normalizeCourseLibraries(snapshot.courseLibraries, termSystem);
+  const { courseLibraries, activeCourseLibraryId, courseCatalog } = resolveCourseLibraryState(
+    normalizedLibraries,
+    normalizedCatalog,
+    snapshot.activeCourseLibraryId,
+  );
   return {
     ...snapshot,
-    courseCatalog: (snapshot.courseCatalog ?? []).map((course) => normalizeCourse(course, termSystem)),
+    courseCatalog,
+    courseLibraries,
+    activeCourseLibraryId,
     distributiveRequirements: normalizedRequirements,
     distributives: normalizedDistributives,
     plans: normalizedPlans,
@@ -648,6 +787,8 @@ const createPlannerState = (
   config: PlannerConfig | null,
   options?: {
     courseCatalog?: Course[];
+    courseLibraries?: CourseLibrary[];
+    activeCourseLibraryId?: string | null;
     distributives?: string[];
     distributiveRequirements?: DistributiveRequirement[];
     plans?: PlannerPlan[];
@@ -664,7 +805,16 @@ const createPlannerState = (
     universityLogo: effectiveConfig.universityLogo ?? null,
   };
   const { startYear, totalCredits, termSystem, planName, university, universityLogo } = normalizedConfig;
-  const courseCatalog = options?.courseCatalog?.map((course) => normalizeCourse(course, termSystem)) ?? [];
+  const fallbackCatalog = options?.courseCatalog?.map((course) => normalizeCourse(course, termSystem)) ?? loadStoredCourses();
+  const normalizedCourseLibraries = options?.courseLibraries?.length
+    ? options.courseLibraries.map((library) => normalizeCourseLibrary(library, termSystem))
+    : loadStoredCourseLibraries(termSystem);
+  const desiredActiveLibraryId = options?.activeCourseLibraryId ?? loadStoredActiveCourseLibraryId();
+  const {
+    courseCatalog,
+    courseLibraries,
+    activeCourseLibraryId,
+  } = resolveCourseLibraryState(normalizedCourseLibraries, fallbackCatalog, desiredActiveLibraryId ?? undefined);
   const distributiveRequirements =
     options?.distributiveRequirements?.map(normalizeDistributiveRequirement) ??
     loadStoredDistributiveRequirements();
@@ -689,6 +839,8 @@ const createPlannerState = (
       genEd: 30,
     },
     courseCatalog,
+    courseLibraries,
+    activeCourseLibraryId,
     distributives,
     distributiveRequirements,
     plans,
@@ -1106,14 +1258,21 @@ export const usePlanner = () => {
       normalizedCourse = normalizeCourse({ ...courseInput, id: courseId }, termSystem);
       const validPlanIds = normalizedCourse.planIds.filter((id) => prev.plans.some((plan) => plan.id === id));
       const courseWithPlans = { ...normalizedCourse, planIds: validPlanIds };
-      const updatedCatalog = [...prev.courseCatalog, courseWithPlans];
+      const { libraries, activeLibraryId, activeLibraryIndex, activeLibrary } = resolveActiveLibraryContext(prev);
+      const updatedCatalog = [...activeLibrary.courses, courseWithPlans];
+      const updatedLibrary: CourseLibrary = { ...activeLibrary, courses: updatedCatalog };
+      const updatedLibraries = libraries.map((library, index) =>
+        index === activeLibraryIndex ? updatedLibrary : library,
+      );
       const updatedDistributives = normalizeDistributives([...prev.distributives, ...courseWithPlans.distributives]);
-      persistJson(COURSE_STORAGE_KEY, updatedCatalog);
+      const persisted = persistCourseLibraryState(updatedLibraries, activeLibraryId);
       persistJson(DISTRIBUTIVES_STORAGE_KEY, updatedDistributives);
 
       return {
         ...prev,
-        courseCatalog: updatedCatalog,
+        courseCatalog: persisted.courseCatalog,
+        courseLibraries: updatedLibraries,
+        activeCourseLibraryId: persisted.activeLibraryId,
         distributives: updatedDistributives,
       };
     });
@@ -1150,8 +1309,13 @@ export const usePlanner = () => {
         sourceId: existing.sourceId ?? courseWithPlans.sourceId,
       });
 
-      const updatedCatalog = prev.courseCatalog.map((course) =>
+      const { libraries, activeLibraryId, activeLibraryIndex, activeLibrary } = resolveActiveLibraryContext(prev);
+      const updatedCatalog = activeLibrary.courses.map((course) =>
         course.id === courseId ? courseWithPlans : course
+      );
+      const updatedLibrary: CourseLibrary = { ...activeLibrary, courses: updatedCatalog };
+      const updatedLibraries = libraries.map((library, index) =>
+        index === activeLibraryIndex ? updatedLibrary : library,
       );
       const updatedDistributives = normalizeDistributives([...prev.distributives, ...courseWithPlans.distributives]);
 
@@ -1167,12 +1331,14 @@ export const usePlanner = () => {
         })),
       }));
 
-      persistJson(COURSE_STORAGE_KEY, updatedCatalog);
+      const persisted = persistCourseLibraryState(updatedLibraries, activeLibraryId);
       persistJson(DISTRIBUTIVES_STORAGE_KEY, updatedDistributives);
 
       return {
         ...prev,
-        courseCatalog: updatedCatalog,
+        courseCatalog: persisted.courseCatalog,
+        courseLibraries: updatedLibraries,
+        activeCourseLibraryId: persisted.activeLibraryId,
         distributives: updatedDistributives,
         years: updatedYears,
       };
@@ -1181,12 +1347,17 @@ export const usePlanner = () => {
 
   const removeCourseFromCatalog = useCallback((courseId: string) => {
     setState((prev) => {
-      const updatedCatalog = prev.courseCatalog.filter((course) => course.id !== courseId);
+      const { libraries, activeLibraryId, activeLibraryIndex, activeLibrary } = resolveActiveLibraryContext(prev);
+      const updatedCatalog = activeLibrary.courses.filter((course) => course.id !== courseId);
       const cleanedCatalog = updatedCatalog.map((course) => ({
         ...course,
         prerequisiteIds: (course.prerequisiteIds ?? []).filter((id) => id !== courseId),
       }));
-      const removedCourse = prev.courseCatalog.find((course) => course.id === courseId);
+      const updatedLibrary: CourseLibrary = { ...activeLibrary, courses: cleanedCatalog };
+      const updatedLibraries = libraries.map((library, index) =>
+        index === activeLibraryIndex ? updatedLibrary : library,
+      );
+      const removedCourse = activeLibrary.courses.find((course) => course.id === courseId);
       const updatedYears = prev.years.map((year) => ({
         ...year,
         terms: year.terms.map((term) => ({
@@ -1204,12 +1375,122 @@ export const usePlanner = () => {
         })),
       }));
 
-      persistJson(COURSE_STORAGE_KEY, cleanedCatalog);
+      const persisted = persistCourseLibraryState(updatedLibraries, activeLibraryId);
 
       return {
         ...prev,
-        courseCatalog: cleanedCatalog,
+        courseCatalog: persisted.courseCatalog,
+        courseLibraries: updatedLibraries,
+        activeCourseLibraryId: persisted.activeLibraryId,
         years: updatedYears,
+      };
+    });
+  }, []);
+
+  const selectCourseLibrary = useCallback((libraryId?: string) => {
+    setState((prev) => {
+      const hadLibraries = prev.courseLibraries.length > 0;
+      const libraries = hadLibraries
+        ? prev.courseLibraries
+        : [
+            {
+              id: generateId(),
+              name: DEFAULT_COURSE_LIBRARY_NAME,
+              courses: prev.courseCatalog,
+            },
+          ];
+      const target = libraries.find((library) => library.id === libraryId) ?? libraries[0];
+      if (!target) return prev;
+      if (hadLibraries && target.id === prev.activeCourseLibraryId) {
+        return prev;
+      }
+      const persisted = persistCourseLibraryState(libraries, target.id);
+      return {
+        ...prev,
+        courseLibraries: libraries,
+        activeCourseLibraryId: persisted.activeLibraryId,
+        courseCatalog: persisted.courseCatalog,
+      };
+    });
+  }, []);
+
+  const createCourseLibrary = useCallback((name?: string) => {
+    let createdLibrary: CourseLibrary | null = null;
+    setState((prev) => {
+      const libraries = prev.courseLibraries.length
+        ? prev.courseLibraries
+        : [
+            {
+              id: generateId(),
+              name: DEFAULT_COURSE_LIBRARY_NAME,
+              courses: prev.courseCatalog,
+            },
+          ];
+      const label = ensureUniqueLibraryName(name?.trim() || 'Class Library', libraries);
+      createdLibrary = { id: generateId(), name: label, courses: [] };
+      const nextLibraries = [...libraries, createdLibrary];
+      const persisted = persistCourseLibraryState(nextLibraries, createdLibrary.id);
+      return {
+        ...prev,
+        courseLibraries: nextLibraries,
+        activeCourseLibraryId: persisted.activeLibraryId,
+        courseCatalog: persisted.courseCatalog,
+      };
+    });
+    return createdLibrary;
+  }, []);
+
+  const renameCourseLibrary = useCallback((libraryId: string, nextName: string) => {
+    const normalized = nextName.trim();
+    if (!normalized) return;
+    setState((prev) => {
+      const libraries = prev.courseLibraries.length
+        ? prev.courseLibraries
+        : [
+            {
+              id: generateId(),
+              name: DEFAULT_COURSE_LIBRARY_NAME,
+              courses: prev.courseCatalog,
+            },
+          ];
+      const targetIndex = libraries.findIndex((library) => library.id === libraryId);
+      if (targetIndex === -1) return prev;
+      const nextLibraries = libraries.map((library, index) =>
+        index === targetIndex
+          ? { ...library, name: ensureUniqueLibraryName(normalized, libraries, library.id) }
+          : library,
+      );
+      const persisted = persistCourseLibraryState(nextLibraries, prev.activeCourseLibraryId);
+      return {
+        ...prev,
+        courseLibraries: nextLibraries,
+        activeCourseLibraryId: persisted.activeLibraryId,
+        courseCatalog: persisted.courseCatalog,
+      };
+    });
+  }, []);
+
+  const deleteCourseLibrary = useCallback((libraryId: string) => {
+    setState((prev) => {
+      const libraries = prev.courseLibraries.length
+        ? prev.courseLibraries
+        : [
+            {
+              id: generateId(),
+              name: DEFAULT_COURSE_LIBRARY_NAME,
+              courses: prev.courseCatalog,
+            },
+          ];
+      if (libraries.length <= 1) return prev;
+      const remaining = libraries.filter((library) => library.id !== libraryId);
+      if (remaining.length === libraries.length) return prev;
+      const nextActiveId = prev.activeCourseLibraryId === libraryId ? remaining[0].id : prev.activeCourseLibraryId;
+      const persisted = persistCourseLibraryState(remaining, nextActiveId);
+      return {
+        ...prev,
+        courseLibraries: remaining,
+        activeCourseLibraryId: persisted.activeLibraryId,
+        courseCatalog: persisted.courseCatalog,
       };
     });
   }, []);
@@ -1496,10 +1777,20 @@ export const usePlanner = () => {
   const removePlan = useCallback((planId: string) => {
     setState((prev) => {
       const updatedPlans = prev.plans.filter((plan) => plan.id !== planId);
-      const updatedCatalog = prev.courseCatalog.map((course) => ({
-        ...course,
-        planIds: course.planIds.filter((id) => id !== planId),
+      const updatedLibraries = (prev.courseLibraries.length ? prev.courseLibraries : [
+        {
+          id: generateId(),
+          name: DEFAULT_COURSE_LIBRARY_NAME,
+          courses: prev.courseCatalog,
+        },
+      ]).map((library) => ({
+        ...library,
+        courses: library.courses.map((course) => ({
+          ...course,
+          planIds: course.planIds.filter((id) => id !== planId),
+        })),
       }));
+      const persisted = persistCourseLibraryState(updatedLibraries, prev.activeCourseLibraryId);
       const updatedYears = prev.years.map((year) => ({
         ...year,
         terms: year.terms.map((term) => ({
@@ -1511,11 +1802,12 @@ export const usePlanner = () => {
         })),
       }));
       persistJson(PLANS_STORAGE_KEY, updatedPlans);
-      persistJson(COURSE_STORAGE_KEY, updatedCatalog);
       return {
         ...prev,
         plans: updatedPlans,
-        courseCatalog: updatedCatalog,
+        courseCatalog: persisted.courseCatalog,
+        courseLibraries: updatedLibraries,
+        activeCourseLibraryId: persisted.activeLibraryId,
         years: updatedYears,
       };
     });
@@ -1728,6 +2020,8 @@ export const usePlanner = () => {
       const restoredYears = rebuildYearsForReset(prev.years, config);
       const nextState = createPlannerState(config, {
         courseCatalog: prev.courseCatalog,
+        courseLibraries: prev.courseLibraries,
+        activeCourseLibraryId: prev.activeCourseLibraryId,
         distributives: prev.distributives,
         distributiveRequirements: prev.distributiveRequirements,
         plans: prev.plans,
@@ -1817,8 +2111,19 @@ export const usePlanner = () => {
       ...course,
       planIds: course.planIds.filter((id) => planIdSet.has(id)),
     }));
+    const normalizedCourseLibraries = snapshot.courseLibraries?.length
+      ? snapshot.courseLibraries.map((library) => normalizeCourseLibrary(library, normalizedConfig.termSystem))
+      : loadStoredCourseLibraries(normalizedConfig.termSystem);
+    const libraryState = resolveCourseLibraryState(
+      normalizedCourseLibraries,
+      sanitizedCatalog,
+      snapshot.activeCourseLibraryId ?? loadStoredActiveCourseLibraryId() ?? undefined,
+    );
+    const persistedLibraries = persistCourseLibraryState(
+      libraryState.courseLibraries,
+      libraryState.activeCourseLibraryId,
+    );
 
-    persistJson(COURSE_STORAGE_KEY, sanitizedCatalog);
     persistJson(DISTRIBUTIVE_REQUIREMENTS_STORAGE_KEY, normalizedDistributiveRequirements);
     persistJson(DISTRIBUTIVES_STORAGE_KEY, mergedDistributives);
     persistJson(PLANS_STORAGE_KEY, normalizedPlans);
@@ -1832,7 +2137,9 @@ export const usePlanner = () => {
       universityLogo: snapshot.universityLogo ?? normalizedConfig.universityLogo ?? null,
       classYear: snapshot.classYear ?? normalizedConfig.startYear + 4,
       config: normalizedConfig,
-      courseCatalog: sanitizedCatalog,
+      courseCatalog: persistedLibraries.courseCatalog,
+      courseLibraries: libraryState.courseLibraries,
+      activeCourseLibraryId: persistedLibraries.activeLibraryId,
       distributiveRequirements: normalizedDistributiveRequirements,
       distributives: mergedDistributives,
       plans: normalizedPlans,
@@ -1891,6 +2198,8 @@ export const usePlanner = () => {
         normalizedConfig,
         {
           courseCatalog: prev.courseCatalog,
+          courseLibraries: prev.courseLibraries,
+          activeCourseLibraryId: prev.activeCourseLibraryId,
           distributives: prev.distributives,
           distributiveRequirements: prev.distributiveRequirements,
           plans: prev.plans,
@@ -1909,6 +2218,8 @@ export const usePlanner = () => {
 
   return {
     state,
+    courseLibraries: state.courseLibraries,
+    activeCourseLibraryId: state.activeCourseLibraryId,
     planProfiles,
     activePlanProfileId,
     getCoursePlacement,
@@ -1917,6 +2228,10 @@ export const usePlanner = () => {
     addCourseToCatalog,
     updateCourseInCatalog,
     removeCourseFromCatalog,
+    selectCourseLibrary,
+    createCourseLibrary,
+    renameCourseLibrary,
+    deleteCourseLibrary,
     setCourseDefaultCredits,
     createPlanProfile,
     selectPlanProfile,
