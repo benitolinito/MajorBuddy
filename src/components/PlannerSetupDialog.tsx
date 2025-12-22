@@ -10,8 +10,13 @@ import { PlannerConfig, TermSystem } from "@/types/planner";
 import { UNIVERSITY_SUGGESTIONS } from '@/data/universities';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const formatInitialValue = (value?: number | string | null) =>
-  (value !== null && value !== undefined ? String(value) : "");
+const formatInitialValue = (value?: number | string | null) => {
+  if (value === null || value === undefined) return "";
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric <= 0) return "";
+  const stringValue = String(value);
+  return stringValue.trim();
+};
 
 const clampNumber = (value: number, min?: number, max?: number) => {
   let nextValue = value;
@@ -78,10 +83,12 @@ const StepperButtons = ({ onIncrement, onDecrement, increaseLabel, decreaseLabel
 export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onReset }: PlannerSetupDialogProps) => {
   const fallbackDefaults = useMemo(() => {
     const currentYear = new Date().getFullYear();
+    const normalizePositive = (value: number | undefined | null, fallback: number) =>
+      typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
     return {
       startYear: initialConfig?.startYear ?? currentYear,
-      classesPerTerm: initialConfig?.classesPerTerm ?? 4,
-      totalCredits: initialConfig?.totalCredits ?? 120,
+      classesPerTerm: normalizePositive(initialConfig?.classesPerTerm, 4),
+      totalCredits: normalizePositive(initialConfig?.totalCredits, 120),
       termSystem: initialConfig?.termSystem ?? "semester",
       planName: initialConfig?.planName ?? "My Plan",
       university: initialConfig?.university ?? "University Name",
@@ -185,14 +192,14 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const parsedStartYear = Number(startYear);
-    const parsedClasses = Number(classesPerTerm);
-    const parsedCredits = Number(totalCredits);
+    const parsedClasses = classesPerTerm.trim() === "" ? null : Number(classesPerTerm);
+    const parsedCredits = totalCredits.trim() === "" ? null : Number(totalCredits);
     const sanitizedStartYear =
       Number.isFinite(parsedStartYear) && startYear.trim() !== "" ? parsedStartYear : fallbackDefaults.startYear;
     const sanitizedClasses =
-      Number.isFinite(parsedClasses) && classesPerTerm.trim() !== "" ? parsedClasses : fallbackDefaults.classesPerTerm;
+      parsedClasses !== null && Number.isFinite(parsedClasses) ? Math.max(1, parsedClasses) : null;
     const sanitizedCredits =
-      Number.isFinite(parsedCredits) && totalCredits.trim() !== "" ? parsedCredits : fallbackDefaults.totalCredits;
+      parsedCredits !== null && Number.isFinite(parsedCredits) ? Math.max(1, parsedCredits) : null;
     const normalizedPlanName = planName.trim() || fallbackDefaults.planName;
     const normalizedUniversity = university.trim() || fallbackDefaults.university;
     const normalizedTermSystem: TermSystem =
@@ -204,8 +211,8 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
 
     onSave({
       startYear: sanitizedStartYear,
-      classesPerTerm: Math.max(1, sanitizedClasses),
-      totalCredits: Math.max(1, sanitizedCredits),
+      classesPerTerm: sanitizedClasses ?? fallbackDefaults.classesPerTerm,
+      totalCredits: sanitizedCredits ?? fallbackDefaults.totalCredits,
       termSystem: normalizedTermSystem,
       planName: normalizedPlanName,
       university: normalizedUniversity,
@@ -361,7 +368,7 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="classes-per-term">Classes per term</Label>
-              <div className="relative">
+              <div className="space-y-2">
                 <Input
                   id="classes-per-term"
                   type="number"
@@ -369,20 +376,14 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
                   max={10}
                   value={classesPerTerm}
                   onChange={(e) => setClassesPerTerm(e.target.value)}
-                  className="pr-12"
                 />
-                <StepperButtons
-                  increaseLabel="Increase classes per term"
-                  decreaseLabel="Decrease classes per term"
-                  onIncrement={() => stepNumericField(setClassesPerTerm, 1, fallbackDefaults.classesPerTerm, 1, 10)}
-                  onDecrement={() => stepNumericField(setClassesPerTerm, -1, fallbackDefaults.classesPerTerm, 1, 10)}
-                />
+                <p className="text-[11px] text-muted-foreground">Leave blank if you don&apos;t track class counts.</p>
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="total-credits">Credits to graduate</Label>
-              <div className="relative">
+              <div className="space-y-2">
                 <Input
                   id="total-credits"
                   type="number"
@@ -390,14 +391,8 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
                   max={400}
                   value={totalCredits}
                   onChange={(e) => setTotalCredits(e.target.value)}
-                  className="pr-12"
                 />
-                <StepperButtons
-                  increaseLabel="Increase credits to graduate"
-                  decreaseLabel="Decrease credits to graduate"
-                  onIncrement={() => stepNumericField(setTotalCredits, 1, fallbackDefaults.totalCredits, 1, 400)}
-                  onDecrement={() => stepNumericField(setTotalCredits, -1, fallbackDefaults.totalCredits, 1, 400)}
-                />
+                <p className="text-[11px] text-muted-foreground">Optional. Leave blank if your program doesn&apos;t cap credits.</p>
               </div>
             </div>
           </div>
