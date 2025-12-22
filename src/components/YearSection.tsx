@@ -21,6 +21,7 @@ interface YearSectionProps {
   showDeleteControls?: boolean;
   onRequestCourseAction?: (payload: { yearId: string; termId: string; course: Course }) => void;
   onAddCourseToTerm?: (termId: string) => void;
+  isRemoving?: boolean;
 }
 
 export const YearSection = ({
@@ -38,6 +39,7 @@ export const YearSection = ({
   showDeleteControls = false,
   onRequestCourseAction,
   onAddCourseToTerm,
+  isRemoving = false,
 }: YearSectionProps) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const deleteControlsVisible = showDeleteControls || isMobile;
@@ -50,7 +52,13 @@ export const YearSection = ({
   );
 
   return (
-    <section className="group mb-6 sm:mb-8">
+    <section
+      className={cn(
+        'group mb-6 sm:mb-8 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform',
+        isRemoving &&
+          'pointer-events-none opacity-0 -translate-y-6 sm:-translate-y-8 scale-[0.92] blur-[1.5px]',
+      )}
+    >
       <div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-4">
         <h3 className="text-lg font-semibold text-foreground sm:text-xl">{year.name}</h3>
         {canRemoveYear && (

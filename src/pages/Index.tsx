@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type CSSProperties, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CourseCatalog } from '@/components/CourseCatalog';
 import { PlannerHeader } from '@/components/PlannerHeader';
@@ -40,6 +40,43 @@ type PlannerHeaderSharedProps = Omit<ComponentProps<typeof PlannerHeader>, 'isMo
 
 const SIDE_PANEL_TRANSITION: CSSProperties = {
   transition: 'flex-basis 200ms ease, width 200ms ease, min-width 200ms ease',
+};
+
+type YearSectionAnimatedProps = ComponentProps<typeof YearSection>;
+
+const collapseDurationMs = 420;
+const AnimatedYearSection = ({ isRemoving = false, ...props }: YearSectionAnimatedProps) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [height, setHeight] = useState<string | null>(null);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    if (!isRemoving) {
+      setHeight(null);
+      return;
+    }
+    const measured = container.getBoundingClientRect().height;
+    setHeight(`${measured}px`);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setHeight('0px');
+      });
+    });
+  }, [isRemoving]);
+
+  return (
+    <div
+      ref={containerRef}
+      className={cn(
+        'transition-[height] ease-[cubic-bezier(0.33,1,0.68,1)]',
+        height !== null && 'overflow-hidden',
+      )}
+      style={height !== null ? { height, transitionDuration: `${collapseDurationMs}ms` } : undefined}
+    >
+      <YearSection {...props} isRemoving={isRemoving} />
+    </div>
+  );
 };
 
 const Index = () => {
@@ -116,6 +153,8 @@ const Index = () => {
   const [showAuth, setShowAuth] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showDeleteControls, setShowDeleteControls] = useState(false);
+  const [removingYearIds, setRemovingYearIds] = useState<string[]>([]);
+  const removalTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [profileActionPending, setProfileActionPending] = useState<null | 'delete-data' | 'delete-account'>(null);
   const [duplicatePrompt, setDuplicatePrompt] = useState<{
     course: Course;
@@ -248,6 +287,13 @@ const Index = () => {
 
   const handleOpenAuth = () => setShowAuth(true);
   const handleOpenProfile = () => setShowProfile(true);
+  useEffect(() => {
+    return () => {
+      removalTimersRef.current.forEach((timer) => clearTimeout(timer));
+      removalTimersRef.current.clear();
+    };
+  }, []);
+
   const handleOpenSettings = () => setShowSetup(true);
   const handleOpenExport = () => setShowExport(true);
   const handleOpenShare = () => setShowShare(true);
@@ -256,6 +302,20 @@ const Index = () => {
     setShowAudit(true);
   };
   const toggleDeleteControls = () => setShowDeleteControls((prev) => !prev);
+
+  const handleRemoveYearWithAnimation = useCallback(
+    (yearId: string) => {
+      if (removalTimersRef.current.has(yearId)) return;
+      setRemovingYearIds((prev) => (prev.includes(yearId) ? prev : [...prev, yearId]));
+      const timer = setTimeout(() => {
+        removeYear(yearId);
+        setRemovingYearIds((prev) => prev.filter((id) => id !== yearId));
+        removalTimersRef.current.delete(yearId);
+      }, collapseDurationMs + 60);
+      removalTimersRef.current.set(yearId, timer);
+    },
+    [removeYear],
+  );
 
   const formatProfileActionError = (error: unknown, fallback: string) => {
     if (error instanceof Error) {
@@ -714,7 +774,8 @@ const Index = () => {
           onDropCourse={handleDropCourse}
           onAddTerm={addTerm}
           onRemoveTerm={removeTerm}
-          onRemoveYear={removeYear}
+          onRemoveYear={handleRemoveYearWithAnimation}
+          removingYearIds={removingYearIds}
           onRequestCourseAction={handleRequestCourseAction}
           onAddPlan={addPlan}
           onUpdatePlan={updatePlan}
@@ -756,7 +817,8 @@ const Index = () => {
           onDropCourse={handleDropCourse}
           onAddTerm={addTerm}
           onRemoveTerm={removeTerm}
-          onRemoveYear={removeYear}
+          onRemoveYear={handleRemoveYearWithAnimation}
+          removingYearIds={removingYearIds}
           onAddPlan={addPlan}
           onUpdatePlan={updatePlan}
           onRemovePlan={removePlan}
@@ -936,6 +998,7 @@ type MobilePlannerLayoutProps = {
   onOpenExport: () => void;
   onOpenShare: () => void;
   onOpenSettings: () => void;
+  removingYearIds: string[];
 };
 
 const MobilePlannerLayout = ({
@@ -976,6 +1039,7 @@ const MobilePlannerLayout = ({
   onOpenExport,
   onOpenShare,
   onOpenSettings,
+  removingYearIds,
 }: MobilePlannerLayoutProps) => {
   const [activeYearId, setActiveYearId] = useState(() => state.years[0]?.id ?? '');
   const [activePane, setActivePane] = useState<MobilePane>('plan');
@@ -1049,7 +1113,7 @@ const MobilePlannerLayout = ({
               ) : (
                 filteredYears.map((year) => (
                   <MobilePaneCard key={year.id}>
-                    <YearSection
+                    <AnimatedYearSection
                       year={year}
                       getTermCredits={(termId) => getTermCredits(year.id, termId)}
                       plans={state.plans}
@@ -1063,6 +1127,7 @@ const MobilePlannerLayout = ({
                       termSystem={termSystem}
                       onRequestCourseAction={onRequestCourseAction}
                       onAddCourseToTerm={(termId) => handleOpenTermPicker(year.id, termId)}
+                      isRemoving={removingYearIds.includes(year.id)}
                     />
                   </MobilePaneCard>
                 ))
@@ -1203,6 +1268,7 @@ type DesktopPlannerLayoutProps = {
   createCourseLibrary: (name: string) => void;
   renameCourseLibrary: (libraryId: string, name: string) => void;
   deleteCourseLibrary: (libraryId: string) => void;
+  removingYearIds: string[];
 };
 
 const DesktopPlannerLayout = ({
@@ -1241,6 +1307,7 @@ const DesktopPlannerLayout = ({
   createCourseLibrary,
   renameCourseLibrary,
   deleteCourseLibrary,
+  removingYearIds,
 }: DesktopPlannerLayoutProps) => {
   const catalogPanelRef = useRef<ImperativePanelHandle>(null);
   const requirementsPanelRef = useRef<ImperativePanelHandle>(null);
@@ -1309,7 +1376,7 @@ const DesktopPlannerLayout = ({
                       <p className="text-sm text-muted-foreground">Show delete buttons without hovering.</p>
                     </div>
                   {state.years.map((year) => (
-                    <YearSection
+                    <AnimatedYearSection
                       key={year.id}
                       year={year}
                       getTermCredits={(termId) => getTermCredits(year.id, termId)}
@@ -1323,6 +1390,7 @@ const DesktopPlannerLayout = ({
                       canRemoveYear={canRemoveYear}
                       termSystem={termSystem}
                       showDeleteControls={showDeleteControls}
+                      isRemoving={removingYearIds.includes(year.id)}
                     />
                   ))}
                   <div className="flex pt-2">

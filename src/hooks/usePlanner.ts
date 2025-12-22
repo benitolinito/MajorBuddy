@@ -734,7 +734,11 @@ const ensureDefaultTermsForReset = (
   return sortTermsForSystem(Array.from(termByName.values()), termSystem);
 };
 
-const rebuildYearsForReset = (existingYears: AcademicYear[], config: PlannerConfig): AcademicYear[] => {
+const rebuildYearsForReset = (
+  existingYears: AcademicYear[],
+  config: PlannerConfig,
+  options?: { preserveUnmatched?: boolean },
+): AcademicYear[] => {
   const baseYears = createInitialYears(config.startYear, config.termSystem);
   const targetCount = Math.max(existingYears.length, baseYears.length);
   const templates = createInitialYears(config.startYear, config.termSystem, targetCount);
@@ -748,14 +752,14 @@ const rebuildYearsForReset = (existingYears: AcademicYear[], config: PlannerConf
     }
   });
 
-  const rebuilt = templates.map((template) => {
+  const rebuilt = templates.map((template, index) => {
     const existing = yearByStart.get(template.startYear);
     const terms = ensureDefaultTermsForReset(existing?.terms, template.startYear, config.termSystem);
 
     return {
       ...template,
       ...(existing ?? {}),
-      id: existing?.id ?? template.id,
+      id: existing?.id ?? existingYears[index]?.id ?? template.id,
       name: isNonEmptyString(existing?.name) ? existing.name : template.name,
       startYear: template.startYear,
       endYear: Number.isFinite(Number(existing?.endYear)) ? Number(existing?.endYear) : template.endYear,
@@ -778,7 +782,9 @@ const rebuildYearsForReset = (existingYears: AcademicYear[], config: PlannerConf
       };
     });
 
-  return [...rebuilt, ...extraYears].sort((a, b) => a.startYear - b.startYear);
+  const includeExtras = options?.preserveUnmatched !== false;
+  const combined = includeExtras ? [...rebuilt, ...extraYears] : rebuilt;
+  return combined.sort((a, b) => a.startYear - b.startYear);
 };
 
 type PlannerMeta = { degreeName?: string; university?: string; universityLogo?: string | null };
@@ -2189,10 +2195,16 @@ export const usePlanner = () => {
     setHasConfig(true);
     setState((prev) => {
       const previousTermSystem: TermSystem = prev.config?.termSystem ?? 'semester';
-      const years =
+      const convertedYears =
         previousTermSystem === 'semester' && normalizedConfig.termSystem === 'quarter'
           ? convertSemesterYearsToQuarter(prev.years, normalizedConfig.startYear)
           : prev.years;
+      const alignedYears = rebuildYearsForReset(convertedYears, normalizedConfig, { preserveUnmatched: false }).map(
+        (year, index) => ({
+          ...year,
+          id: prev.years[index]?.id ?? year.id,
+        }),
+      );
 
       return createPlannerState(
         normalizedConfig,
@@ -2203,7 +2215,7 @@ export const usePlanner = () => {
           distributives: prev.distributives,
           distributiveRequirements: prev.distributiveRequirements,
           plans: prev.plans,
-          years,
+          years: alignedYears,
           colorPalette: prev.colorPalette,
           courseDefaults: prev.courseDefaults,
           meta: {

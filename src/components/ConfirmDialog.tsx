@@ -76,8 +76,13 @@ export const ConfirmDialog = ({
     onConfirm();
   };
 
+  const dialogProps =
+    open === undefined
+      ? { onOpenChange: handleOpenChange }
+      : { open, onOpenChange: handleOpenChange };
+
   return (
-    <AlertDialog open={open} onOpenChange={handleOpenChange}>
+    <AlertDialog {...dialogProps}>
       {trigger ? <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger> : null}
       <AlertDialogContent>
         <AlertDialogHeader>
