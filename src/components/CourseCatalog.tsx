@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowRight, ArrowUpDown, BookOpen, ChevronDown, ChevronsLeft, Filter, Pencil, Plus, Search, Tag, Trash, X } from 'lucide-react';
+import { ArrowRight, ArrowUpDown, BookOpen, ChevronDown, ChevronsLeft, Filter, Pencil, Plus, Search, Trash, X } from 'lucide-react';
 import { Course, CourseLibrary, NewCourseInput, PlannerPlan, TermName, TermSystem } from '@/types/planner';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -862,30 +862,12 @@ export const CourseCatalog = ({
         description="Group this class into your custom goals, then give each tag a color."
       >
         <div className="space-y-3">
-          <div className="space-y-2">
-            <Label htmlFor="class-distributives">Add a tag</Label>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                id="class-distributives"
-                placeholder="Add a distributive"
-                value={newDistributive}
-                onChange={(e) => updateFormField('newDistributive', e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddDistributive();
-                  }
-                }}
-              />
-              <Button type="button" variant="secondary" onClick={handleAddDistributive}>
-                <Tag className="h-4 w-4 mr-1" />
-                Add
-              </Button>
-            </div>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Add tags from the Requirements tab, then pick which ones apply to this class.
+          </p>
           <div className="flex flex-wrap gap-2">
             {distributives.length === 0 && selectedDistributives.length === 0 && (
-              <p className="text-sm text-muted-foreground">No tags yet. Add one above to get started.</p>
+              <p className="text-sm text-muted-foreground">No tags yet. Create them in Requirements.</p>
             )}
             {[...distributives, ...selectedDistributives.filter((dist) => !distributives.includes(dist))].map((dist) => (
               <TogglePill

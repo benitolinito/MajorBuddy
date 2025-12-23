@@ -927,7 +927,7 @@ const MobileYearNavigator = ({ years, activeYearId, onSelectYear, onAddYear }: M
     <div className="relative">
       <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent" />
       <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
-      <div className="flex gap-2 overflow-x-auto pb-1 pr-2" aria-label="Select academic year">
+      <div className="flex gap-2 overflow-x-auto pb-1 pr-3 pl-1" aria-label="Select academic year">
         {years.length === 0 ? (
           <span className="text-sm text-muted-foreground">Add an academic year to get started.</span>
         ) : (
@@ -937,7 +937,7 @@ const MobileYearNavigator = ({ years, activeYearId, onSelectYear, onAddYear }: M
               type="button"
               onClick={() => onSelectYear(year.id)}
               className={cn(
-                'flex-shrink-0 rounded-full border px-4 py-1 text-sm font-medium transition',
+                'flex-shrink-0 rounded-full border px-4 py-1 text-sm font-medium transition first:ml-2 last:mr-2',
                 activeYearId === year.id
                   ? 'bg-primary text-primary-foreground border-primary shadow-sm'
                   : 'bg-card text-muted-foreground hover:text-foreground',
@@ -950,7 +950,7 @@ const MobileYearNavigator = ({ years, activeYearId, onSelectYear, onAddYear }: M
         <button
           type="button"
           onClick={onAddYear}
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-dashed border-border/70 text-muted-foreground transition hover:border-primary/60 hover:text-primary"
+          className="ml-1 mr-3 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-dashed border-border/70 text-muted-foreground transition hover:border-primary/60 hover:text-primary"
           aria-label="Add academic year"
         >
           <Plus className="h-4 w-4" />
@@ -1132,15 +1132,6 @@ const MobilePlannerLayout = ({
                   </MobilePaneCard>
                 ))
               )}
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full border-dashed"
-                onClick={onAddYear}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add academic year
-              </Button>
             </div>
           )}
 

@@ -57,7 +57,7 @@ export const ProfileDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl p-0">
+      <DialogContent className="max-w-4xl p-0 sm:min-h-[520px]">
         <Tabs defaultValue="account" orientation="vertical" className="flex flex-col sm:flex-row">
           <div className="border-b border-border bg-muted/30 p-4 sm:w-60 sm:border-b-0 sm:border-r">
             <DialogHeader className="text-left">
@@ -83,7 +83,7 @@ export const ProfileDialog = ({
               </TabsTrigger>
             </TabsList>
           </div>
-          <div className="flex-1 p-6">
+          <div className="flex-1 p-6 min-h-[420px]">
             <TabsContent value="account" className="mt-0">
               <div className="space-y-6">
                 <div className="rounded-xl border border-border bg-card p-4">

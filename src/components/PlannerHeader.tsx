@@ -137,9 +137,6 @@ export const PlannerHeader = ({
     </p>
   );
 
-  const mobileUserAction = signedIn ? onOpenProfile ?? onSignOut : onSignIn;
-  const showMobileUserAction = Boolean(isMobile && mobileUserAction);
-  const mobileUserLabel = signedIn ? 'Open profile' : 'Sign in to sync';
   const userInitial = userLabel?.charAt(0)?.toUpperCase() ?? 'U';
   const showProfileMenu = Boolean((showAuth && authAction) || canOpenProfile);
   const profileMenuLabel = signedIn ? 'Open profile menu' : 'Open sign-in menu';
@@ -196,7 +193,7 @@ export const PlannerHeader = ({
               onClick={() => handlePlanAction(onOpenSettings)}
               disabled={!onOpenSettings}
             >
-              <Settings className="mr-2 h-4 w-4" />
+              <Wrench className="mr-2 h-4 w-4" />
               Configuration
             </Button>
           </div>
@@ -255,25 +252,41 @@ export const PlannerHeader = ({
                   )}
                 </div>
               </div>
-              {showMobileUserAction && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-12 w-12 shrink-0 rounded-full border border-border/60 bg-background/90 shadow-sm"
-                  onClick={mobileUserAction!}
-                  aria-label={mobileUserLabel}
-                  disabled={cloudBusy && !signedIn}
-                >
-                  {signedIn && userPhotoUrl ? (
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={userPhotoUrl} alt={userLabel ?? 'Profile photo'} />
-                      <AvatarFallback>{userInitial}</AvatarFallback>
-                    </Avatar>
-                  ) : (
-                    <UserRound className="h-5 w-5" />
-                  )}
-                </Button>
-              )}
+                {showProfileMenu && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-12 w-12 shrink-0 rounded-full border border-border/60 bg-background/90 shadow-sm"
+                        aria-label={profileMenuLabel}
+                        disabled={cloudBusy && !signedIn}
+                      >
+                        {signedIn && userPhotoUrl ? (
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={userPhotoUrl} alt={userLabel ?? 'Profile photo'} />
+                            <AvatarFallback>{userInitial}</AvatarFallback>
+                          </Avatar>
+                        ) : (
+                          <UserRound className="h-5 w-5" />
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      {authAction && (
+                        <DropdownMenuItem
+                          onSelect={() => authAction?.()}
+                          disabled={authActionDisabled}
+                        >
+                          {authMenuLabel}
+                        </DropdownMenuItem>
+                      )}
+                      {onOpenProfile && (
+                        <DropdownMenuItem onSelect={() => onOpenProfile?.()}>Settings</DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
             </div>
           </div>
         </header>
