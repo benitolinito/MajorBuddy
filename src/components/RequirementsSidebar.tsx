@@ -63,6 +63,8 @@ export const RequirementsSidebar = ({
   const [distributiveColor, setDistributiveColor] = useState<string>(() => getDefaultColorId(''));
   const [showDistributiveDialog, setShowDistributiveDialog] = useState(false);
   const [editingDistributive, setEditingDistributive] = useState<DistributiveRequirement | null>(null);
+  const colorHelperText =
+    'Colors appear on badges in the Class Library and across your schedule, so pick something easy to spot.';
 
   const sortedPlans = useMemo(
     () => [...plans].sort((a, b) => a.name.localeCompare(b.name)),
@@ -492,9 +494,7 @@ export const RequirementsSidebar = ({
 
             <div className="space-y-2">
               <Label>Color</Label>
-              <p className="text-[11px] text-muted-foreground">
-                This color appears on plan badges in the Class Library and schedule.
-              </p>
+              <p className="text-[11px] text-muted-foreground">{colorHelperText}</p>
               <TagColorPicker
                 value={colorChoice}
                 onSelect={(colorId) => {
@@ -566,30 +566,30 @@ export const RequirementsSidebar = ({
               ) : null}
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="distributive-classes">Classes needed</Label>
-                <Input
-                  id="distributive-classes"
-                  type="number"
-                  min={1}
-                  value={distributiveClasses}
-                  onChange={(e) => setDistributiveClasses(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Color</Label>
-                <TagColorPicker
-                  value={distributiveColor}
-                  onSelect={(colorId) => colorId && setDistributiveColor(colorId)}
-                  customColors={colorPalette}
-                  onAddCustomColor={(hex) => {
-                    const added = onAddPaletteColor(hex);
-                    setDistributiveColor(added || hex);
-                  }}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="distributive-classes">Classes needed</Label>
+              <Input
+                id="distributive-classes"
+                type="number"
+                min={1}
+                value={distributiveClasses}
+                onChange={(e) => setDistributiveClasses(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <p className="text-[11px] text-muted-foreground">{colorHelperText}</p>
+              <TagColorPicker
+                value={distributiveColor}
+                onSelect={(colorId) => colorId && setDistributiveColor(colorId)}
+                customColors={colorPalette}
+                onAddCustomColor={(hex) => {
+                  const added = onAddPaletteColor(hex);
+                  setDistributiveColor(added || hex);
+                }}
+              />
             </div>
 
             <div className="flex justify-between gap-2 pt-2">
