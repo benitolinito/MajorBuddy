@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getTagAccentClass, getTagAccentStyle, getTagColorClasses, getTagColorStyle } from '@/lib/tagColors';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 
@@ -193,7 +194,6 @@ export const CourseCatalog = ({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formState, setFormState] = useState<CourseFormState>(() => createEmptyCourseForm(resolvedDefaultCredits));
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
-  const [defaultCreditsDraft, setDefaultCreditsDraft] = useState<number>(resolvedDefaultCredits);
   const [libraryEditor, setLibraryEditor] = useState<{ mode: 'create' | 'rename'; open: boolean }>({ mode: 'create', open: false });
   const [libraryNameDraft, setLibraryNameDraft] = useState('');
   const [deleteLibraryDialogOpen, setDeleteLibraryDialogOpen] = useState(false);
@@ -438,10 +438,6 @@ export const CourseCatalog = ({
   }, [addCourseTrigger, resolvedDefaultCredits]);
 
   useEffect(() => {
-    setDefaultCreditsDraft(resolvedDefaultCredits);
-  }, [resolvedDefaultCredits]);
-
-  useEffect(() => {
     if (!editingCourse) {
       setFormState((prev) => {
         if (prev.credits !== previousDefaultCreditsRef.current) return prev;
@@ -468,11 +464,8 @@ export const CourseCatalog = ({
     setDialogOpen(true);
   };
 
-  const handleSaveDefaultCredits = () => {
-    const normalized = Number.isFinite(Number(defaultCreditsDraft))
-      ? Math.max(0, Number(defaultCreditsDraft))
-      : resolvedDefaultCredits;
-    setDefaultCreditsDraft(normalized);
+  const handleUseCreditsAsDefault = () => {
+    const normalized = Number.isFinite(Number(credits)) ? Math.max(0, Number(credits)) : resolvedDefaultCredits;
     onUpdateDefaultCourseCredits?.(normalized);
     if (!editingCourse && credits === resolvedDefaultCredits) {
       updateFormField('credits', normalized);
@@ -523,7 +516,6 @@ export const CourseCatalog = ({
     setDialogOpen(open);
     if (!open) {
       resetForm();
-      setDefaultCreditsDraft(resolvedDefaultCredits);
     }
   };
 
@@ -610,7 +602,17 @@ export const CourseCatalog = ({
       <div className="grid gap-3 sm:grid-cols-2 items-start">
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="class-credits">Credits</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="class-credits">Credits</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleUseCreditsAsDefault}>
+                    Use as default
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Makes new classes be worth this number of credits by default.</TooltipContent>
+              </Tooltip>
+            </div>
             <Input
               id="class-credits"
               type="number"
@@ -629,39 +631,6 @@ export const CourseCatalog = ({
               onChange={(e) => updateFormField('subject', e.target.value)}
             />
             <p className="text-[11px] text-muted-foreground">Use your own subject label for quick scanning.</p>
-          </div>
-          <div className="space-y-2 rounded-xl border border-dashed border-border/70 bg-card/70 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="space-y-0.5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Default credits</p>
-                <p className="text-[11px] text-muted-foreground">Pre-fill new classes with this number.</p>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                className="h-8"
-                onClick={() => setDefaultCreditsDraft(credits)}
-              >
-                Use current
-              </Button>
-            </div>
-            <div className="flex items-center gap-2 pt-2">
-              <Input
-                id="class-default-credits"
-                type="number"
-                min={0}
-                max={20}
-                value={defaultCreditsDraft}
-                onChange={(e) => {
-                  const value = Number(e.target.value);
-                  setDefaultCreditsDraft(Number.isFinite(value) ? value : 0);
-                }}
-              />
-              <Button type="button" size="sm" onClick={handleSaveDefaultCredits}>
-                Save
-              </Button>
-            </div>
           </div>
         </div>
 
@@ -855,7 +824,17 @@ export const CourseCatalog = ({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="class-credits">Credits</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="class-credits">Credits</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleUseCreditsAsDefault}>
+                    Use as default
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Makes new classes be worth this number of credits by default.</TooltipContent>
+              </Tooltip>
+            </div>
             <Input
               id="class-credits"
               type="number"
@@ -864,31 +843,6 @@ export const CourseCatalog = ({
               value={credits}
               onChange={(e) => updateFormField('credits', Number(e.target.value))}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="class-default-credits-mobile">Default credits for new classes</Label>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Input
-                id="class-default-credits-mobile"
-                type="number"
-                min={0}
-                max={20}
-                value={defaultCreditsDraft}
-                onChange={(e) => {
-                  const value = Number(e.target.value);
-                  setDefaultCreditsDraft(Number.isFinite(value) ? value : 0);
-                }}
-              />
-              <div className="flex gap-2">
-                <Button type="button" variant="secondary" onClick={() => setDefaultCreditsDraft(credits)}>
-                  Use current
-                </Button>
-                <Button type="button" onClick={handleSaveDefaultCredits}>
-                  Save
-                </Button>
-              </div>
-            </div>
-            <p className="text-[11px] text-muted-foreground">Pre-fill new classes with this credit number.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="class-description">Description</Label>
