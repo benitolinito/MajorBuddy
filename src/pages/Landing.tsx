@@ -66,10 +66,11 @@ const workflowSteps = [
   },
 ] as const;
 
-type PreviewTagTone = 'major' | 'lab' | 'dist' | 'math' | 'project' | 'elective' | 'writing';
+type PreviewTagTone = 'major' | 'minor' | 'lab' | 'dist' | 'math' | 'project' | 'elective' | 'writing';
 
 const previewTagToneClasses: Record<PreviewTagTone, string> = {
   major: 'border-primary/40 bg-primary/10 text-primary',
+  minor: 'border-primary/40 bg-primary/2 text-primary',
   lab: 'border-indigo-200 bg-indigo-50 text-indigo-700',
   dist: 'border-emerald-200 bg-emerald-50 text-emerald-700',
   math: 'border-amber-200 bg-amber-50 text-amber-700',
@@ -144,33 +145,38 @@ const Landing = () => {
       {
         code: "COSC 10",
         name: "Data Structures & Algorithms",
-        credits: 4,
+        credits: 1,
         tags: [
-          { label: "Major core", tone: "major" },
-          { label: "Lab", tone: "lab" },
+          { label: "Major: Computer Science", tone: "major" },
+          { label: "LAB/SLA", tone: "lab" },
         ],
       },
       {
         code: "MATH 22",
         name: "Linear Algebra with Applications",
-        credits: 4,
-        tags: [{ label: "Math", tone: "math" }],
+        credits: 1,
+        tags: [
+          { label: "Minor: Math", tone: "minor" },
+          { label: "QDS", tone: "math" },
+
+
+        ],
       },
       {
         code: "WRIT 5",
         name: "Academic Writing Seminar",
-        credits: 3,
+        credits: 1,
         tags: [{ label: "Writing dist.", tone: "writing" }],
       },
-      {
-        code: "ECON 1",
-        name: "Microeconomics Principles",
-        credits: 4,
-        tags: [
-          { label: "Distributive", tone: "dist" },
-          { label: "Elective", tone: "elective" },
-        ],
-      },
+      // {
+      //   code: "ECON 1",
+      //   name: "Microeconomics Principles",
+      //   credits: 1,
+      //   tags: [
+      //     { label: "Distributive", tone: "dist" },
+      //     { label: "Elective", tone: "elective" },
+      //   ],
+      // },
     ],
   };
 
@@ -355,16 +361,16 @@ const Landing = () => {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-muted-foreground">
+                {/* <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-muted-foreground">
                   <span className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3 py-1">
                     <Layers3 className="h-3.5 w-3.5" />
                     Course library stays pinned left
                   </span>
                   <span className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3 py-1">
                     <ListChecks className="h-3.5 w-3.5" />
-                    Requirements sit on the right
+                    Requirements
                   </span>
-                </div>
+                </div> */}
 
                 <div className="rounded-xl border border-border/70 bg-background/80 p-4 shadow-[0_16px_40px_-24px_rgba(0,0,0,0.55)]">
                   <div className="flex items-start justify-between gap-2">
