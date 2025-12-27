@@ -69,7 +69,7 @@ export const YearSection = ({
         if (addedTermTimer.current) {
           clearTimeout(addedTermTimer.current);
         }
-        addedTermTimer.current = setTimeout(() => setRecentTermId(null), 900);
+        addedTermTimer.current = setTimeout(() => setRecentTermId(null), 1100);
       }
     } else {
       initializedTerms.current = true;
@@ -143,11 +143,12 @@ export const YearSection = ({
             <div
               key={term.id}
               className={cn(
-                'transition-[opacity,transform,filter] duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] will-change-transform',
+                'transition-[opacity,transform,filter] duration-350 ease-[cubic-bezier(0.33,1,0.68,1)] will-change-transform',
                 isRemovingTerm
                   ? 'pointer-events-none opacity-0 -translate-y-2 scale-[0.98] blur-[1px]'
                   : 'opacity-100 translate-y-0 scale-100',
-                isNewTerm && 'animate-term-enter',
+                isNewTerm &&
+                  'animate-term-enter shadow-[0_22px_50px_-34px_hsl(var(--primary)_/_0.35)] ring-1 ring-primary/25',
               )}
             >
               <TermCard

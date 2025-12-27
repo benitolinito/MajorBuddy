@@ -39,8 +39,11 @@ type PlannerStats = {
 type PlannerHeaderSharedProps = Omit<ComponentProps<typeof PlannerHeader>, 'isMobile' | 'sticky'>;
 
 const SIDE_PANEL_TRANSITION: CSSProperties = {
-  transition: 'flex-basis 200ms ease, width 200ms ease, min-width 200ms ease',
+  transition:
+    'flex-grow 300ms cubic-bezier(0.33,1,0.68,1), flex-basis 300ms cubic-bezier(0.33,1,0.68,1), width 300ms cubic-bezier(0.33,1,0.68,1), min-width 300ms cubic-bezier(0.33,1,0.68,1)',
 };
+const SIDE_PANEL_TRANSITION_CLASS =
+  'transition-[flex-grow,flex-basis,width,min-width] duration-300 ease-[cubic-bezier(0.33,1,0.68,1)]';
 const SIDE_PANEL_CONTENT_ANIMATION =
   'absolute inset-0 h-full transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.33,1,0.68,1)]';
 
@@ -48,6 +51,7 @@ type YearSectionAnimatedProps = ComponentProps<typeof YearSection>;
 
 const collapseDurationMs = 420;
 const landingReturnDelayMs = 340;
+const plannerEntryDurationMs = 200;
 const AnimatedYearSection = ({ isRemoving = false, ...props }: YearSectionAnimatedProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [height, setHeight] = useState<string | null>(null);
@@ -160,6 +164,7 @@ const Index = () => {
   const removalTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [isReturningHome, setIsReturningHome] = useState(false);
   const returnHomeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [hasAnimatedIn, setHasAnimatedIn] = useState(false);
   const [profileActionPending, setProfileActionPending] = useState<null | 'delete-data' | 'delete-account'>(null);
   const [duplicatePrompt, setDuplicatePrompt] = useState<{
     course: Course;
@@ -301,6 +306,11 @@ const Index = () => {
         clearTimeout(returnHomeTimerRef.current);
       }
     };
+  }, []);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setHasAnimatedIn(true));
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   const handleOpenSettings = () => setShowSetup(true);
@@ -628,10 +638,12 @@ const Index = () => {
   return (
     <div
       className={cn(
-        "min-h-screen bg-background transition-[opacity,transform,filter] duration-300 ease-[cubic-bezier(0.33,1,0.68,1)]",
+        "min-h-screen bg-background transition-[opacity,transform,filter] ease-[cubic-bezier(0.33,1,0.68,1)]",
+        !isReturningHome &&
+          (hasAnimatedIn ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 blur-[1px]"),
         isReturningHome && "pointer-events-none opacity-0 translate-y-2 blur-[1px]",
       )}
-      style={isReturningHome ? { transitionDuration: `${landingReturnDelayMs}ms` } : undefined}
+      style={{ transitionDuration: `${isReturningHome ? landingReturnDelayMs : plannerEntryDurationMs}ms` }}
       onDragEnd={() => setDraggedCourse(null)}
     >
       <PlannerSetupDialog
@@ -1342,6 +1354,7 @@ const DesktopPlannerLayout = ({
         collapsedSize={1.5}
         onCollapse={() => setCatalogCollapsed(true)}
         onExpand={() => setCatalogCollapsed(false)}
+        className={SIDE_PANEL_TRANSITION_CLASS}
         style={SIDE_PANEL_TRANSITION}
       >
         <div className="relative h-full">
@@ -1441,6 +1454,7 @@ const DesktopPlannerLayout = ({
               collapsedSize={2}
               onCollapse={() => setRequirementsCollapsed(true)}
               onExpand={() => setRequirementsCollapsed(false)}
+              className={SIDE_PANEL_TRANSITION_CLASS}
               style={SIDE_PANEL_TRANSITION}
             >
               <div className="relative h-full">
