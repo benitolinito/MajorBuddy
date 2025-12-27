@@ -261,21 +261,13 @@ export const ProfileDialog = ({
                     </Button>
                   </div>
                 </div>
-                <div className="rounded-xl border border-border bg-muted/30 p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">About MajorBuddy</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Meet the folks behind the planner.</p>
-                    </div>
-                    <AboutDialog
-                      trigger={
-                        <Button type="button" variant="outline" size="sm" className="justify-start sm:justify-center">
-                          View about
-                        </Button>
-                      }
-                    />
-                  </div>
-                </div>
+                <AboutDialog
+                  trigger={
+                    <Button type="button" variant="outline" size="sm" className="justify-start sm:justify-center">
+                      Open About modal
+                    </Button>
+                  }
+                />
               </div>
             </TabsContent>
           </div>

@@ -404,6 +404,7 @@ const Index = () => {
   const plannerHeaderProps: PlannerHeaderSharedProps = {
     degreeName: plannerTitle,
     university: state.university,
+    universityLogo: state.universityLogo ?? null,
     classYear: state.classYear,
     userLabel,
     userPhotoUrl: user?.photoURL ?? undefined,

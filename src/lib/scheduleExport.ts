@@ -1,4 +1,7 @@
 import { AcademicYear, PlannerPlan } from '@/types/planner';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { utils as xlsxUtils, writeFileXLSX } from 'xlsx';
 
 export type ScheduleRow = {
   academicYear: string;
@@ -115,4 +118,70 @@ export const triggerCsvDownload = (csvContent: string, fileName: string) => {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+};
+
+export const triggerPdfDownload = (rows: ScheduleRow[], fileName: string) => {
+  if (typeof window === 'undefined') return;
+
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+
+  autoTable(doc, {
+    styles: { fontSize: 9, cellPadding: 6 },
+    headStyles: { fillColor: [0, 0, 0], textColor: [255, 255, 255] },
+    columnStyles: {
+      0: { cellWidth: 80 },
+      1: { cellWidth: 80 },
+      2: { cellWidth: 90 },
+      3: { cellWidth: 170 },
+      4: { cellWidth: 60, halign: 'center' },
+      5: { cellWidth: 120 },
+      6: { cellWidth: 110 },
+    },
+    head: [['Academic Year', 'Term', 'Course Code', 'Course Name', 'Credits', 'Plans', 'Distributives']],
+    body: rows.map((row) => [
+      row.academicYear,
+      row.termLabel,
+      row.courseCode === '—' ? '' : row.courseCode,
+      row.courseName,
+      row.credits === '' ? '—' : row.credits,
+      row.plans || '—',
+      row.distributives || '—',
+    ]),
+    foot: rows.length
+      ? undefined
+      : [['', '', '', 'No courses planned yet', '', '', '']],
+    margin: { left: 36, right: 36, top: 48, bottom: 32 },
+    didDrawPage: (data) => {
+      const title = 'Plan Export';
+      const subtitle = fileName;
+      doc.setFontSize(14);
+      doc.text(title, data.settings.margin.left, 28);
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(subtitle, data.settings.margin.left, 42);
+    },
+  });
+
+  doc.save(`${fileName}.pdf`);
+};
+
+export const triggerXlsxDownload = (rows: ScheduleRow[], fileName: string) => {
+  if (typeof window === 'undefined') return;
+
+  const header = ['Academic Year', 'Term', 'Course Code', 'Course Name', 'Credits', 'Plans', 'Distributives'];
+  const data = rows.map((row) => [
+    row.academicYear,
+    row.termLabel,
+    row.courseCode === '—' ? '' : row.courseCode,
+    row.courseName,
+    row.credits === '' ? '' : row.credits,
+    row.plans,
+    row.distributives,
+  ]);
+
+  const worksheet = xlsxUtils.aoa_to_sheet([header, ...data]);
+  const workbook = xlsxUtils.book_new();
+  xlsxUtils.book_append_sheet(workbook, worksheet, 'Schedule');
+
+  writeFileXLSX(workbook, `${fileName}.xlsx`);
 };

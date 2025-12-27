@@ -228,7 +228,7 @@ export const RequirementsSidebar = ({
           Add major/minor
         </Button>
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           className="w-full"
           onClick={() => {

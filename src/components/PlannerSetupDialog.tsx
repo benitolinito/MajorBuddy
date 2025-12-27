@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PlannerConfig, TermSystem } from "@/types/planner";
-import { UNIVERSITY_SUGGESTIONS } from '@/data/universities';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const formatInitialValue = (value?: number | string | null) => {
@@ -80,6 +79,52 @@ const StepperButtons = ({ onIncrement, onDecrement, increaseLabel, decreaseLabel
   </div>
 );
 
+const PRIORITY_SCHOOLS = [
+  "Harvard University",
+  "Yale University",
+  "Princeton University",
+  "Columbia University in the City of New York",
+  "Cornell University",
+  "University of Pennsylvania",
+  "Brown University",
+  "Dartmouth College",
+  "Massachusetts Institute of Technology",
+  "Stanford University",
+  "University of California, Berkeley",
+  "University of California-Los Angeles",
+  "University of Michigan-Ann Arbor",
+  "University of Chicago",
+  "California Institute of Technology",
+  "University of Southern California",
+  "University of Texas at Austin",
+  "University of Washington-Seattle Campus",
+  "University of Florida",
+  "Georgia Institute of Technology-Main Campus",
+] as const;
+const PRIORITY_MAP = new Map(PRIORITY_SCHOOLS.map((name, index) => [name.toLowerCase(), index]));
+
+let universitiesCache: readonly string[] | null = null;
+let universitiesLoadPromise: Promise<readonly string[]> | null = null;
+
+const loadUniversities = async (): Promise<readonly string[]> => {
+  if (universitiesCache) return universitiesCache;
+  if (!universitiesLoadPromise) {
+    universitiesLoadPromise = import("@/data/universities")
+      .then((module) => {
+        universitiesCache = module.UNIVERSITY_SUGGESTIONS as readonly string[];
+        return universitiesCache;
+      })
+      .catch((error) => {
+        universitiesCache = null;
+        throw error;
+      })
+      .finally(() => {
+        universitiesLoadPromise = null;
+      });
+  }
+  return universitiesLoadPromise!;
+};
+
 export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onReset }: PlannerSetupDialogProps) => {
   const fallbackDefaults = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -103,49 +148,47 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
   const [planName, setPlanName] = useState(() => initialConfig?.planName ?? "");
   const [university, setUniversity] = useState(() => initialConfig?.university ?? "");
   const [universityLogo, setUniversityLogo] = useState<string | null>(() => initialConfig?.universityLogo ?? null);
+  const [universities, setUniversities] = useState<readonly string[]>([]);
   const [universityFocused, setUniversityFocused] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const filteredUniversities = useMemo(() => {
     const query = university.trim().toLowerCase();
-    if (!query) return [];
-    const prioritySchools = [
-      "Harvard University",
-      "Yale University",
-      "Princeton University",
-      "Columbia University in the City of New York",
-      "Cornell University",
-      "University of Pennsylvania",
-      "Brown University",
-      "Dartmouth College",
-      "Massachusetts Institute of Technology",
-      "Stanford University",
-      "University of California, Berkeley",
-      "University of California-Los Angeles",
-      "University of Michigan-Ann Arbor",
-      "University of Chicago",
-      "California Institute of Technology",
-      "University of Southern California",
-      "University of Texas at Austin",
-      "University of Washington-Seattle Campus",
-      "University of Florida",
-      "Georgia Institute of Technology-Main Campus",
-    ];
-    const priorityMap = new Map(prioritySchools.map((name, index) => [name.toLowerCase(), index]));
-    return UNIVERSITY_SUGGESTIONS.filter((school) => school.toLowerCase().includes(query))
+    if (!query || universities.length === 0) return [];
+    return universities
+      .filter((school) => school.toLowerCase().includes(query))
       .sort((a, b) => {
         const aLower = a.toLowerCase();
         const bLower = b.toLowerCase();
         const aStarts = aLower.startsWith(query);
         const bStarts = bLower.startsWith(query);
         if (aStarts !== bStarts) return aStarts ? -1 : 1;
-        const aPriority = priorityMap.has(aLower) ? priorityMap.get(aLower) : Infinity;
-        const bPriority = priorityMap.has(bLower) ? priorityMap.get(bLower) : Infinity;
+        const aPriority = PRIORITY_MAP.has(aLower) ? PRIORITY_MAP.get(aLower) : Infinity;
+        const bPriority = PRIORITY_MAP.has(bLower) ? PRIORITY_MAP.get(bLower) : Infinity;
         if (aPriority !== bPriority) return aPriority - bPriority;
         return a.localeCompare(b);
       })
       .slice(0, 6);
-  }, [university]);
+  }, [university, universities]);
+
+  useEffect(() => {
+    if (!universityFocused && university.trim() === "") return;
+    let cancelled = false;
+    loadUniversities()
+      .then((data) => {
+        if (!cancelled) {
+          setUniversities((previous) => (previous === data ? previous : data));
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error("Failed to load university suggestions", error);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [universityFocused, university]);
 
   useEffect(() => {
     setStartYear(formatInitialValue(initialConfig?.startYear));

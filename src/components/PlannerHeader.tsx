@@ -16,6 +16,7 @@ import { PresencePeer } from '@/hooks/useSharePresence';
 interface PlannerHeaderProps {
   degreeName: string;
   university: string;
+  universityLogo?: string | null;
   classYear: number;
   userLabel?: string;
   userPhotoUrl?: string;
@@ -41,6 +42,7 @@ interface PlannerHeaderProps {
 export const PlannerHeader = ({
   degreeName,
   university,
+  universityLogo,
   classYear,
   userLabel,
   cloudStatus,
@@ -142,6 +144,32 @@ export const PlannerHeader = ({
   const profileMenuLabel = signedIn ? 'Open profile menu' : 'Open sign-in menu';
   const authMenuLabel = signedIn ? 'Sign out' : 'Sign in';
   const authActionDisabled = Boolean(!authAction || cloudBusy);
+  const normalizedUniversityLogo =
+    typeof universityLogo === 'string' && universityLogo.trim().length ? universityLogo.trim() : null;
+
+  const UniversityLogo = ({ size = 'md' }: { size?: 'sm' | 'md' }) => {
+    const dimensionClass = size === 'sm' ? 'h-10 w-10' : 'h-11 w-11';
+    const iconClass = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
+    const borderRadius = size === 'sm' ? '0.75rem' : '0.9rem';
+    return (
+      <Avatar
+        className={`overflow-hidden border border-border bg-primary/10 text-primary-foreground shadow-sm ${dimensionClass}`}
+        style={{ borderRadius }}
+      >
+        {normalizedUniversityLogo ? (
+          <AvatarImage
+            src={normalizedUniversityLogo}
+            alt={`${university || 'School'} logo`}
+            className="object-cover"
+          />
+        ) : null}
+        <AvatarFallback className="bg-primary text-primary-foreground" style={{ borderRadius }}>
+          <GraduationCap className={iconClass} />
+        </AvatarFallback>
+      </Avatar>
+    );
+  };
+
   const handlePlanAction = (action?: () => void) => {
     if (!action) return;
     action();
@@ -227,9 +255,7 @@ export const PlannerHeader = ({
           <div className="flex flex-col gap-3">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 flex-1 items-start gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
-                  <GraduationCap className="h-5 w-5" />
-                </div>
+                <UniversityLogo />
                 <div className={`${planTitleContainerClass} space-y-1`}>
                   <button
                     type="button"
@@ -299,9 +325,7 @@ export const PlannerHeader = ({
     <header className={headerClass}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 flex-1 min-w-0 sm:flex-none">
-          <div className="p-2 rounded-lg bg-primary text-primary-foreground">
-            <GraduationCap className="h-5 w-5" />
-          </div>
+          <UniversityLogo size="sm" />
           <div className={planTitleContainerClass}>
             {planSwitcherControl}
             <div className="mt-1">{planMeta}</div>
