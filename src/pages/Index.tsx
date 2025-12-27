@@ -28,7 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from '@/components/ui/sonner';
 import { DEFAULT_PLAN_NAME } from '@/lib/plannerProfiles';
 import { consumeSharedImport } from '@/lib/shareImport';
-import { ShareLinkAccess } from '@/lib/sharePlanStore';
+import { ShareLinkAccess, upsertShareRecord } from '@/lib/sharePlanStore';
 
 type PlannerStats = {
   totalCredits: number;
@@ -52,6 +52,7 @@ type YearSectionAnimatedProps = ComponentProps<typeof YearSection>;
 const collapseDurationMs = 420;
 const landingReturnDelayMs = 340;
 const plannerEntryDurationMs = 200;
+const IMPORTED_SHARE_OWNER = "__external__";
 const AnimatedYearSection = ({ isRemoving = false, ...props }: YearSectionAnimatedProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [height, setHeight] = useState<string | null>(null);
@@ -192,6 +193,7 @@ const Index = () => {
   const [courseActionTarget, setCourseActionTarget] = useState('');
   const [courseActionMode, setCourseActionMode] = useState<'move' | 'copy'>('move');
   const shareImportApplied = useRef(false);
+  const shareSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userLabel = user?.displayName || user?.email || undefined;
   const cloudBusy = cloudSaving || cloudLoading || authBusy;
   const canRemoveYear = state.years.length > 1;
@@ -201,6 +203,7 @@ const Index = () => {
   const plannerTitle = state.degreeName || activePlanProfile?.name || DEFAULT_PLAN_NAME;
   const activeShareId = activePlanProfile?.shareId ?? null;
   const activeShareAccess = activePlanProfile?.shareLinkAccess;
+  const activeShareOwnerId = activePlanProfile?.shareOwnerId ?? null;
   const { peers: presencePeers } = useSharePresence({
     shareId: activeShareId,
     userId: user?.uid ?? null,
@@ -631,9 +634,42 @@ const Index = () => {
       setPlanShareMeta(activePlanProfileId, {
         shareId: candidate.shareId,
         linkAccess: candidate.linkAccess,
+        ownerId: IMPORTED_SHARE_OWNER,
       });
     }
   }, [activePlanProfileId, applySnapshot, location.state, setPlanShareMeta]);
+
+  useEffect(() => {
+    if (shareSyncTimerRef.current) {
+      window.clearTimeout(shareSyncTimerRef.current);
+      shareSyncTimerRef.current = null;
+    }
+    if (!user?.uid || !activeShareId) return;
+    if (!activeShareOwnerId || activeShareOwnerId !== user.uid) return;
+
+    const access = activeShareAccess ?? 'viewer';
+    const planName = plannerTitle || DEFAULT_PLAN_NAME;
+
+    shareSyncTimerRef.current = window.setTimeout(() => {
+      upsertShareRecord({
+        ownerId: user.uid,
+        planName,
+        snapshot: state,
+        planProfileId: activePlanProfileId,
+        linkAccess: access,
+        shareId: activeShareId,
+      }).catch((error) => {
+        console.error("Unable to refresh share link", error);
+      });
+    }, 900);
+
+    return () => {
+      if (shareSyncTimerRef.current) {
+        window.clearTimeout(shareSyncTimerRef.current);
+        shareSyncTimerRef.current = null;
+      }
+    };
+  }, [activePlanProfileId, activeShareAccess, activeShareId, activeShareOwnerId, plannerTitle, state, user?.uid]);
 
   return (
     <div
@@ -670,11 +706,13 @@ const Index = () => {
         activeProfileId={activePlanProfileId}
         existingShareId={activeShareId}
         existingLinkAccess={activeShareAccess}
+        existingShareOwnerId={activePlanProfile?.shareOwnerId}
         onSharePersist={(payload) => {
           if (!activePlanProfileId) return;
           setPlanShareMeta(activePlanProfileId, {
             shareId: payload.shareId,
             linkAccess: payload.linkAccess,
+            ownerId: user?.uid ?? null,
           });
         }}
       />

@@ -69,17 +69,18 @@ const persistCourseDefaults = (defaults: CourseDefaults) => {
   persistJson(COURSE_DEFAULTS_STORAGE_KEY, defaults);
 };
 
-type PlanShareMeta = { shareId: string | null; linkAccess?: ShareLinkAccess };
+type PlanShareMeta = { shareId: string | null; linkAccess?: ShareLinkAccess; ownerId?: string | null };
 
 const normalizeShareMeta = (value: unknown): PlanShareMeta | null => {
   if (!value || typeof value !== 'object') return null;
-  const record = value as { shareId?: unknown; linkAccess?: unknown };
+  const record = value as { shareId?: unknown; linkAccess?: unknown; ownerId?: unknown };
   const shareId = typeof record.shareId === 'string' && record.shareId.trim().length ? record.shareId.trim() : null;
   const linkAccess = record.linkAccess === 'viewer' || record.linkAccess === 'editor' || record.linkAccess === 'none'
     ? (record.linkAccess as ShareLinkAccess)
     : undefined;
-  if (!shareId && !linkAccess) return shareId === null ? { shareId: null } : null;
-  return { shareId, linkAccess };
+  const ownerId = isNonEmptyString(record.ownerId) ? record.ownerId.trim() : null;
+  if (!shareId && !linkAccess && !ownerId) return shareId === null ? { shareId: null } : null;
+  return { shareId, linkAccess, ownerId };
 };
 
 const loadShareMetaMap = (): Record<string, PlanShareMeta> => {
@@ -428,10 +429,18 @@ const loadStoredPlanProfiles = (): { activeId: string; profiles: PlanProfileSnap
           if (!snapshotEntry?.snapshot) return null;
           const id = isNonEmptyString(snapshotEntry.id) ? snapshotEntry.id : generateId();
           const name = isNonEmptyString(snapshotEntry.name) ? snapshotEntry.name : DEFAULT_PLAN_NAME;
+          const shareMeta = normalizeShareMeta({
+            shareId: (snapshotEntry as Record<string, unknown>).shareId,
+            linkAccess: (snapshotEntry as Record<string, unknown>).shareLinkAccess,
+            ownerId: (snapshotEntry as Record<string, unknown>).shareOwnerId ?? (snapshotEntry as Record<string, unknown>).ownerId,
+          });
           const snapshot = snapshotEntry.snapshot as PlannerState;
           return {
             id,
             name,
+            shareId: shareMeta?.shareId ?? null,
+            shareLinkAccess: shareMeta?.linkAccess,
+            shareOwnerId: shareMeta?.ownerId ?? null,
             snapshot: {
               ...snapshot,
               colorPalette: normalizePalette((snapshot as PlannerState)?.colorPalette ?? storedPalette),
@@ -877,12 +886,20 @@ const buildInitialPlanner = () => {
         years: sanitizeYears(loadStoredYears(), createDefaultConfig()),
       });
 
-    const planProfilesWithShare = storedProfiles.profiles.map(({ id, name }) => ({
-      id,
-      name,
-      shareId: storedShareMeta[id]?.shareId ?? null,
-      shareLinkAccess: storedShareMeta[id]?.linkAccess,
-    }));
+    const planProfilesWithShare = storedProfiles.profiles.map(({ id, name, shareId, shareLinkAccess, shareOwnerId }) => {
+      const normalizedShare = normalizeShareMeta({
+        shareId: shareId ?? storedShareMeta[id]?.shareId,
+        linkAccess: shareLinkAccess ?? storedShareMeta[id]?.linkAccess,
+        ownerId: shareOwnerId ?? storedShareMeta[id]?.ownerId,
+      });
+      return {
+        id,
+        name,
+        shareId: normalizedShare?.shareId ?? null,
+        shareLinkAccess: normalizedShare?.linkAccess,
+        shareOwnerId: normalizedShare?.ownerId ?? null,
+      };
+    });
 
     return {
       state: clonePlannerState(fallbackState),
@@ -894,6 +911,7 @@ const buildInitialPlanner = () => {
         acc[profile.id] = {
           shareId: profile.shareId ?? null,
           linkAccess: profile.shareLinkAccess,
+          ownerId: profile.shareOwnerId,
         };
         return acc;
       }, {}),
@@ -916,12 +934,13 @@ const buildInitialPlanner = () => {
   });
   const profileId = generateId();
   const profileName = initialState.degreeName || initialState.config?.planName || DEFAULT_PLAN_NAME;
-  const initialShareMeta = storedShareMeta[profileId] ?? { shareId: null };
+  const fallbackShareMeta = Object.values(storedShareMeta).find((meta): meta is PlanShareMeta => Boolean(meta));
+  const initialShareMeta = storedShareMeta[profileId] ?? fallbackShareMeta ?? { shareId: null, ownerId: null };
 
   return {
     state: initialState,
     hasConfig: Boolean(initialConfig),
-    planProfiles: [{ id: profileId, name: profileName, shareId: initialShareMeta.shareId ?? null, shareLinkAccess: initialShareMeta.linkAccess }],
+    planProfiles: [{ id: profileId, name: profileName, shareId: initialShareMeta.shareId ?? null, shareLinkAccess: initialShareMeta.linkAccess, shareOwnerId: initialShareMeta.ownerId }],
     activePlanProfileId: profileId,
     profileSnapshots: new Map<string, PlannerState>([[profileId, initialState]]),
     shareMeta: { [profileId]: initialShareMeta },
@@ -988,17 +1007,18 @@ const usePlanProfilesManager = ({
   initialPlanProfiles.forEach((profile) => {
     const meta = initialShareMeta[profile.id];
     if (meta) {
-      shareMetaInitial[profile.id] = { shareId: meta.shareId ?? null, linkAccess: meta.linkAccess };
+      shareMetaInitial[profile.id] = { shareId: meta.shareId ?? null, linkAccess: meta.linkAccess, ownerId: meta.ownerId };
     } else if (profile.shareId || profile.shareLinkAccess) {
       shareMetaInitial[profile.id] = {
         shareId: profile.shareId ?? null,
         linkAccess: profile.shareLinkAccess,
+        ownerId: profile.shareOwnerId,
       };
     }
   });
   Object.entries(initialShareMeta).forEach(([id, meta]) => {
     if (!shareMetaInitial[id]) {
-      shareMetaInitial[id] = { shareId: meta.shareId ?? null, linkAccess: meta.linkAccess };
+      shareMetaInitial[id] = { shareId: meta.shareId ?? null, linkAccess: meta.linkAccess, ownerId: meta.ownerId };
     }
   });
 
@@ -1009,6 +1029,7 @@ const usePlanProfilesManager = ({
       ...profile,
       shareId: profile.shareId ?? shareMetaRef.current[profile.id]?.shareId ?? null,
       shareLinkAccess: profile.shareLinkAccess ?? shareMetaRef.current[profile.id]?.linkAccess,
+      shareOwnerId: profile.shareOwnerId ?? shareMetaRef.current[profile.id]?.ownerId,
     })),
   );
   const [activePlanProfileId, setActivePlanProfileId] = useState<string>(initialActiveId);
@@ -1022,6 +1043,10 @@ const usePlanProfilesManager = ({
   const persistShareMeta = useCallback(() => {
     persistShareMetaMap(shareMetaRef.current);
   }, []);
+
+  useEffect(() => {
+    persistShareMeta();
+  }, [persistShareMeta]);
 
   const selectPlanProfile = useCallback(
     (profileId: string) => {
@@ -1049,10 +1074,10 @@ const usePlanProfilesManager = ({
         name || snapshot.degreeName || snapshot.config?.planName || DEFAULT_PLAN_NAME,
         planProfiles,
       );
-      const newProfile: PlanProfile = { id: generateId(), name: profileName, shareId: null };
+      const newProfile: PlanProfile = { id: generateId(), name: profileName, shareId: null, shareOwnerId: null };
 
       profileSnapshotsRef.current.set(newProfile.id, snapshot);
-      shareMetaRef.current[newProfile.id] = { shareId: null };
+      shareMetaRef.current[newProfile.id] = { shareId: null, ownerId: null };
       persistShareMeta();
       setPlanProfiles((prev) => [...prev, newProfile]);
       setActivePlanProfileId(newProfile.id);
@@ -1076,18 +1101,19 @@ const usePlanProfilesManager = ({
   const setPlanShareMeta = useCallback(
     (profileId: string, meta: Partial<PlanShareMeta>) => {
       if (!profileId) return;
-      const current = shareMetaRef.current[profileId] ?? { shareId: null };
-      const next: PlanShareMeta = {
-        shareId: meta.shareId === undefined ? current.shareId ?? null : meta.shareId ?? null,
-        linkAccess: meta.linkAccess === undefined ? current.linkAccess : meta.linkAccess,
-      };
-      shareMetaRef.current = { ...shareMetaRef.current, [profileId]: next };
-      persistShareMeta();
-      setPlanProfiles((prev) =>
-        prev.map((profile) =>
-          profile.id === profileId ? { ...profile, shareId: next.shareId, shareLinkAccess: next.linkAccess } : profile,
-        ),
-      );
+      const current = shareMetaRef.current[profileId] ?? { shareId: null, ownerId: null };
+    const next: PlanShareMeta = {
+      shareId: meta.shareId === undefined ? current.shareId ?? null : meta.shareId ?? null,
+      linkAccess: meta.linkAccess === undefined ? current.linkAccess : meta.linkAccess,
+      ownerId: meta.ownerId === undefined ? current.ownerId ?? null : meta.ownerId ?? null,
+    };
+    shareMetaRef.current = { ...shareMetaRef.current, [profileId]: next };
+    persistShareMeta();
+    setPlanProfiles((prev) =>
+      prev.map((profile) =>
+        profile.id === profileId ? { ...profile, shareId: next.shareId, shareLinkAccess: next.linkAccess, shareOwnerId: next.ownerId } : profile,
+      ),
+    );
     },
     [persistShareMeta],
   );
@@ -1164,6 +1190,19 @@ const usePlanProfilesManager = ({
     },
     [persistShareMeta, setHasConfig, setPlannerState],
   );
+
+  useEffect(() => {
+    if (!activePlanProfileId) return;
+    const activeSnapshot = clonePlannerState(state);
+    profileSnapshotsRef.current.set(activePlanProfileId, activeSnapshot);
+
+    const snapshotPayload: PlanProfileSnapshot[] = planProfiles.map((profile) => {
+      const snapshot = profileSnapshotsRef.current.get(profile.id) ?? activeSnapshot;
+      return { ...profile, snapshot: clonePlannerState(snapshot) };
+    });
+
+    persistPlanProfiles(activePlanProfileId, snapshotPayload);
+  }, [activePlanProfileId, planProfiles, state]);
 
   return {
     planProfiles,

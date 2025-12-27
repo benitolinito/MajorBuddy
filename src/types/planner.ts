@@ -115,6 +115,7 @@ export type PlanProfile = {
   name: string;
   shareId?: string | null;
   shareLinkAccess?: ShareLinkAccess;
+  shareOwnerId?: string | null;
 };
 
 export type CourseDropSource = {

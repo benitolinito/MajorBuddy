@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
-import { Plus, X } from 'lucide-react';
+import { type LucideIcon, Leaf, Plus, Snowflake, Sprout, Sun, X } from 'lucide-react';
 import { Term, Course, PlannerPlan, CourseDropOptions } from '@/types/planner';
 import { CourseCard } from './CourseCard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getTagColorClasses } from '@/lib/tagColors';
+
+const termIconStyles: Record<Term['name'], { Icon: LucideIcon; colorClass: string }> = {
+  Fall: { Icon: Leaf, colorClass: 'text-orange-500' },
+  Winter: { Icon: Snowflake, colorClass: 'text-sky-400' },
+  Spring: { Icon: Sprout, colorClass: 'text-emerald-500' },
+  Summer: { Icon: Sun, colorClass: 'text-amber-400' },
+};
 
 const extractSource = (event: DragEvent): CourseDropOptions['source'] | undefined => {
   const rawSource = event.dataTransfer.getData('course-source');
@@ -182,6 +189,7 @@ export const TermCard = ({
   const emptyDescription = isStacked
     ? 'Tap "Add class" below to pick from your library.'
     : '';
+  const seasonIcon = termIconStyles[term.name];
 
   const containerClassName = cn(
     'group relative bg-muted/50 rounded-xl transition-all',
@@ -222,7 +230,15 @@ export const TermCard = ({
       )}
       <div className="flex items-start justify-between mb-3">
         <div>
-          <p className="text-xs font-semibold text-primary uppercase tracking-wide">{term.name}</p>
+          <p className="flex items-center gap-1 text-xs font-semibold text-primary uppercase tracking-wide">
+            {seasonIcon && (
+              <seasonIcon.Icon
+                aria-hidden="true"
+                className={cn('h-3 w-3 stroke-[2.4]', seasonIcon.colorClass)}
+              />
+            )}
+            {term.name}
+          </p>
           <p className="text-lg font-bold text-foreground leading-tight">{term.year}</p>
         </div>
         <Badge variant="outline" className="text-xs font-medium bg-card hidden sm:inline-flex">
