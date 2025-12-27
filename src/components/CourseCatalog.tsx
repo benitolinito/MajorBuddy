@@ -232,6 +232,13 @@ export const CourseCatalog = ({
     return [...baseTermOptions, ...extras];
   }, [baseTermOptions, offeredTerms]);
 
+  const uniqueTermOptions = useMemo<TermName[]>(() => Array.from(new Set(termOptions)), [termOptions]);
+  const allTermOptionsSelected = useMemo(
+    () => uniqueTermOptions.length > 0 && uniqueTermOptions.every((term) => offeredTerms.includes(term)),
+    [uniqueTermOptions, offeredTerms],
+  );
+  const selectAllLabel = allTermOptionsSelected ? 'Deselect all' : 'Select all';
+
   const planLookup = useMemo(() => new Map(plans.map((plan) => [plan.id, plan])), [plans]);
 
   const courseOrder = useMemo(() => new Map(courses.map((course, index) => [course.id, index])), [courses]);
@@ -391,9 +398,12 @@ export const CourseCatalog = ({
     });
   };
 
-  const selectAllOfferedTerms = () => {
-    const allTerms = Array.from(new Set(termOptions));
-    setFormState((prev) => ({ ...prev, offeredTerms: allTerms }));
+  const toggleAllOfferedTerms = () => {
+    setFormState((prev) => {
+      const allTerms = Array.from(new Set(uniqueTermOptions));
+      const isFullySelected = allTerms.length > 0 && allTerms.every((term) => prev.offeredTerms.includes(term));
+      return { ...prev, offeredTerms: isFullySelected ? [] : allTerms };
+    });
   };
 
   const togglePlan = (planId: string) => {
@@ -748,9 +758,9 @@ export const CourseCatalog = ({
             variant="ghost"
             size="sm"
             className="h-8"
-            onClick={selectAllOfferedTerms}
+            onClick={toggleAllOfferedTerms}
           >
-            Select all
+            {selectAllLabel}
           </Button>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -970,9 +980,9 @@ export const CourseCatalog = ({
             variant="outline"
             size="sm"
             className="h-8"
-            onClick={selectAllOfferedTerms}
+            onClick={toggleAllOfferedTerms}
           >
-            Select all
+            {selectAllLabel}
           </Button>
         </div>
         <div className="grid grid-cols-2 gap-2">

@@ -60,10 +60,10 @@ export const CourseCard = ({
       </button>
       
       <div className="flex items-start justify-between gap-2">
-        <span className="font-semibold text-sm text-foreground">{course.code}</span>
-        <span className="text-xs text-muted-foreground">{course.credits}cr</span>
+        <p className="font-semibold text-sm text-foreground leading-tight line-clamp-2">{course.name}</p>
+        <span className="text-xs text-muted-foreground whitespace-nowrap">{course.credits}cr</span>
       </div>
-      <p className="text-xs text-muted-foreground mt-1">{course.name}</p>
+      <p className="text-xs text-muted-foreground mt-1">{course.code}</p>
       {course.description && <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{course.description}</p>}
       <div className="flex flex-wrap gap-1.5 mt-2">
         {coursePlans.map((plan) => (

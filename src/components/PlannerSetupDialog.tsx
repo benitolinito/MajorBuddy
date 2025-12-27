@@ -312,18 +312,34 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
                 }
                 className="grid grid-cols-1 gap-3 sm:grid-cols-2"
               >
-                <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-border p-3 text-center">
-                  <RadioGroupItem id="term-semester" value="semester" />
-                  <Label htmlFor="term-semester" className="text-sm font-medium leading-none">
-                    Semester
-                  </Label>
-                </div>
-                <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-border p-3 text-center">
-                  <RadioGroupItem id="term-quarter" value="quarter" />
-                  <Label htmlFor="term-quarter" className="text-sm font-medium leading-none">
-                    Quarter
-                  </Label>
-                </div>
+                <Label
+                  htmlFor="term-semester"
+                  className={`flex cursor-pointer flex-col items-start gap-2 rounded-lg border p-3 text-left transition ${
+                    termSystem === "semester"
+                      ? "border-primary bg-primary/10 shadow-sm"
+                      : "border-border hover:border-primary/60 hover:bg-primary/5"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem id="term-semester" value="semester" />
+                    <span className="text-sm font-medium leading-none">Semester</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Fall & Spring terms</p>
+                </Label>
+                <Label
+                  htmlFor="term-quarter"
+                  className={`flex cursor-pointer flex-col items-start gap-2 rounded-lg border p-3 text-left transition ${
+                    termSystem === "quarter"
+                      ? "border-primary bg-primary/10 shadow-sm"
+                      : "border-border hover:border-primary/60 hover:bg-primary/5"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem id="term-quarter" value="quarter" />
+                    <span className="text-sm font-medium leading-none">Quarter</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Fall, Winter, Spring, Summer</p>
+                </Label>
               </RadioGroup>
             </div>
           </div>

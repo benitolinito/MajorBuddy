@@ -226,7 +226,7 @@ export const TermCard = ({
           <p className="text-lg font-bold text-foreground leading-tight">{term.year}</p>
         </div>
         <Badge variant="outline" className="text-xs font-medium bg-card hidden sm:inline-flex">
-          {credits} Credits
+          {credits} Credit{credits === 1 ? "" : "s"}
         </Badge>
       </div>
       <div ref={listRef} className={cn('space-y-2', isStacked ? 'min-h-[100px]' : 'min-h-[120px]')}>

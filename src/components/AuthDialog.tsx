@@ -54,6 +54,7 @@ export const AuthDialog = ({
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -61,6 +62,7 @@ export const AuthDialog = ({
       setFormError(null);
     } else {
       setPassword("");
+      setConfirmPassword("");
     }
   }, [open]);
 
@@ -87,10 +89,22 @@ export const AuthDialog = ({
     setFormError(null);
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
+    const trimmedConfirmPassword = confirmPassword.trim();
 
     if (!trimmedEmail || !trimmedPassword) {
       setFormError("Enter both an email and password to continue.");
       return;
+    }
+
+    if (mode === "signup") {
+      if (trimmedPassword.length < 6) {
+        setFormError("Password must be at least 6 characters.");
+        return;
+      }
+      if (trimmedPassword !== trimmedConfirmPassword) {
+        setFormError("Passwords need to match.");
+        return;
+      }
     }
 
     try {
@@ -107,14 +121,14 @@ export const AuthDialog = ({
   };
 
   const submitLabel = mode === "signin" ? "Sign in with email" : "Create account";
-  const hint = mode === "signin" ? "Enter your email and password to continue." : "Set a password with at least 6 characters.";
+  const hint = mode === "signin" ? "Enter your email and password to continue." : "Use a password with at least 6 characters.";
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader className="space-y-2">
           <DialogTitle>Sign in to sync your planner</DialogTitle>
-          <DialogDescription>Choose Google for one-click access or sign in with your email to keep your schedule in sync.</DialogDescription>
+          <DialogDescription>Use Google for one-tap access or email to sign in or create an account.</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-6 lg:grid-cols-5">
@@ -151,6 +165,22 @@ export const AuthDialog = ({
               <p className="text-xs text-muted-foreground">{hint}</p>
             </div>
 
+            {mode === "signup" && (
+              <div className="space-y-2">
+                <Label htmlFor="auth-confirm-password">Confirm password</Label>
+                <Input
+                  id="auth-confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  disabled={busy}
+                  placeholder="Repeat password"
+                  minLength={6}
+                />
+              </div>
+            )}
+
             {formError && <p className="text-sm text-destructive">{formError}</p>}
             {status && !formError && <p className="text-sm text-muted-foreground">{status}</p>}
 
@@ -158,7 +188,11 @@ export const AuthDialog = ({
               <button
                 type="button"
                 className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-                onClick={() => setMode((prev) => (prev === "signin" ? "signup" : "signin"))}
+                onClick={() => {
+                  setMode((prev) => (prev === "signin" ? "signup" : "signin"));
+                  setFormError(null);
+                  setConfirmPassword("");
+                }}
                 disabled={busy}
               >
                 {mode === "signin" ? "Create a new account instead" : "Use an existing account"}
@@ -179,40 +213,28 @@ export const AuthDialog = ({
           </form>
 
           <div className="lg:col-span-2 space-y-4 rounded-xl border border-border/80 bg-muted/40 p-4 shadow-sm">
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-foreground">Quick sign-in</p>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full justify-center gap-2"
-                onClick={handleGoogle}
-                disabled={busy}
-              >
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoogleIcon className="h-4 w-4" />}
-                Continue with Google
-              </Button>
-              <p className="text-xs text-muted-foreground">Use your Google account for a one-tap login—no extra passwords.</p>
-            </div>
-
+            <p className="text-sm font-semibold text-foreground">Quick sign-in</p>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full justify-center gap-2"
+              onClick={handleGoogle}
+              disabled={busy}
+            >
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoogleIcon className="h-4 w-4" />}
+              Continue with Google
+            </Button>
             <Separator />
-
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-foreground">What you get</p>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-start gap-2">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 text-primary" />
-                  <span>Cloud backups so your terms and credits stay safe.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 text-primary" />
-                  <span>Sync across devices without re-entering your plan.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 text-primary" />
-                  <span>Fast Google or email access with trusted security.</span>
-                </li>
-              </ul>
-            </div>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              <li className="flex items-start gap-2">
+                <ShieldCheck className="mt-0.5 h-4 w-4 text-primary" />
+                <span>Sync and back up your planner automatically.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <ShieldCheck className="mt-0.5 h-4 w-4 text-primary" />
+                <span>Secure access with Google or your email password.</span>
+              </li>
+            </ul>
           </div>
         </div>
       </DialogContent>
