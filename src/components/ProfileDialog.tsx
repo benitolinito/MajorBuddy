@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Database, Info, Palette, User } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { AboutDialog } from '@/components/AboutDialog';
+import { AboutContent } from '@/components/AboutDialog';
 
 type ProfileDialogProps = {
   open: boolean;
@@ -261,13 +261,13 @@ export const ProfileDialog = ({
                     </Button>
                   </div>
                 </div>
-                <AboutDialog
-                  trigger={
-                    <Button type="button" variant="outline" size="sm" className="justify-start sm:justify-center">
-                      Open About modal
-                    </Button>
-                  }
-                />
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">About MajorBuddy</p>
+                    <p className="text-xs text-muted-foreground">Learn more about who built this project.</p>
+                  </div>
+                  <AboutContent />
+                </div>
               </div>
             </TabsContent>
           </div>

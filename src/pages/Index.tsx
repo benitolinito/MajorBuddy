@@ -645,7 +645,7 @@ const Index = () => {
       shareSyncTimerRef.current = null;
     }
     if (!user?.uid || !activeShareId) return;
-    if (!activeShareOwnerId || activeShareOwnerId !== user.uid) return;
+    if (activeShareOwnerId && activeShareOwnerId !== user.uid) return;
 
     const access = activeShareAccess ?? 'viewer';
     const planName = plannerTitle || DEFAULT_PLAN_NAME;
