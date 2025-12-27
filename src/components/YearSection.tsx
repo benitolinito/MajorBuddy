@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { AcademicYear, Course, PlannerPlan, CourseDropOptions, TermSystem } from '@/types/planner';
 import { TermCard } from './TermCard';
@@ -5,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+
+const termExitDurationMs = 320;
 
 interface YearSectionProps {
   year: AcademicYear;
@@ -50,6 +53,51 @@ export const YearSection = ({
     'flex gap-4',
     isMobile && 'flex-col gap-3',
   );
+  const [removingTermIds, setRemovingTermIds] = useState<string[]>([]);
+  const [recentTermId, setRecentTermId] = useState<string | null>(null);
+  const termRemovalTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const addedTermTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previousTermIds = useRef<string[]>([]);
+  const initializedTerms = useRef(false);
+
+  useEffect(() => {
+    const currentIds = year.terms.map((term) => term.id);
+    if (initializedTerms.current) {
+      const addedId = currentIds.find((id) => !previousTermIds.current.includes(id));
+      if (addedId) {
+        setRecentTermId(addedId);
+        if (addedTermTimer.current) {
+          clearTimeout(addedTermTimer.current);
+        }
+        addedTermTimer.current = setTimeout(() => setRecentTermId(null), 900);
+      }
+    } else {
+      initializedTerms.current = true;
+    }
+    previousTermIds.current = currentIds;
+  }, [year.terms]);
+
+  useEffect(
+    () => () => {
+      termRemovalTimers.current.forEach((timer) => clearTimeout(timer));
+      termRemovalTimers.current.clear();
+      if (addedTermTimer.current) {
+        clearTimeout(addedTermTimer.current);
+      }
+    },
+    [],
+  );
+
+  const handleRemoveTerm = (termId: string) => {
+    if (removingTermIds.includes(termId)) return;
+    setRemovingTermIds((prev) => [...prev, termId]);
+    const timer = setTimeout(() => {
+      onRemoveTerm(termId);
+      setRemovingTermIds((prev) => prev.filter((id) => id !== termId));
+      termRemovalTimers.current.delete(termId);
+    }, termExitDurationMs);
+    termRemovalTimers.current.set(termId, timer);
+  };
 
   return (
     <section
@@ -88,27 +136,41 @@ export const YearSection = ({
       </div>
       
       <div className={termContainerClass}>
-        {year.terms.map((term) => (
-          <TermCard
-            key={term.id}
-            yearId={year.id}
-            term={term}
-            credits={getTermCredits(term.id)}
-            plans={plans}
-            distributiveColors={distributiveColors}
-            onRemoveCourse={(courseId) => onRemoveCourse(term.id, courseId)}
-            onDropCourse={(course, options) => onDropCourse(year.id, term.id, course, options)}
-            onRemoveTerm={() => onRemoveTerm(term.id)}
-            isStacked={isMobile}
-            showDeleteControls={deleteControlsVisible}
-            onRequestCourseAction={
-              onRequestCourseAction
-                ? (course) => onRequestCourseAction({ yearId: year.id, termId: term.id, course })
-                : undefined
-            }
-            onAddCourse={onAddCourseToTerm ? () => onAddCourseToTerm(term.id) : undefined}
-          />
-        ))}
+        {year.terms.map((term) => {
+          const isRemovingTerm = removingTermIds.includes(term.id);
+          const isNewTerm = recentTermId === term.id;
+          return (
+            <div
+              key={term.id}
+              className={cn(
+                'transition-[opacity,transform,filter] duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] will-change-transform',
+                isRemovingTerm
+                  ? 'pointer-events-none opacity-0 -translate-y-2 scale-[0.98] blur-[1px]'
+                  : 'opacity-100 translate-y-0 scale-100',
+                isNewTerm && 'animate-term-enter',
+              )}
+            >
+              <TermCard
+                yearId={year.id}
+                term={term}
+                credits={getTermCredits(term.id)}
+                plans={plans}
+                distributiveColors={distributiveColors}
+                onRemoveCourse={(courseId) => onRemoveCourse(term.id, courseId)}
+                onDropCourse={(course, options) => onDropCourse(year.id, term.id, course, options)}
+                onRemoveTerm={() => handleRemoveTerm(term.id)}
+                isStacked={isMobile}
+                showDeleteControls={deleteControlsVisible}
+                onRequestCourseAction={
+                  onRequestCourseAction
+                    ? (course) => onRequestCourseAction({ yearId: year.id, termId: term.id, course })
+                    : undefined
+                }
+                onAddCourse={onAddCourseToTerm ? () => onAddCourseToTerm(term.id) : undefined}
+              />
+            </div>
+          );
+        })}
         
         <div
           className={cn(

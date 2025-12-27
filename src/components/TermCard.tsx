@@ -181,7 +181,7 @@ export const TermCard = ({
   const emptyTitle = isStacked ? 'No classes scheduled' : 'Drag courses here';
   const emptyDescription = isStacked
     ? 'Tap "Add class" below to pick from your library.'
-    : 'Drop classes into this term to schedule them.';
+    : '';
 
   const containerClassName = cn(
     'group relative bg-muted/50 rounded-xl transition-all',

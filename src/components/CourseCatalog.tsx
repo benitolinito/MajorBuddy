@@ -588,7 +588,16 @@ export const CourseCatalog = ({
 
   const renderDesktopForm = () => (
     <>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-3">
+        <div className="space-y-2">
+          <Label htmlFor="class-title">Title</Label>
+          <Input
+            id="class-title"
+            placeholder="Linear Algebra"
+            value={title}
+            onChange={(e) => updateFormField('title', e.target.value)}
+          />
+        </div>
         <div className="space-y-2">
           <Label htmlFor="class-code">Class code</Label>
           <Input
@@ -599,62 +608,66 @@ export const CourseCatalog = ({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="class-title">Title</Label>
+          <Label htmlFor="class-subject">Subject</Label>
           <Input
-            id="class-title"
-            placeholder="Linear Algebra"
-            value={title}
-            onChange={(e) => updateFormField('title', e.target.value)}
+            id="class-subject"
+            placeholder="Math, Science, Languages"
+            value={subject}
+            onChange={(e) => updateFormField('subject', e.target.value)}
+          />
+          <p className="text-[11px] text-muted-foreground">Use your own subject label for quick scanning.</p>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="class-credits">Credits</Label>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleUseCreditsAsDefault}>
+                  Use as default
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Makes new classes be worth this number of credits by default.</TooltipContent>
+            </Tooltip>
+          </div>
+          <Input
+            id="class-credits"
+            type="number"
+            min={0}
+            max={20}
+            value={credits}
+            onChange={(e) => updateFormField('credits', Number(e.target.value))}
           />
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 items-start">
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="class-credits">Credits</Label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleUseCreditsAsDefault}>
-                    Use as default
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">Makes new classes be worth this number of credits by default.</TooltipContent>
-              </Tooltip>
-            </div>
-            <Input
-              id="class-credits"
-              type="number"
-              min={0}
-              max={20}
-              value={credits}
-              onChange={(e) => updateFormField('credits', Number(e.target.value))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="class-subject">Subject</Label>
-            <Input
-              id="class-subject"
-              placeholder="Math, Science, Languages"
-              value={subject}
-              onChange={(e) => updateFormField('subject', e.target.value)}
-            />
-            <p className="text-[11px] text-muted-foreground">Use your own subject label for quick scanning.</p>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="class-distributives">Distributives</Label>
-          <p className="text-[11px] text-muted-foreground">Tag to distributives from the Requirements panel.</p>
-          <div className="flex flex-wrap gap-2 pt-1">
-            {distributives.map((dist) => {
+      <div className="space-y-2">
+        <Label htmlFor="class-distributives">Distributives</Label>
+        <p className="text-[11px] text-muted-foreground">Tag to distributives from the Requirements panel.</p>
+        <div className="flex flex-wrap gap-2 pt-1">
+          {distributives.map((dist) => {
+            const colorId = distributiveColorMap?.[dist];
+            return (
+              <TogglePill
+                key={dist}
+                label={dist}
+                active={selectedDistributives.includes(dist)}
+                colorClassName={getTagColorClasses(dist, colorId)}
+                colorAccentClass={getTagAccentClass(dist, colorId)}
+                colorStyle={getTagColorStyle(dist, colorId)}
+                colorAccentStyle={getTagAccentStyle(dist, colorId)}
+                onClick={() => toggleDistributive(dist)}
+              />
+            );
+          })}
+          {selectedDistributives
+            .filter((dist) => !distributives.includes(dist))
+            .map((dist) => {
               const colorId = distributiveColorMap?.[dist];
               return (
                 <TogglePill
                   key={dist}
                   label={dist}
-                  active={selectedDistributives.includes(dist)}
+                  active
                   colorClassName={getTagColorClasses(dist, colorId)}
                   colorAccentClass={getTagAccentClass(dist, colorId)}
                   colorStyle={getTagColorStyle(dist, colorId)}
@@ -663,24 +676,6 @@ export const CourseCatalog = ({
                 />
               );
             })}
-            {selectedDistributives
-              .filter((dist) => !distributives.includes(dist))
-              .map((dist) => {
-                const colorId = distributiveColorMap?.[dist];
-                return (
-                  <TogglePill
-                    key={dist}
-                    label={dist}
-                    active
-                    colorClassName={getTagColorClasses(dist, colorId)}
-                    colorAccentClass={getTagAccentClass(dist, colorId)}
-                    colorStyle={getTagColorStyle(dist, colorId)}
-                    colorAccentStyle={getTagAccentStyle(dist, colorId)}
-                    onClick={() => toggleDistributive(dist)}
-                  />
-                );
-              })}
-          </div>
         </div>
       </div>
 
@@ -1290,10 +1285,10 @@ export const CourseCatalog = ({
                   <Pencil className="h-4 w-4" />
                 </Button>
                 <div className="flex items-start justify-between gap-2">
-                  <span className="font-semibold text-sm text-foreground">{course.code}</span>
-                  <span className="text-xs text-muted-foreground">{course.credits}cr</span>
+                  <p className="font-semibold text-sm text-foreground leading-tight line-clamp-2">{course.name}</p>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{course.credits}cr</span>
                 </div>
-                <p className="text-sm text-foreground mt-1">{course.name}</p>
+                <p className="text-xs text-muted-foreground mt-1">{course.code}</p>
                 {course.description && (
                   <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
                 )}

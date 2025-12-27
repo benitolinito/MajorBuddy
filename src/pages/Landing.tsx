@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 
+import { AboutDialog } from '@/components/AboutDialog';
 import { AuthDialog } from '@/components/AuthDialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -445,6 +446,16 @@ const Landing = () => {
               <a className="transition-colors hover:text-primary" href="/privacy">
                 Privacy
               </a>
+              <span aria-hidden="true" className="text-muted-foreground/60">
+                •
+              </span>
+              <AboutDialog
+                trigger={
+                  <button type="button" className="transition-colors hover:text-primary">
+                    About
+                  </button>
+                }
+              />
             </nav>
           </div>
         </footer>

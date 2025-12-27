@@ -41,10 +41,13 @@ type PlannerHeaderSharedProps = Omit<ComponentProps<typeof PlannerHeader>, 'isMo
 const SIDE_PANEL_TRANSITION: CSSProperties = {
   transition: 'flex-basis 200ms ease, width 200ms ease, min-width 200ms ease',
 };
+const SIDE_PANEL_CONTENT_ANIMATION =
+  'absolute inset-0 h-full transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.33,1,0.68,1)]';
 
 type YearSectionAnimatedProps = ComponentProps<typeof YearSection>;
 
 const collapseDurationMs = 420;
+const landingReturnDelayMs = 340;
 const AnimatedYearSection = ({ isRemoving = false, ...props }: YearSectionAnimatedProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [height, setHeight] = useState<string | null>(null);
@@ -155,6 +158,8 @@ const Index = () => {
   const [showDeleteControls, setShowDeleteControls] = useState(false);
   const [removingYearIds, setRemovingYearIds] = useState<string[]>([]);
   const removalTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const [isReturningHome, setIsReturningHome] = useState(false);
+  const returnHomeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [profileActionPending, setProfileActionPending] = useState<null | 'delete-data' | 'delete-account'>(null);
   const [duplicatePrompt, setDuplicatePrompt] = useState<{
     course: Course;
@@ -288,9 +293,13 @@ const Index = () => {
   const handleOpenAuth = () => setShowAuth(true);
   const handleOpenProfile = () => setShowProfile(true);
   useEffect(() => {
+    const removalTimers = removalTimersRef.current;
     return () => {
-      removalTimersRef.current.forEach((timer) => clearTimeout(timer));
-      removalTimersRef.current.clear();
+      removalTimers.forEach((timer) => clearTimeout(timer));
+      removalTimers.clear();
+      if (returnHomeTimerRef.current) {
+        clearTimeout(returnHomeTimerRef.current);
+      }
     };
   }, []);
 
@@ -326,6 +335,15 @@ const Index = () => {
     }
     return fallback;
   };
+
+  const triggerReturnToLanding = useCallback(() => {
+    if (isReturningHome) return false;
+    setIsReturningHome(true);
+    returnHomeTimerRef.current = setTimeout(() => {
+      navigate('/', { replace: true });
+    }, landingReturnDelayMs);
+    return true;
+  }, [isReturningHome, navigate]);
 
   const handleDeletePlannerData = async () => {
     if (profileActionPending) return;
@@ -372,9 +390,12 @@ const Index = () => {
   };
 
   const handleSignOut = async () => {
+    const animated = triggerReturnToLanding();
     await signOut();
     resetPlannerState();
-    navigate('/', { replace: true });
+    if (!animated) {
+      navigate('/', { replace: true });
+    }
   };
 
   const deletingData = profileActionPending === 'delete-data';
@@ -605,7 +626,11 @@ const Index = () => {
 
   return (
     <div
-      className="min-h-screen bg-background"
+      className={cn(
+        "min-h-screen bg-background transition-[opacity,transform,filter] duration-300 ease-[cubic-bezier(0.33,1,0.68,1)]",
+        isReturningHome && "pointer-events-none opacity-0 translate-y-2 blur-[1px]",
+      )}
+      style={isReturningHome ? { transitionDuration: `${landingReturnDelayMs}ms` } : undefined}
       onDragEnd={() => setDraggedCourse(null)}
     >
       <PlannerSetupDialog
@@ -1318,32 +1343,45 @@ const DesktopPlannerLayout = ({
         onExpand={() => setCatalogCollapsed(false)}
         style={SIDE_PANEL_TRANSITION}
       >
-        {catalogCollapsed ? (
-          <CollapsedRail side="left" ariaLabel="Expand class library" onExpand={() => catalogPanelRef.current?.expand()} />
-        ) : (
-          <CourseCatalog
-            courses={state.courseCatalog}
-            distributives={state.distributives}
-            plans={state.plans}
-            termSystem={termSystem}
-            colorPalette={state.colorPalette}
-            onAddPaletteColor={addColorToPalette}
-            defaultCourseCredits={defaultCourseCredits}
-            onUpdateDefaultCourseCredits={onUpdateDefaultCourseCredits}
-            onDragStart={onDragStart}
-            onCreateCourse={addCourseToCatalog}
-            onUpdateCourse={updateCourseInCatalog}
-            onRemoveCourse={removeCourseFromCatalog}
-            onCreateDistributive={addDistributive}
-            courseLibraries={courseLibraries}
-            activeCourseLibraryId={activeCourseLibraryId}
-            onSelectCourseLibrary={selectCourseLibrary}
-            onCreateCourseLibrary={createCourseLibrary}
-            onRenameCourseLibrary={renameCourseLibrary}
-            onDeleteCourseLibrary={deleteCourseLibrary}
-            onCollapsePanel={() => catalogPanelRef.current?.collapse()}
-          />
-        )}
+        <div className="relative h-full">
+          <div
+            className={cn(
+              SIDE_PANEL_CONTENT_ANIMATION,
+              catalogCollapsed ? 'pointer-events-none opacity-0 -translate-x-3' : 'opacity-100 translate-x-0',
+            )}
+          >
+            <CourseCatalog
+              courses={state.courseCatalog}
+              distributives={state.distributives}
+              plans={state.plans}
+              termSystem={termSystem}
+              colorPalette={state.colorPalette}
+              onAddPaletteColor={addColorToPalette}
+              defaultCourseCredits={defaultCourseCredits}
+              onUpdateDefaultCourseCredits={onUpdateDefaultCourseCredits}
+              onDragStart={onDragStart}
+              onCreateCourse={addCourseToCatalog}
+              onUpdateCourse={updateCourseInCatalog}
+              onRemoveCourse={removeCourseFromCatalog}
+              onCreateDistributive={addDistributive}
+              courseLibraries={courseLibraries}
+              activeCourseLibraryId={activeCourseLibraryId}
+              onSelectCourseLibrary={selectCourseLibrary}
+              onCreateCourseLibrary={createCourseLibrary}
+              onRenameCourseLibrary={renameCourseLibrary}
+              onDeleteCourseLibrary={deleteCourseLibrary}
+              onCollapsePanel={() => catalogPanelRef.current?.collapse()}
+            />
+          </div>
+          <div
+            className={cn(
+              SIDE_PANEL_CONTENT_ANIMATION,
+              catalogCollapsed ? 'opacity-100 translate-x-0' : 'pointer-events-none opacity-0 translate-x-2',
+            )}
+          >
+            <CollapsedRail side="left" ariaLabel="Expand class library" onExpand={() => catalogPanelRef.current?.expand()} />
+          </div>
+        </div>
       </ResizablePanel>
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={78} minSize={50}>
@@ -1404,31 +1442,48 @@ const DesktopPlannerLayout = ({
               onExpand={() => setRequirementsCollapsed(false)}
               style={SIDE_PANEL_TRANSITION}
             >
-              {requirementsCollapsed ? (
-                <CollapsedRail side="right" ariaLabel="Expand requirements" onExpand={() => requirementsPanelRef.current?.expand()} />
-              ) : (
-                <aside className="flex h-full flex-col border-l border-border bg-card">
-                  <div className="flex-1 overflow-y-auto p-6">
-                    <RequirementsSidebar
-                      totalCredits={stats.totalCredits}
-                      maxCredits={state.requirements.totalCredits}
-                      plans={state.plans}
-                      planProgress={stats.planProgress}
-                      distributiveRequirements={state.distributiveRequirements}
-                      distributiveProgress={stats.distributiveProgress}
-                      onAddPlan={onAddPlan}
-                      onUpdatePlan={onUpdatePlan}
-                      onRemovePlan={onRemovePlan}
-                      onAddDistributive={addDistributiveRequirement}
-                      onUpdateDistributive={updateDistributiveRequirement}
-                      onRemoveDistributive={removeDistributiveRequirement}
-                      colorPalette={state.colorPalette}
-                      onAddPaletteColor={addColorToPalette}
-                      onCollapsePanel={() => requirementsPanelRef.current?.collapse()}
-                    />
-                  </div>
-                </aside>
-              )}
+              <div className="relative h-full">
+                <div
+                  className={cn(
+                    SIDE_PANEL_CONTENT_ANIMATION,
+                    requirementsCollapsed
+                      ? 'pointer-events-none opacity-0 translate-x-3'
+                      : 'opacity-100 translate-x-0',
+                  )}
+                >
+                  <aside className="flex h-full flex-col border-l border-border bg-card">
+                    <div className="flex-1 overflow-y-auto p-6">
+                      <RequirementsSidebar
+                        totalCredits={stats.totalCredits}
+                        maxCredits={state.requirements.totalCredits}
+                        plans={state.plans}
+                        planProgress={stats.planProgress}
+                        distributiveRequirements={state.distributiveRequirements}
+                        distributiveProgress={stats.distributiveProgress}
+                        onAddPlan={onAddPlan}
+                        onUpdatePlan={onUpdatePlan}
+                        onRemovePlan={onRemovePlan}
+                        onAddDistributive={addDistributiveRequirement}
+                        onUpdateDistributive={updateDistributiveRequirement}
+                        onRemoveDistributive={removeDistributiveRequirement}
+                        colorPalette={state.colorPalette}
+                        onAddPaletteColor={addColorToPalette}
+                        onCollapsePanel={() => requirementsPanelRef.current?.collapse()}
+                      />
+                    </div>
+                  </aside>
+                </div>
+                <div
+                  className={cn(
+                    SIDE_PANEL_CONTENT_ANIMATION,
+                    requirementsCollapsed
+                      ? 'opacity-100 translate-x-0'
+                      : 'pointer-events-none opacity-0 translate-x-2',
+                  )}
+                >
+                  <CollapsedRail side="right" ariaLabel="Expand requirements" onExpand={() => requirementsPanelRef.current?.expand()} />
+                </div>
+              </div>
             </ResizablePanel>
           </ResizablePanelGroup>
         </div>

@@ -1,4 +1,3 @@
-import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -6,6 +5,8 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Database, Info, Palette, User } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { AboutDialog } from '@/components/AboutDialog';
 
 type ProfileDialogProps = {
   open: boolean;
@@ -258,6 +259,21 @@ export const ProfileDialog = ({
                     <Button asChild variant="outline" className="justify-start sm:justify-center">
                       <a href="/privacy">Privacy Policy</a>
                     </Button>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border bg-muted/30 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">About MajorBuddy</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Meet the folks behind the planner.</p>
+                    </div>
+                    <AboutDialog
+                      trigger={
+                        <Button type="button" variant="outline" size="sm" className="justify-start sm:justify-center">
+                          View about
+                        </Button>
+                      }
+                    />
                   </div>
                 </div>
               </div>
