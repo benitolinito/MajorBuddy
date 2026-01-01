@@ -16,6 +16,7 @@ type TagColorPickerProps = {
   onAddCustomColor?: (hex: string) => string | void;
   layout?: 'grid' | 'carousel';
   showSelectionInfo?: boolean;
+  showAdvancedControls?: boolean;
 };
 
 const sizeVariants = {
@@ -25,7 +26,7 @@ const sizeVariants = {
     gap: 'gap-2',
   },
   compact: {
-    swatch: 'h-9 w-9',
+    swatch: 'h-8 w-8',
     grid: 'grid-cols-6 sm:grid-cols-8',
     gap: 'gap-1.5',
   },
@@ -49,6 +50,7 @@ export const TagColorPicker = ({
   onAddCustomColor,
   layout = 'grid',
   showSelectionInfo = false,
+  showAdvancedControls = true,
 }: TagColorPickerProps) => {
   const { swatch, grid, gap } = sizeVariants[size];
   const colorInputRef = useRef<HTMLInputElement | null>(null);
@@ -153,8 +155,10 @@ export const TagColorPicker = ({
   };
 
   const swatchBaseClass =
-    'relative flex items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2';
-  const swatchShapeClass = isCarousel ? 'h-12 w-12 flex-shrink-0 rounded-2xl' : swatch;
+    'relative flex items-center justify-center rounded-full border p-[2px] sm:p-[3px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-ring focus-visible:ring-offset-background';
+  const swatchShapeClass = isCarousel
+    ? cn('flex-shrink-0 rounded-2xl', size === 'compact' ? 'h-9 w-9' : 'h-11 w-11')
+    : cn('rounded-2xl', swatch);
   const swatchGridClass = isCarousel
     ? 'flex gap-2 overflow-x-auto pb-1 -mx-1 px-1'
     : cn('grid', grid, gap);
@@ -192,12 +196,13 @@ export const TagColorPicker = ({
                   style={{ backgroundColor: swatchEntry.value }}
                   aria-hidden
                 />
-                {isSelected && (
-                  <span
-                    className="relative inline-flex h-2 w-2 rounded-full bg-background shadow-sm"
-                    aria-hidden
-                  />
-                )}
+                <span
+                  className={cn(
+                    'absolute inset-0 rounded-full border-2 border-primary/80 transition-opacity pointer-events-none opacity-0',
+                    isSelected && 'opacity-100',
+                  )}
+                  aria-hidden
+                />
               </button>
             );
           })}
@@ -213,63 +218,65 @@ export const TagColorPicker = ({
         </div>
       )}
 
-      <div className="space-y-3 rounded-2xl border border-border/70 bg-muted/30 p-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span
-              className="inline-flex h-10 w-10 rounded-full border border-white/60 shadow-sm"
-              style={{ backgroundColor: previewColor }}
-              aria-hidden
-            />
-            <div className="leading-tight">
-              <p className="text-xs font-medium text-muted-foreground">Custom color</p>
-              <p className="text-sm font-semibold text-foreground">{previewColor}</p>
+      {showAdvancedControls && (
+        <div className="space-y-3 rounded-2xl border border-border/70 bg-muted/30 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span
+                className="inline-flex h-10 w-10 rounded-full border border-white/60 shadow-sm"
+                style={{ backgroundColor: previewColor }}
+                aria-hidden
+              />
+              <div className="leading-tight">
+                <p className="text-xs font-medium text-muted-foreground">Custom color</p>
+                <p className="text-sm font-semibold text-foreground">{previewColor}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => colorInputRef.current?.click()}
+                disabled={disabled}
+              >
+                <Pipette className="mr-2 h-3.5 w-3.5" aria-hidden />
+                Pick color
+              </Button>
+              <input
+                ref={colorInputRef}
+                type="color"
+                className="sr-only"
+                value={previewColor}
+                onChange={(event) => handleCustomColorPick(event.target.value)}
+              />
             </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              value={customColorInput}
+              onChange={(event) => handleCustomColorInput(event.target.value)}
+              placeholder="#123abc"
+              className="font-mono text-sm"
+              disabled={disabled}
+            />
             <Button
               type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => colorInputRef.current?.click()}
-              disabled={disabled}
+              onClick={handleAddCustomColor}
+              disabled={disabled || !canAddCustomColor}
+              className="sm:w-auto"
             >
-              <Pipette className="mr-2 h-3.5 w-3.5" aria-hidden />
-              Pick color
+              <Plus className="mr-2 h-4 w-4" aria-hidden />
+              Save to palette
             </Button>
-            <input
-              ref={colorInputRef}
-              type="color"
-              className="sr-only"
-              value={previewColor}
-              onChange={(event) => handleCustomColorPick(event.target.value)}
-            />
           </div>
-        </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Input
-            value={customColorInput}
-            onChange={(event) => handleCustomColorInput(event.target.value)}
-            placeholder="#123abc"
-            className="font-mono text-sm"
-            disabled={disabled}
-          />
-          <Button
-            type="button"
-            onClick={handleAddCustomColor}
-            disabled={disabled || !canAddCustomColor}
-            className="sm:w-auto"
-          >
-            <Plus className="mr-2 h-4 w-4" aria-hidden />
-            Save to palette
-          </Button>
+          <p className="text-[11px] text-muted-foreground">
+            Saved custom colors show up with the presets above in every picker.
+          </p>
         </div>
-
-        <p className="text-[11px] text-muted-foreground">
-          Saved custom colors show up with the presets above in every picker.
-        </p>
-      </div>
+      )}
     </div>
   );
 };

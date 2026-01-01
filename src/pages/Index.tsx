@@ -196,7 +196,7 @@ const Index = () => {
   const shareSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userLabel = user?.displayName || user?.email || undefined;
   const cloudBusy = cloudSaving || cloudLoading || authBusy;
-  const canRemoveYear = state.years.length > 1;
+  const canRemoveYear = state.years.length > 0;
   const isMobile = useIsMobile();
   const termSystem = state.config?.termSystem ?? 'semester';
   const activePlanProfile = planProfiles.find((profile) => profile.id === activePlanProfileId);

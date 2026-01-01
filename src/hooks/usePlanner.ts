@@ -1960,9 +1960,9 @@ export const usePlanner = () => {
 
   const removeYear = useCallback((yearId: string) => {
     setState((prev) => {
-      if (prev.years.length <= 1) return prev;
       const remainingYears = prev.years.filter((year) => year.id !== yearId);
-      if (remainingYears.length === prev.years.length || remainingYears.length === 0) return prev;
+      if (remainingYears.length === prev.years.length) return prev;
+
       const maxEndYear = remainingYears.reduce((max, year) => {
         const candidate = Number.isFinite(year.endYear)
           ? Number(year.endYear)
@@ -1972,7 +1972,9 @@ export const usePlanner = () => {
         return Math.max(max, candidate);
       }, 0);
 
-      const nextClassYear = maxEndYear > 0 ? maxEndYear : prev.classYear;
+      const fallbackClassYear =
+        Number.isFinite(prev.config?.startYear) ? Number(prev.config?.startYear) + 4 : createDefaultConfig().startYear + 4;
+      const nextClassYear = remainingYears.length > 0 ? (maxEndYear > 0 ? maxEndYear : prev.classYear) : fallbackClassYear;
 
       return {
         ...prev,

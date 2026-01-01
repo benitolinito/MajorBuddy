@@ -243,7 +243,7 @@ export const RequirementsSidebar = ({
       </div>
 
       <div className="space-y-3">
-        <p className="text-xs font-medium text-muted-foreground">Majors &amp; minors</p>
+        <p className="text-xs font-medium text-muted-foreground">Majors &amp; Minors</p>
         {sortedPlans.length === 0 ? (
           <div className="text-xs text-muted-foreground bg-muted/50 border border-dashed border-border rounded-lg p-3">
             Add a major or minor to track here.
@@ -273,7 +273,7 @@ export const RequirementsSidebar = ({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute right-3 bottom-3 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-transparent focus-visible:bg-transparent"
+                  className="absolute right-3 top-3 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-transparent focus-visible:bg-transparent"
                   onClick={() => {
                     setEditingPlan(plan);
                     setPlanName(plan.name);
@@ -418,27 +418,29 @@ export const RequirementsSidebar = ({
       </div>
 
       <Dialog open={showDialog} onOpenChange={handleDialogChange}>
-        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingPlan ? `Edit ${editingPlan.name}` : 'Add a major or minor'}</DialogTitle>
-            <DialogDescription>
-              Set how many classes you need, add optional credits, and pick a color for quick tagging.
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader className="space-y-1.5">
+            <DialogTitle className="text-base font-semibold">
+              {editingPlan ? `Edit ${editingPlan.name}` : 'Add a major or minor'}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Set a class goal, optional credits, and a badge color.
             </DialogDescription>
           </DialogHeader>
 
           <form
-            className="space-y-4"
+            className="space-y-3"
             onSubmit={(event) => {
               event.preventDefault();
               handleSavePlan();
             }}
           >
-            <div className="flex gap-2">
+            <div className="grid grid-cols-2 gap-1.5">
               <Button
                 type="button"
                 variant={planType === 'major' ? 'default' : 'outline'}
                 size="sm"
-                className="flex-1"
+                className="w-full"
                 onClick={() => setPlanType('major')}
               >
                 Major
@@ -447,14 +449,14 @@ export const RequirementsSidebar = ({
                 type="button"
                 variant={planType === 'minor' ? 'default' : 'outline'}
                 size="sm"
-                className="flex-1"
+                className="w-full"
                 onClick={() => setPlanType('minor')}
               >
                 Minor
               </Button>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="plan-name">Title</Label>
               <Input
                 id="plan-name"
@@ -465,8 +467,8 @@ export const RequirementsSidebar = ({
               />
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="plan-classes">Classes needed</Label>
                 <Input
                   id="plan-classes"
@@ -476,9 +478,8 @@ export const RequirementsSidebar = ({
                   onChange={(e) => setClassesNeeded(e.target.value)}
                   required
                 />
-                <p className="text-[11px] text-muted-foreground">Required so we can chart progress.</p>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="plan-credits">Credits (optional)</Label>
                 <Input
                   id="plan-credits"
@@ -488,43 +489,46 @@ export const RequirementsSidebar = ({
                   onChange={(e) => setPlanCredits(e.target.value)}
                   placeholder="e.g., 48"
                 />
-                <p className="text-[11px] text-muted-foreground">Skip if you only track classes.</p>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Color</Label>
-              <p className="text-[11px] text-muted-foreground">{colorHelperText}</p>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label>Color</Label>
+                <p className="text-[11px] text-muted-foreground">Used on plan badges</p>
+              </div>
               <TagColorPicker
                 value={colorChoice}
-                onSelect={(colorId) => {
-                  if (colorId) setColorChoice(colorId);
-                }}
+                onSelect={(colorId) => colorId && setColorChoice(colorId)}
                 customColors={colorPalette}
                 onAddCustomColor={(hex) => {
                   const added = onAddPaletteColor(hex);
-                  if (added) {
-                    setColorChoice(added);
-                  } else {
-                    setColorChoice(hex);
-                  }
+                  setColorChoice(added || hex);
                 }}
               />
             </div>
 
-            <div className="flex justify-between gap-2 pt-2">
+            <div className="flex justify-between gap-2 pt-1">
               {editingPlan ? (
-                <Button type="button" variant="destructive" onClick={() => { onRemovePlan(editingPlan.id); handleDialogChange(false); }}>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    onRemovePlan(editingPlan.id);
+                    handleDialogChange(false);
+                  }}
+                >
                   Delete
                 </Button>
               ) : (
                 <span />
               )}
               <div className="flex gap-2">
-                <Button type="button" variant="ghost" onClick={() => handleDialogChange(false)}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => handleDialogChange(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={!canSavePlan}>
+                <Button type="submit" size="sm" disabled={!canSavePlan}>
                   {editingPlan ? 'Save changes' : 'Save plan'}
                 </Button>
               </div>

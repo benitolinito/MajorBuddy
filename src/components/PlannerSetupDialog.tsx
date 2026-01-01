@@ -266,7 +266,7 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose?.()}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" hideClose={!onClose}>
-        <DialogHeader>
+        <DialogHeader className="space-y-1">
           <DialogTitle>Set up your planner</DialogTitle>
           <DialogDescription>
             Tell us how you want to plan so we can build the right term layout. We&apos;ll remember this on your device
@@ -274,9 +274,9 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
           </DialogDescription>
         </DialogHeader>
 
-        <form className="space-y-5 pb-2" onSubmit={handleSubmit}>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
+        <form className="space-y-4 pb-1" onSubmit={handleSubmit}>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <div className="space-y-1.5">
               <Label htmlFor="plan-name">Plan name</Label>
               <Input
                 id="plan-name"
@@ -286,7 +286,7 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
                 placeholder="e.g., Math & CS"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="university">School</Label>
               <div className="relative">
                 <Input
@@ -324,40 +324,79 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="start-year">Starting academic year</Label>
-              <div className="relative">
-                <Input
-                  id="start-year"
-                  type="number"
-                  min={2000}
-                  max={3000}
-                  value={startYear}
-                  onChange={(e) => setStartYear(e.target.value)}
-                  className="pr-12"
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="start-year">Starting academic year</Label>
+                <div className="relative">
+                  <Input
+                    id="start-year"
+                    type="number"
+                    min={2000}
+                    max={3000}
+                    value={startYear}
+                    onChange={(e) => setStartYear(e.target.value)}
+                    className="pr-12"
+                  />
+                  <StepperButtons
+                    increaseLabel="Increase start year"
+                    decreaseLabel="Decrease start year"
+                    onIncrement={() => stepNumericField(setStartYear, 1, fallbackDefaults.startYear, 2000, 3000)}
+                    onDecrement={() => stepNumericField(setStartYear, -1, fallbackDefaults.startYear, 2000, 3000)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                <Label htmlFor="school-logo">School logo (optional)</Label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Avatar className="h-12 w-12 rounded-2xl border border-border bg-muted">
+                    {universityLogo ? (
+                      <AvatarImage src={universityLogo} alt={`${university || 'School'} logo`} className="object-cover" />
+                    ) : (
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        <GraduationCap className="h-5 w-5" />
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Button type="button" onClick={() => logoInputRef.current?.click()}>
+                      {universityLogo ? "Replace logo" : "Upload logo"}
+                    </Button>
+                    {universityLogo ? (
+                      <Button type="button" variant="ghost" onClick={handleClearLogo}>
+                        Remove
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+                <input
+                  ref={logoInputRef}
+                  id="school-logo"
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={handleLogoChange}
                 />
-                <StepperButtons
-                  increaseLabel="Increase start year"
-                  decreaseLabel="Decrease start year"
-                  onIncrement={() => stepNumericField(setStartYear, 1, fallbackDefaults.startYear, 2000, 3000)}
-                  onDecrement={() => stepNumericField(setStartYear, -1, fallbackDefaults.startYear, 2000, 3000)}
-                />
+                <p className="text-xs text-muted-foreground">
+                  SVG or PNG with a transparent background works best. Max file size 512 KB.
+                </p>
+                {logoError ? <p className="text-xs text-destructive">{logoError}</p> : null}
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <Label className="block">Academic calendar</Label>
               <RadioGroup
                 value={termSystem}
                 onValueChange={(value) =>
                   setTermSystem(value === "quarter" ? "quarter" : value === "semester" ? "semester" : "")
                 }
-                className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+                className="flex flex-col gap-2.5"
               >
                 <Label
                   htmlFor="term-semester"
-                  className={`flex cursor-pointer flex-col items-start gap-2 rounded-lg border p-3 text-left transition ${
+                  className={`flex cursor-pointer flex-col items-start gap-1.5 rounded-lg border p-2.5 text-left transition ${
                     termSystem === "semester"
                       ? "border-primary bg-primary/10 shadow-sm"
                       : "border-border hover:border-primary/60 hover:bg-primary/5"
@@ -371,7 +410,7 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
                 </Label>
                 <Label
                   htmlFor="term-quarter"
-                  className={`flex cursor-pointer flex-col items-start gap-2 rounded-lg border p-3 text-left transition ${
+                  className={`flex cursor-pointer flex-col items-start gap-1.5 rounded-lg border p-2.5 text-left transition ${
                     termSystem === "quarter"
                       ? "border-primary bg-primary/10 shadow-sm"
                       : "border-border hover:border-primary/60 hover:bg-primary/5"
@@ -387,47 +426,10 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
             </div>
           </div>
 
-          <div className="space-y-3">
-            <Label htmlFor="school-logo">School logo (optional)</Label>
-            <div className="flex flex-wrap items-center gap-3">
-              <Avatar className="h-14 w-14 rounded-2xl border border-border bg-muted">
-                {universityLogo ? (
-                  <AvatarImage src={universityLogo} alt={`${university || 'School'} logo`} className="object-cover" />
-                ) : (
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    <GraduationCap className="h-5 w-5" />
-                  </AvatarFallback>
-                )}
-              </Avatar>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" onClick={() => logoInputRef.current?.click()}>
-                  {universityLogo ? "Replace logo" : "Upload logo"}
-                </Button>
-                {universityLogo ? (
-                  <Button type="button" variant="ghost" onClick={handleClearLogo}>
-                    Remove
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-            <input
-              ref={logoInputRef}
-              id="school-logo"
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              onChange={handleLogoChange}
-            />
-            <p className="text-xs text-muted-foreground">
-              SVG or PNG with a transparent background works best. Max file size 512 KB.
-            </p>
-            {logoError ? <p className="text-xs text-destructive">{logoError}</p> : null}
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <div className="space-y-1.5">
               <Label htmlFor="classes-per-term">Classes per term</Label>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Input
                   id="classes-per-term"
                   type="number"
@@ -440,9 +442,9 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="total-credits">Credits to graduate</Label>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Input
                   id="total-credits"
                   type="number"
@@ -457,8 +459,8 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
           </div>
 
           {onReset ? (
-            <div className="rounded-lg border border-border bg-muted/30 p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="rounded-lg border border-border bg-muted/30 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-foreground">Reset schedule</p>
                   <p className="text-xs text-muted-foreground">
@@ -486,7 +488,7 @@ export const PlannerSetupDialog = ({ open, onClose, onSave, initialConfig, onRes
             </div>
           ) : null}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-1.5 pt-1.5">
             {onClose && (
               <Button type="button" variant="ghost" onClick={onClose}>
                 Cancel
